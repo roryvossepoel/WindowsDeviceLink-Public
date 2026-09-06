@@ -1,11 +1,31 @@
 # WindowsDeviceLink
 
+[![PowerShell Gallery Version](https://img.shields.io/powershellgallery/v/WindowsDeviceLink?include_prereleases&label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/WindowsDeviceLink)
+[![PowerShell Gallery Downloads](https://img.shields.io/powershellgallery/dt/WindowsDeviceLink)](https://www.powershellgallery.com/packages/WindowsDeviceLink)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 PowerShell module for **pre-associating physical Windows devices with a Microsoft Intune tenant for Windows Autopilot Device Preparation Device Association**.
 
 WindowsDeviceLink can generate the TPM-backed DeviceLink identity from a device, export the official Windows `.devicelink.csv`, or submit the DeviceLink directly to Intune through Microsoft Graph before the device enrolls.
 
 > [!IMPORTANT]
 > This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the online registration uses a Microsoft Graph beta endpoint. Both can change without notice.
+
+## Install from PowerShell Gallery
+
+```powershell
+Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease
+```
+
+Then verify the installation:
+
+```powershell
+Import-Module WindowsDeviceLink
+Get-Module WindowsDeviceLink | Select-Object Name, Version, Path
+Test-WindowsDeviceLinkSupport
+```
+
+PowerShell Gallery: [WindowsDeviceLink](https://www.powershellgallery.com/packages/WindowsDeviceLink)
 
 ## What this module is for
 
@@ -65,8 +85,6 @@ See [`src/WindowsDeviceLink/Runtime/README.md`](src/WindowsDeviceLink/Runtime/RE
 ## Quick start
 
 ```powershell
-Import-Module .\src\WindowsDeviceLink\WindowsDeviceLink.psd1 -Force
-
 Test-WindowsDeviceLinkSupport
 Get-WindowsDeviceLink
 ```
