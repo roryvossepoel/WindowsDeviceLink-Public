@@ -1,0 +1,11 @@
+*.devicelink.csv
+*.log
+*.pfx
+*.p12
+*.cer
+*.key
+DeviceLink-result.txt
+out/
+.vs/
+.vscode/
+Windows.Management.Service.dll
