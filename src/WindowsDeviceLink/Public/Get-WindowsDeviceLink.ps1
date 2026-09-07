@@ -143,6 +143,9 @@ function Get-WindowsDeviceLink {
             }
             'Webhook' {
                 if (-not $WebhookUri) { throw '-WebhookUri is required for -Method Webhook.' }
+                if (-not $PSBoundParameters.ContainsKey('WebhookApiKey')) {
+                    Write-Warning 'No -WebhookApiKey was supplied. A webhook API key is strongly recommended unless equivalent protection is implemented at the webhook endpoint.'
+                }
             }
         }
     }
@@ -195,10 +198,6 @@ function Get-WindowsDeviceLink {
     }
 
     if ($Method -eq 'Webhook') {
-        if (-not $PSBoundParameters.ContainsKey('WebhookApiKey')) {
-            Write-Warning 'No -WebhookApiKey was supplied. Use an API key unless the webhook endpoint has equivalent request protection.'
-        }
-
         $webhookParameters = @{
             InputObject = $deviceLink
             WebhookUri  = $WebhookUri
