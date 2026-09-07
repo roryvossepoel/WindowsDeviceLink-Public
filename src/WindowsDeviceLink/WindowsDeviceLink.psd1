@@ -1,6 +1,6 @@
 @{
     RootModule        = 'WindowsDeviceLink.psm1'
-    ModuleVersion     = '0.3.12'
+    ModuleVersion     = '0.4.0'
     GUID              = '776a2252-d4f4-495d-9445-ac3195ebbf46'
     Author            = 'Rory Vossepoel'
     CompanyName       = 'Community'
@@ -20,7 +20,7 @@
     AliasesToExport   = @()
     PrivateData       = @{
         PSData = @{
-            Tags       = @('Windows', 'WinPE', 'Intune', 'Autopilot', 'DevicePreparation', 'DeviceLink', 'DeviceAssociation')
+            Tags       = @('Windows', 'WinPE', 'Intune', 'Autopilot', 'DevicePreparation', 'DeviceLink', 'DeviceAssociation', 'Webhook')
             LicenseUri = 'https://github.com/roryvossepoel/WindowsDeviceLink-Public/blob/main/LICENSE'
             ProjectUri = 'https://github.com/roryvossepoel/WindowsDeviceLink-Public'
             Prerelease = 'preview1'
