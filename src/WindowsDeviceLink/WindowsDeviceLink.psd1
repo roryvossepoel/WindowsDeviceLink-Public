@@ -5,7 +5,7 @@
     Author            = 'Rory Vossepoel'
     CompanyName       = 'Community'
     Copyright         = '(c) 2026 Rory Vossepoel. MIT License.'
-    Description       = 'Generate DeviceLink identity, export the official CSV, and pre-associate physical Windows devices for Windows Autopilot Device Preparation Device Association directly or through a webhook automation layer.'
+    Description       = 'Generate TPM-backed DeviceLink identity information, export the official Windows-generated .devicelink.csv, and pre-associate physical Windows devices with Microsoft Intune for Windows Autopilot Device Preparation Device Association. Supports AMD64 Windows 11 and Windows PE, multiple online authentication methods, and optional webhook-based registration for unattended and multi-tenant automation.'
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop')
     FunctionsToExport = @(
