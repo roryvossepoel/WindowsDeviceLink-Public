@@ -220,17 +220,22 @@ function Get-WindowsDeviceLink {
         return Invoke-WindowsDeviceLinkGraphRegistration -InputObject $deviceLink -AccessToken $token.AccessToken -TenantId $TenantId
     }
 
+    if ($Method -eq 'ClientSecret') {
+        if ($Environment -ne 'Global') {
+            throw 'Native client-secret authentication currently supports the Global Microsoft cloud only.'
+        }
+
+        Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication (Microsoft.Graph.Authentication is not required).'
+        $token = Get-WindowsDeviceLinkClientSecretToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
+        return Invoke-WindowsDeviceLinkGraphRegistration -InputObject $deviceLink -AccessToken $token.AccessToken -TenantId $TenantId
+    }
+
     if ($support.Environment -eq 'WindowsPE') {
         if ($Environment -ne 'Global') {
             throw 'Native WinPE authentication currently supports the Global Microsoft cloud only.'
         }
 
         switch ($Method) {
-            'ClientSecret' {
-                Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication for WinPE (Microsoft.Graph.Authentication is not required).'
-                $token = Get-WindowsDeviceLinkClientSecretToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
-                return Invoke-WindowsDeviceLinkGraphRegistration -InputObject $deviceLink -AccessToken $token.AccessToken -TenantId $TenantId
-            }
             'AccessToken' {
                 $credential = New-Object System.Management.Automation.PSCredential('token', $AccessToken)
                 $plainToken = $credential.GetNetworkCredential().Password
@@ -286,11 +291,6 @@ function Get-WindowsDeviceLink {
             $connectParams.ClientId = $ClientId
             $connectParams.CertificateSubjectName = $CertificateSubjectName
             $connectParams.SendCertificateChain = $SendCertificateChain
-        }
-        'ClientSecret' {
-            $connectParams.TenantId = $TenantId
-            $connectParams.ClientId = $ClientId
-            $connectParams.ClientSecret = $ClientSecret
         }
         'ManagedIdentity' {
             $connectParams.Identity = $true
