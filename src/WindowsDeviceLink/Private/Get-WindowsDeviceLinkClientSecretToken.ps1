@@ -19,6 +19,7 @@ function Get-WindowsDeviceLinkClientSecretToken {
 
     $credential = New-Object System.Management.Automation.PSCredential($ClientId, $ClientSecret)
     $plainSecret = $credential.GetNetworkCredential().Password
+    $response = $null
 
     try {
         $response = Invoke-RestMethod `
@@ -33,13 +34,16 @@ function Get-WindowsDeviceLinkClientSecretToken {
             } `
             -ErrorAction Stop
     }
+    catch {
+        throw "Client-secret authentication failed for tenant '$TenantId' and client '$ClientId'. $($_.Exception.Message)"
+    }
     finally {
         $plainSecret = $null
         $credential = $null
     }
 
-    if (-not $response.access_token) {
-        throw 'Client-secret authentication succeeded without returning an access token.'
+    if (-not $response -or -not $response.access_token) {
+        throw 'Client-secret authentication completed without returning an access token.'
     }
 
     [pscustomobject]@{
