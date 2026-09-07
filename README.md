@@ -13,7 +13,7 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 
 ## Install from PowerShell Gallery
 
-The currently published Gallery version is `0.3.12-preview1`. The `0.4.0-preview1` webhook work is currently available from this repository for validation before the next Gallery publish.
+The currently published Gallery preview is `0.4.0-preview1`.
 
 ```powershell
 Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease
@@ -27,7 +27,7 @@ Get-Module WindowsDeviceLink | Select-Object Name, Version, Path
 Test-WindowsDeviceLinkSupport
 ```
 
-PowerShell Gallery: [WindowsDeviceLink](https://www.powershellgallery.com/packages/WindowsDeviceLink)
+This repository may contain post-`0.4.0-preview1` development changes before the next Gallery preview is published.
 
 ## What this module is for
 
@@ -52,6 +52,8 @@ This is **not** classic Windows Autopilot V1 hardware-hash registration.
 - Include an optional API key in the `X-WindowsDeviceLink-Key` header.
 - Use explicit online methods so each flow only accepts its relevant parameters.
 - Detect whether the current Windows / WinPE environment can access the DeviceLink runtime.
+
+See [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) for guidance on choosing an online method.
 
 ## Important WinPE note
 
@@ -111,12 +113,6 @@ Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 
 Windows itself generates the CSV through `ExportDeviceLinkInfoCsvAsync`. WindowsDeviceLink does not reconstruct or re-encode the CSV.
 
-Example filename:
-
-```text
-ABC1234_Contoso-Computers_Model-123_2026-09-06.devicelink.csv
-```
-
 ## Online mode
 
 Starting with `0.4.0-preview1`, `-Online` requires an explicit `-Method`.
@@ -137,12 +133,12 @@ Supported methods:
 | `CertificateThumbprint` | `TenantId`, `ClientId`, `CertificateThumbprint` |
 | `CertificateSubjectName` | `TenantId`, `ClientId`, `CertificateSubjectName` |
 | `EnvironmentVariable` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` |
-| `ManagedIdentity` | no required additional parameter; optional `ClientId` |
+| `ManagedIdentity` | optional `ClientId` |
 | `Webhook` | `WebhookUri`; optional `WebhookApiKey` and `TenantId` |
 
 Parameters that do not belong to the selected method are rejected before DeviceLink generation starts.
 
-### Direct DeviceCode example
+### Device code
 
 ```powershell
 Get-WindowsDeviceLink `
@@ -151,83 +147,7 @@ Get-WindowsDeviceLink `
     -TenantId '<tenant-id>'
 ```
 
-The module submits the DeviceLink to:
-
-```text
-POST /beta/deviceManagement/tenantAssociatedDevices/importTenantAssociatedDevice
-```
-
-A successful response normally returns `AssociationState : preassociated`.
-
-### Client secret example
-
-```powershell
-$secret = Read-Host 'Client secret' -AsSecureString
-
-Get-WindowsDeviceLink `
-    -Online `
-    -Method ClientSecret `
-    -TenantId '<tenant-id>' `
-    -ClientId '<app-id>' `
-    -ClientSecret $secret
-```
-
-### Existing access token
-
-```powershell
-$token = ConvertTo-SecureString '<access-token>' -AsPlainText -Force
-
-Get-WindowsDeviceLink `
-    -Online `
-    -Method AccessToken `
-    -TenantId '<tenant-id>' `
-    -AccessToken $token
-```
-
-### Environment variables
-
-Required variables:
-
-```text
-AZURE_TENANT_ID
-AZURE_CLIENT_ID
-AZURE_CLIENT_SECRET
-```
-
-Then:
-
-```powershell
-Get-WindowsDeviceLink -Online -Method EnvironmentVariable
-```
-
-## Webhook automation
-
-The webhook method is an optional transport for unattended or centralized workflows where Graph credentials should not exist on the Windows / WinPE device.
-
-```text
-Windows / WinPE
-    -> WindowsDeviceLink
-    -> HTTPS webhook
-    -> automation / runbook
-    -> tenant routing and centralized authentication
-    -> Microsoft Graph
-    -> DeviceLink pre-association
-```
-
-On the device only the webhook connection information is required. The device does **not** need a Graph client secret, Graph certificate, or DeviceCode interaction when using `-Method Webhook`.
-
-### Basic webhook call
-
-```powershell
-Get-WindowsDeviceLink `
-    -Online `
-    -Method Webhook `
-    -WebhookUri '<webhook-url>'
-```
-
-### Webhook with API key and tenant routing
-
-For unattended use, obtain the API key from your deployment or secrets mechanism instead of prompting for it.
+### Webhook
 
 ```powershell
 $webhookKey = $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY
@@ -240,31 +160,9 @@ Get-WindowsDeviceLink `
     -TenantId '<target-tenant-id>'
 ```
 
-`WebhookApiKey` is optional at module level because some webhook platforms already provide their own authentication. When supplied, it is sent only in:
+The receiving automation layer owns tenant routing and Graph authentication. No Graph certificate, client secret, or DeviceCode interaction is required on the device when `-Method Webhook` is used.
 
-```text
-X-WindowsDeviceLink-Key
-```
-
-It is not added to the JSON body.
-
-`TenantId` is optional for webhook mode. It is routing information for the receiving automation layer, not local Graph authentication on the device.
-
-### Webhook payload
-
-Schema version 1 contains:
-
-- request ID and request type;
-- optional target tenant ID;
-- serial number;
-- manufacturer / model;
-- SMBIOS UUID;
-- Link ID;
-- DeviceLink creation time;
-- complete base64 DeviceLink payload;
-- source environment, architecture, module version, PowerShell version and DeviceLink DLL/runtime information.
-
-Only the actual `deviceLink` needs to be forwarded to the Graph import action. The additional fields are available for routing, diagnostics and optional logging/CMDB integration.
+The webhook schema is documented in [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Included Azure Automation receiver
 
@@ -286,24 +184,25 @@ The sample receiver supports:
 - Graph DeviceLink pre-association;
 - targeted duplicate / HTTP 409 errors.
 
-The receiving runbook is an optional companion. WindowsDeviceLink does not require Azure Automation for local generation, CSV export or direct Graph registration.
-
 ## Validation status
 
-The original direct methods have been validated successfully on both Windows 11 and AMD64 Windows PE in the 0.3.x line.
+The direct methods were validated successfully on both Windows 11 and AMD64 Windows PE in the 0.3.x line.
 
-The `0.4.0-preview1` webhook route has been validated end-to-end on Windows 11 with:
+The webhook route has been validated end-to-end on Windows 11 with:
 
 - webhook transport;
 - request headers and JSON payload;
 - API-key validation;
 - incorrect API-key rejection before Graph registration;
 - tenant configuration routing;
-- Azure Automation Runtime Environment using PowerShell 7.4 and `Microsoft.Graph.Authentication`;
+- Azure Automation PowerShell 7.4 Runtime Environment;
+- `Microsoft.Graph.Authentication`;
 - Managed Identity Graph authentication;
 - successful DeviceLink pre-association returning `associationState = preassociated`.
 
-See [`TESTING.md`](TESTING.md) for the validation matrix and remaining regression items.
+Post-0.4.0 development also adds a reusable parameter regression suite, a formal schema v1 contract, method-selection guidance, and more targeted webhook transport errors.
+
+See [`TESTING.md`](TESTING.md) for the validation matrix.
 
 ## Public commands
 
@@ -317,9 +216,7 @@ See [`TESTING.md`](TESTING.md) for the validation matrix and remaining regressio
 
 ## Scope
 
-Repository preview: `0.4.0-preview1`.
-
-Currently published PowerShell Gallery preview: `0.3.12-preview1`.
+Currently published PowerShell Gallery preview: `0.4.0-preview1`.
 
 In scope:
 
@@ -337,7 +234,7 @@ Not currently in scope:
 - ARM64;
 - Device Preparation policy assignment;
 - association completion / UEFI write operations;
-- association removal / decommissioning;
+- association removal / decommissioning until the correct Device Association delete API is verified;
 - production support guarantees.
 
 ## License
