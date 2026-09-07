@@ -4,8 +4,6 @@ Last updated: 2026-09-07
 
 The primary Windows Autopilot Device Preparation Device Association **pre-association** workflow has been validated successfully on both Windows 11 and AMD64 Windows PE.
 
-For the reusable online parameter regression set, use `tests/Online-Method-Validation.ps1` in the development repository. The public repository documents the validated outcomes below.
-
 ## Confirmed direct functionality
 
 | Area | Windows 11 | Windows PE |
@@ -41,6 +39,17 @@ Validated parameter behavior:
 | `-Method AccessToken` without token | Pass - rejected with targeted error. |
 
 The complete parameter regression set passed on 2026-09-07.
+
+### Live direct-method regression
+
+The following preview flows were repeated successfully on Windows 11:
+
+- `-Method DeviceCode` -> native OAuth -> direct Graph registration -> `preassociated`;
+- duplicate DeviceCode registration -> targeted HTTP 409 error;
+- `-Method ClientSecret` -> native OAuth client credentials -> direct Graph REST -> `preassociated`;
+- duplicate ClientSecret registration -> targeted HTTP 409 error.
+
+The ClientSecret route now uses native OAuth + REST on both Windows and WinPE and does not require `Microsoft.Graph.Authentication`.
 
 ## Webhook validation
 
@@ -83,12 +92,11 @@ The complete Windows 11 webhook route was repeated successfully against the 0.4.
 - The public repository and PowerShell Gallery package do **not** redistribute `Windows.Management.Service.dll`; WinPE users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
 - Device-code authentication uses direct OAuth 2.0 + Graph REST.
-- WinPE client-secret, access-token and environment-variable flows avoid Graph SDK bootstrapping where practical.
+- Client-secret authentication uses native OAuth client credentials + direct Graph REST on both Windows and WinPE.
 
 ## Remaining validation
 
-- Repeat successful direct `DeviceCode` flow using `-Method DeviceCode`.
-- Repeat app-only flows using their explicit `-Method` values.
+- Repeat remaining app-only flows using their explicit `-Method` values.
 - Validate webhook transport in AMD64 WinPE.
 - Validate a second target tenant through the same webhook/runbook routing table.
 - Additional Windows 11 and WinPE builds.
