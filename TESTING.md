@@ -42,16 +42,21 @@ The complete parameter regression set passed on 2026-09-07.
 
 ### Live direct-method regression
 
-The following preview flows were repeated successfully on Windows 11:
+The following `0.4.1-preview1` flows were repeated successfully on Windows 11:
 
 - `-Method DeviceCode` -> native OAuth -> direct Graph registration -> `preassociated`;
-- duplicate DeviceCode registration -> targeted HTTP 409 error;
 - `-Method ClientSecret` -> native OAuth client credentials -> direct Graph REST -> `preassociated`;
-- duplicate ClientSecret registration -> targeted HTTP 409 error;
-- `-Method AccessToken` with an externally obtained app-only token -> Graph -> `preassociated`;
-- duplicate AccessToken registration -> targeted HTTP 409 error.
+- `-Method AccessToken` -> externally obtained app-only token -> Graph -> `preassociated`;
+- `-Method EnvironmentVariable` -> environment-sourced client credentials -> native OAuth -> direct Graph REST -> `preassociated`;
+- `-Method Certificate` -> certificate authentication -> `preassociated`;
+- `-Method CertificateThumbprint` -> certificate-store lookup -> `preassociated`;
+- `-Method CertificateSubjectName` -> certificate-store lookup -> `preassociated`.
 
-The ClientSecret route now uses native OAuth + REST on both Windows and WinPE and does not require `Microsoft.Graph.Authentication`.
+Each of these direct methods also produced the targeted HTTP 409 duplicate error when the DeviceLink pre-association already existed.
+
+ClientSecret and EnvironmentVariable now use native OAuth + direct Graph REST on both Windows and WinPE and do not require `Microsoft.Graph.Authentication` for those methods.
+
+`Interactive` and local `ManagedIdentity` remain lower priority because they depend on different user/host conditions and are not required for the primary endpoint and WinPE scenarios.
 
 ## Webhook validation
 
@@ -85,7 +90,7 @@ Confirmed sample Azure Automation receiver behavior:
 - `associationState = preassociated` returned;
 - targeted duplicate / HTTP 409 handling.
 
-The complete Windows 11 webhook route was repeated successfully against the 0.4.1 preview code on 2026-09-07.
+The complete Windows 11 webhook route was repeated successfully against `0.4.1-preview1` on 2026-09-07.
 
 ## Notes
 
@@ -94,11 +99,10 @@ The complete Windows 11 webhook route was repeated successfully against the 0.4.
 - The public repository and PowerShell Gallery package do **not** redistribute `Windows.Management.Service.dll`; WinPE users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
 - Device-code authentication uses direct OAuth 2.0 + Graph REST.
-- Client-secret authentication uses native OAuth client credentials + direct Graph REST on both Windows and WinPE.
+- Client-secret and environment-variable authentication use native OAuth client credentials + direct Graph REST on both Windows and WinPE.
 
 ## Remaining validation
 
-- Repeat remaining app-only flows using their explicit `-Method` values.
 - Validate webhook transport in AMD64 WinPE.
 - Validate a second target tenant through the same webhook/runbook routing table.
 - Additional Windows 11 and WinPE builds.
