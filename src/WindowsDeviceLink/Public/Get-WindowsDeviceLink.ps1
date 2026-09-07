@@ -12,15 +12,25 @@ function Get-WindowsDeviceLink {
 
         [switch]$Online,
 
+        [ValidateSet(
+            'DeviceCode',
+            'Interactive',
+            'ClientSecret',
+            'AccessToken',
+            'Certificate',
+            'CertificateThumbprint',
+            'CertificateSubjectName',
+            'EnvironmentVariable',
+            'ManagedIdentity',
+            'Webhook'
+        )]
+        [string]$Method,
+
         [ValidateNotNullOrEmpty()]
         [string]$TenantId,
 
         [ValidateNotNullOrEmpty()]
         [string]$ClientId,
-
-        [switch]$Interactive,
-
-        [switch]$UseDeviceCode,
 
         [securestring]$AccessToken,
 
@@ -36,9 +46,10 @@ function Get-WindowsDeviceLink {
 
         [securestring]$ClientSecret,
 
-        [switch]$Identity,
+        [uri]$WebhookUri,
 
-        [switch]$EnvironmentVariable,
+        [ValidateNotNullOrEmpty()]
+        [string]$WebhookApiKey,
 
         [ValidateNotNullOrEmpty()]
         [string]$Environment = 'Global',
@@ -47,14 +58,92 @@ function Get-WindowsDeviceLink {
         [double]$ClientTimeout = 100
     )
 
+    $onlineParameters = @(
+        'Method','TenantId','ClientId','AccessToken','Certificate','CertificateThumbprint',
+        'CertificateSubjectName','SendCertificateChain','ClientSecret','WebhookUri','WebhookApiKey',
+        'Environment','ClientTimeout'
+    )
+
     if (-not $Online) {
-        $onlineOnlyParameters = @(
-            'TenantId','ClientId','Interactive','UseDeviceCode','AccessToken','Certificate',
-            'CertificateThumbprint','CertificateSubjectName','ClientSecret','Identity','EnvironmentVariable'
-        )
-        $usedOnlineOnly = $onlineOnlyParameters | Where-Object { $PSBoundParameters.ContainsKey($_) }
+        $usedOnlineOnly = $onlineParameters | Where-Object {
+            $PSBoundParameters.ContainsKey($_) -and $_ -notin @('Environment','ClientTimeout','SendCertificateChain')
+        }
         if ($usedOnlineOnly) {
-            throw "Online authentication parameters require -Online. Parameters supplied: $($usedOnlineOnly -join ', ')."
+            throw "Online parameters require -Online. Parameters supplied: $($usedOnlineOnly -join ', ')."
+        }
+    }
+    elseif (-not $PSBoundParameters.ContainsKey('Method')) {
+        throw "-Method is required with -Online. Supported methods: DeviceCode, Interactive, ClientSecret, AccessToken, Certificate, CertificateThumbprint, CertificateSubjectName, EnvironmentVariable, ManagedIdentity, Webhook."
+    }
+
+    if ($Online) {
+        $allowedByMethod = @{
+            DeviceCode = @('TenantId','ClientId')
+            Interactive = @('TenantId','ClientId')
+            ClientSecret = @('TenantId','ClientId','ClientSecret')
+            AccessToken = @('TenantId','AccessToken')
+            Certificate = @('TenantId','ClientId','Certificate','SendCertificateChain')
+            CertificateThumbprint = @('TenantId','ClientId','CertificateThumbprint','SendCertificateChain')
+            CertificateSubjectName = @('TenantId','ClientId','CertificateSubjectName','SendCertificateChain')
+            EnvironmentVariable = @()
+            ManagedIdentity = @('ClientId')
+            Webhook = @('WebhookUri','WebhookApiKey','TenantId')
+        }
+
+        $methodSpecificParameters = @(
+            'TenantId','ClientId','AccessToken','Certificate','CertificateThumbprint',
+            'CertificateSubjectName','SendCertificateChain','ClientSecret','WebhookUri','WebhookApiKey'
+        )
+        $invalidParameters = $methodSpecificParameters | Where-Object {
+            $PSBoundParameters.ContainsKey($_) -and $_ -notin $allowedByMethod[$Method]
+        }
+        if ($invalidParameters) {
+            throw "The following parameters are not valid with -Method $Method`: $($invalidParameters -join ', ')."
+        }
+
+        switch ($Method) {
+            'DeviceCode' {
+                if (-not $TenantId) { throw '-TenantId is required for -Method DeviceCode.' }
+            }
+            'Interactive' {
+                if (-not $TenantId) { throw '-TenantId is required for -Method Interactive.' }
+            }
+            'ClientSecret' {
+                if (-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')) {
+                    throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'
+                }
+            }
+            'AccessToken' {
+                if (-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')) {
+                    throw '-TenantId and -AccessToken are required for -Method AccessToken.'
+                }
+            }
+            'Certificate' {
+                if (-not $TenantId -or -not $ClientId -or -not $Certificate) {
+                    throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.'
+                }
+            }
+            'CertificateThumbprint' {
+                if (-not $TenantId -or -not $ClientId -or -not $CertificateThumbprint) {
+                    throw '-TenantId, -ClientId, and -CertificateThumbprint are required for -Method CertificateThumbprint.'
+                }
+            }
+            'CertificateSubjectName' {
+                if (-not $TenantId -or -not $ClientId -or -not $CertificateSubjectName) {
+                    throw '-TenantId, -ClientId, and -CertificateSubjectName are required for -Method CertificateSubjectName.'
+                }
+            }
+            'EnvironmentVariable' {
+                $missingVariables = @('AZURE_TENANT_ID','AZURE_CLIENT_ID','AZURE_CLIENT_SECRET') | Where-Object {
+                    -not [Environment]::GetEnvironmentVariable($_)
+                }
+                if ($missingVariables) {
+                    throw "-Method EnvironmentVariable requires environment variables: $($missingVariables -join ', ')."
+                }
+            }
+            'Webhook' {
+                if (-not $WebhookUri) { throw '-WebhookUri is required for -Method Webhook.' }
+            }
         }
     }
 
@@ -105,26 +194,21 @@ function Get-WindowsDeviceLink {
         return $deviceLink
     }
 
-    $methods = @()
-    if ($Interactive) { $methods += 'Interactive' }
-    if ($UseDeviceCode) { $methods += 'DeviceCode' }
-    if ($PSBoundParameters.ContainsKey('AccessToken')) { $methods += 'AccessToken' }
-    if ($PSBoundParameters.ContainsKey('Certificate')) { $methods += 'Certificate' }
-    if ($PSBoundParameters.ContainsKey('CertificateThumbprint')) { $methods += 'CertificateThumbprint' }
-    if ($PSBoundParameters.ContainsKey('CertificateSubjectName')) { $methods += 'CertificateSubjectName' }
-    if ($PSBoundParameters.ContainsKey('ClientSecret')) { $methods += 'ClientSecret' }
-    if ($Identity) { $methods += 'ManagedIdentity' }
-    if ($EnvironmentVariable) { $methods += 'EnvironmentVariable' }
+    if ($Method -eq 'Webhook') {
+        if (-not $PSBoundParameters.ContainsKey('WebhookApiKey')) {
+            Write-Warning 'No -WebhookApiKey was supplied. Use an API key unless the webhook endpoint has equivalent request protection.'
+        }
 
-    if ($methods.Count -eq 0) {
-        throw 'When using -Online, specify an authentication method: -Interactive, -UseDeviceCode, -AccessToken, -Certificate, -CertificateThumbprint, -CertificateSubjectName, -ClientSecret, -Identity, or -EnvironmentVariable.'
-    }
-    if ($methods.Count -gt 1) {
-        throw "Specify only one authentication method with -Online. Methods supplied: $($methods -join ', ')."
+        $webhookParameters = @{
+            InputObject = $deviceLink
+            WebhookUri  = $WebhookUri
+        }
+        if ($PSBoundParameters.ContainsKey('WebhookApiKey')) { $webhookParameters.WebhookApiKey = $WebhookApiKey }
+        if ($TenantId) { $webhookParameters.TenantId = $TenantId }
+        return Invoke-WindowsDeviceLinkWebhook @webhookParameters
     }
 
-    if ($methods[0] -eq 'DeviceCode') {
-        if (-not $TenantId) { throw '-TenantId is required for -Online -UseDeviceCode.' }
+    if ($Method -eq 'DeviceCode') {
         if ($Environment -ne 'Global') {
             throw 'Native device-code authentication currently supports the Global Microsoft cloud only.'
         }
@@ -142,19 +226,13 @@ function Get-WindowsDeviceLink {
             throw 'Native WinPE authentication currently supports the Global Microsoft cloud only.'
         }
 
-        switch ($methods[0]) {
+        switch ($Method) {
             'ClientSecret' {
-                if (-not $TenantId -or -not $ClientId) {
-                    throw '-TenantId and -ClientId are required for client secret authentication.'
-                }
                 Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication for WinPE (Microsoft.Graph.Authentication is not required).'
                 $token = Get-WindowsDeviceLinkClientSecretToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret
                 return Invoke-WindowsDeviceLinkGraphRegistration -InputObject $deviceLink -AccessToken $token.AccessToken -TenantId $TenantId
             }
             'AccessToken' {
-                if (-not $TenantId) {
-                    throw '-TenantId is required with -AccessToken in WinPE so the registration result can identify the tenant.'
-                }
                 $credential = New-Object System.Management.Automation.PSCredential('token', $AccessToken)
                 $plainToken = $credential.GetNetworkCredential().Password
                 try {
@@ -167,9 +245,6 @@ function Get-WindowsDeviceLink {
                 }
             }
             'EnvironmentVariable' {
-                if (-not $env:AZURE_TENANT_ID -or -not $env:AZURE_CLIENT_ID -or -not $env:AZURE_CLIENT_SECRET) {
-                    throw 'WinPE environment-variable authentication requires AZURE_TENANT_ID, AZURE_CLIENT_ID, and AZURE_CLIENT_SECRET.'
-                }
                 $environmentSecret = ConvertTo-SecureString $env:AZURE_CLIENT_SECRET -AsPlainText -Force
                 Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication from environment variables for WinPE.'
                 $token = Get-WindowsDeviceLinkClientSecretToken `
@@ -189,36 +264,31 @@ function Get-WindowsDeviceLink {
         ClientTimeout = $ClientTimeout
     }
 
-    switch ($methods[0]) {
+    switch ($Method) {
         'Interactive' {
-            if (-not $TenantId) { throw '-TenantId is required for -Online -Interactive.' }
             $connectParams.TenantId = $TenantId
             if ($ClientId) { $connectParams.ClientId = $ClientId }
         }
         'AccessToken' { $connectParams.AccessToken = $AccessToken }
         'Certificate' {
-            if (-not $TenantId -or -not $ClientId) { throw '-TenantId and -ClientId are required for certificate authentication.' }
             $connectParams.TenantId = $TenantId
             $connectParams.ClientId = $ClientId
             $connectParams.Certificate = $Certificate
             $connectParams.SendCertificateChain = $SendCertificateChain
         }
         'CertificateThumbprint' {
-            if (-not $TenantId -or -not $ClientId) { throw '-TenantId and -ClientId are required for certificate thumbprint authentication.' }
             $connectParams.TenantId = $TenantId
             $connectParams.ClientId = $ClientId
             $connectParams.CertificateThumbprint = $CertificateThumbprint
             $connectParams.SendCertificateChain = $SendCertificateChain
         }
         'CertificateSubjectName' {
-            if (-not $TenantId -or -not $ClientId) { throw '-TenantId and -ClientId are required for certificate subject authentication.' }
             $connectParams.TenantId = $TenantId
             $connectParams.ClientId = $ClientId
             $connectParams.CertificateSubjectName = $CertificateSubjectName
             $connectParams.SendCertificateChain = $SendCertificateChain
         }
         'ClientSecret' {
-            if (-not $TenantId -or -not $ClientId) { throw '-TenantId and -ClientId are required for client secret authentication.' }
             $connectParams.TenantId = $TenantId
             $connectParams.ClientId = $ClientId
             $connectParams.ClientSecret = $ClientSecret
