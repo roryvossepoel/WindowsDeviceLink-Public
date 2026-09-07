@@ -22,6 +22,8 @@ The primary Windows Autopilot Device Preparation Device Association **pre-associ
 | Certificate object | Pass | Pass |
 | Certificate thumbprint | Pass | Pass |
 | Certificate subject name | Pass | Pass |
+| Device Association removal by serial number | Pass | Not yet repeated |
+| Device Association removal by association ID | Pass | Not yet repeated |
 
 ## 0.4.x online method validation
 
@@ -54,9 +56,29 @@ The following `0.4.1-preview1` flows were repeated successfully on Windows 11:
 
 Each of these direct methods also produced the targeted HTTP 409 duplicate error when the DeviceLink pre-association already existed.
 
-ClientSecret and EnvironmentVariable now use native OAuth + direct Graph REST on both Windows and WinPE and do not require `Microsoft.Graph.Authentication` for those methods.
+ClientSecret and EnvironmentVariable use native OAuth + direct Graph REST on both Windows and WinPE and do not require `Microsoft.Graph.Authentication` for those methods.
 
 `Interactive` and local `ManagedIdentity` remain lower priority because they depend on different user/host conditions and are not required for the primary endpoint and WinPE scenarios.
+
+## 0.4.2 association removal validation
+
+The Device Association removal operation was derived from the Intune admin center request and then verified as a standalone Microsoft Graph beta request:
+
+```text
+DELETE /deviceManagement/tenantAssociatedDevices/{associationId}
+```
+
+Validated successfully on Windows 11:
+
+- standalone DELETE of a `preassociated` record;
+- `Remove-WindowsDeviceLinkAssociation -SerialNumber ... -Method DeviceCode`;
+- serial-number lookup resolving the correct association ID before deletion;
+- `Remove-WindowsDeviceLinkAssociation -AssociationId ... -Method DeviceCode`;
+- successful removal result with `Removed = True`.
+
+`-SerialNumber` is the normal user-facing route. `-AssociationId` is the exact/advanced route when the record ID is already known or a serial-number lookup is ambiguous.
+
+The cmdlet targets Device Association records (`tenantAssociatedDevices`) and does **not** use the classic Autopilot V1 `windowsAutopilotDeviceIdentities` deletion API.
 
 ## Webhook validation
 
@@ -103,6 +125,8 @@ The complete Windows 11 webhook route was repeated successfully against `0.4.1-p
 
 ## Remaining validation
 
+- Repeat Device Association removal in AMD64 WinPE.
+- Repeat removal with additional authentication methods.
 - Validate webhook transport in AMD64 WinPE.
 - Validate a second target tenant through the same webhook/runbook routing table.
 - Additional Windows 11 and WinPE builds.
@@ -112,4 +136,6 @@ The complete Windows 11 webhook route was repeated successfully against `0.4.1-p
 
 ## Association lifecycle
 
-Removal/decommissioning support is a desirable future addition. It must use the Device Association API rather than the classic Autopilot V1 deletion action. The correct Device Association delete operation still needs to be verified before implementation.
+`0.4.2-preview1` adds removal of Device Association records from Intune/Graph.
+
+The currently validated removal scenario is a **preassociated** record. For a device that is already fully associated, removing the server-side record alone may not clear device-side tenant affinity. Device-side/UEFI decommissioning is separate from deleting the `tenantAssociatedDevices` record and remains outside the currently validated module behavior.
