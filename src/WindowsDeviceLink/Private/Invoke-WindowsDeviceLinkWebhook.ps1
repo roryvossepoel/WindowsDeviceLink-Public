@@ -77,10 +77,24 @@ function Invoke-WindowsDeviceLinkWebhook {
         }
         catch {}
 
-        if ($statusCode) {
-            throw "DeviceLink webhook request failed with HTTP $statusCode. Request ID: $requestId. $($_.Exception.Message)"
+        $detail = $_.Exception.Message
+        switch ($statusCode) {
+            400 { throw "DeviceLink webhook rejected the request with HTTP 400 (Bad Request). Request ID: $requestId. $detail" }
+            401 { throw "DeviceLink webhook authentication failed with HTTP 401 (Unauthorized). Request ID: $requestId. $detail" }
+            403 { throw "DeviceLink webhook authorization failed with HTTP 403 (Forbidden). Request ID: $requestId. $detail" }
+            404 { throw "DeviceLink webhook endpoint was not found (HTTP 404). Verify -WebhookUri. Request ID: $requestId. $detail" }
+            408 { throw "DeviceLink webhook request timed out (HTTP 408). Request ID: $requestId. $detail" }
+            429 { throw "DeviceLink webhook is throttling requests (HTTP 429). Request ID: $requestId. $detail" }
         }
-        throw "DeviceLink webhook request failed. Request ID: $requestId. $($_.Exception.Message)"
+
+        if ($statusCode -ge 500) {
+            throw "DeviceLink webhook returned server error HTTP $statusCode. Request ID: $requestId. $detail"
+        }
+        if ($statusCode) {
+            throw "DeviceLink webhook request failed with HTTP $statusCode. Request ID: $requestId. $detail"
+        }
+
+        throw "DeviceLink webhook could not be reached or the request failed before an HTTP response was received. Request ID: $requestId. $detail"
     }
     finally {
         $headers.Remove('X-WindowsDeviceLink-Key') | Out-Null
