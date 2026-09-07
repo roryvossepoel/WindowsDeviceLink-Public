@@ -230,6 +230,23 @@ function Get-WindowsDeviceLink {
         return Invoke-WindowsDeviceLinkGraphRegistration -InputObject $deviceLink -AccessToken $token.AccessToken -TenantId $TenantId
     }
 
+    if ($Method -eq 'EnvironmentVariable') {
+        if ($Environment -ne 'Global') {
+            throw 'Native environment-variable authentication currently supports the Global Microsoft cloud only.'
+        }
+
+        $environmentSecret = ConvertTo-SecureString $env:AZURE_CLIENT_SECRET -AsPlainText -Force
+        Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication from environment variables (Microsoft.Graph.Authentication is not required).'
+        $token = Get-WindowsDeviceLinkClientSecretToken `
+            -TenantId $env:AZURE_TENANT_ID `
+            -ClientId $env:AZURE_CLIENT_ID `
+            -ClientSecret $environmentSecret
+        return Invoke-WindowsDeviceLinkGraphRegistration `
+            -InputObject $deviceLink `
+            -AccessToken $token.AccessToken `
+            -TenantId $env:AZURE_TENANT_ID
+    }
+
     if ($support.Environment -eq 'WindowsPE') {
         if ($Environment -ne 'Global') {
             throw 'Native WinPE authentication currently supports the Global Microsoft cloud only.'
@@ -247,18 +264,6 @@ function Get-WindowsDeviceLink {
                     $plainToken = $null
                     $credential = $null
                 }
-            }
-            'EnvironmentVariable' {
-                $environmentSecret = ConvertTo-SecureString $env:AZURE_CLIENT_SECRET -AsPlainText -Force
-                Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication from environment variables for WinPE.'
-                $token = Get-WindowsDeviceLinkClientSecretToken `
-                    -TenantId $env:AZURE_TENANT_ID `
-                    -ClientId $env:AZURE_CLIENT_ID `
-                    -ClientSecret $environmentSecret
-                return Invoke-WindowsDeviceLinkGraphRegistration `
-                    -InputObject $deviceLink `
-                    -AccessToken $token.AccessToken `
-                    -TenantId $env:AZURE_TENANT_ID
             }
         }
     }
@@ -296,7 +301,6 @@ function Get-WindowsDeviceLink {
             $connectParams.Identity = $true
             if ($ClientId) { $connectParams.ClientId = $ClientId }
         }
-        'EnvironmentVariable' { $connectParams.EnvironmentVariable = $true }
     }
 
     Connect-WindowsDeviceLink @connectParams | Out-Null
