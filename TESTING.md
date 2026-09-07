@@ -4,6 +4,8 @@ Last updated: 2026-09-07
 
 The primary Windows Autopilot Device Preparation Device Association **pre-association** workflow has been validated successfully on both Windows 11 and AMD64 Windows PE.
 
+For the reusable online parameter regression set, use `tests/Online-Method-Validation.ps1` in the development repository. The public repository documents the validated outcomes below.
+
 ## Confirmed direct functionality
 
 | Area | Windows 11 | Windows PE |
@@ -23,9 +25,9 @@ The primary Windows Autopilot Device Preparation Device Association **pre-associ
 | Certificate thumbprint | Pass | Pass |
 | Certificate subject name | Pass | Pass |
 
-## 0.4.0 online method validation
+## 0.4.x online method validation
 
-`0.4.0-preview1` changes the high-level `Get-WindowsDeviceLink -Online` interface to require an explicit `-Method`.
+The high-level `Get-WindowsDeviceLink -Online` interface requires an explicit `-Method`.
 
 Validated parameter behavior:
 
@@ -35,12 +37,16 @@ Validated parameter behavior:
 | `-Method Webhook` without `-WebhookUri` | Pass - rejected with targeted error. |
 | Method-incompatible parameter supplied | Pass - rejected with targeted error. |
 | `-Method DeviceCode` without `-TenantId` | Pass - rejected with targeted error. |
+| `-Method ClientSecret` with missing required input | Pass - rejected with targeted error. |
+| `-Method AccessToken` without token | Pass - rejected with targeted error. |
 
-The underlying direct authentication implementations were validated in the 0.3.x line. A complete regression pass using the new `-Method` syntax remains desirable before a stable 0.4.x release.
+The complete parameter regression set passed on 2026-09-07.
 
 ## Webhook validation
 
-The new webhook route has been validated end-to-end on Windows 11.
+The webhook route has been validated end-to-end on Windows 11.
+
+The schema contract is documented in [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 Confirmed module behavior:
 
@@ -51,7 +57,8 @@ Confirmed module behavior:
 - API key absent from JSON body;
 - payload contains DeviceLink plus device/runtime metadata;
 - optional `tenantId` included for routing;
-- Azure Automation webhook accepts request and starts a job.
+- Azure Automation webhook accepts request and starts a job;
+- targeted client-side errors exist for common HTTP 400, 401, 403, 404, 408, 429 and 5xx failures.
 
 Confirmed sample Azure Automation receiver behavior:
 
@@ -67,7 +74,7 @@ Confirmed sample Azure Automation receiver behavior:
 - `associationState = preassociated` returned;
 - targeted duplicate / HTTP 409 handling.
 
-The receiving runbook is optional. The module continues to support local generation, CSV export and direct Graph registration without Azure Automation.
+The complete Windows 11 webhook route was repeated successfully against the 0.4.1 preview code on 2026-09-07.
 
 ## Notes
 
@@ -88,3 +95,7 @@ The receiving runbook is optional. The module continues to support local generat
 - Additional OEMs/models.
 - Additional file-path/failure edge cases.
 - Non-Global Microsoft clouds.
+
+## Association lifecycle
+
+Removal/decommissioning support is a desirable future addition. It must use the Device Association API rather than the classic Autopilot V1 deletion action. The correct Device Association delete operation still needs to be verified before implementation.
