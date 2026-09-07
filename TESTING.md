@@ -47,7 +47,9 @@ The following preview flows were repeated successfully on Windows 11:
 - `-Method DeviceCode` -> native OAuth -> direct Graph registration -> `preassociated`;
 - duplicate DeviceCode registration -> targeted HTTP 409 error;
 - `-Method ClientSecret` -> native OAuth client credentials -> direct Graph REST -> `preassociated`;
-- duplicate ClientSecret registration -> targeted HTTP 409 error.
+- duplicate ClientSecret registration -> targeted HTTP 409 error;
+- `-Method AccessToken` with an externally obtained app-only token -> Graph -> `preassociated`;
+- duplicate AccessToken registration -> targeted HTTP 409 error.
 
 The ClientSecret route now uses native OAuth + REST on both Windows and WinPE and does not require `Microsoft.Graph.Authentication`.
 
