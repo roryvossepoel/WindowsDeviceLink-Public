@@ -6,12 +6,14 @@
 
 PowerShell module for **pre-associating physical Windows devices with a Microsoft Intune tenant for Windows Autopilot Device Preparation Device Association**.
 
-WindowsDeviceLink can generate the TPM-backed DeviceLink identity from a device, export the official Windows `.devicelink.csv`, or submit the DeviceLink directly to Intune through Microsoft Graph before the device enrolls.
+WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the official Windows `.devicelink.csv`, pre-associate directly through Microsoft Graph, or send a richer DeviceLink payload to a webhook for centralized automation.
 
 > [!IMPORTANT]
 > This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the online registration uses a Microsoft Graph beta endpoint. Both can change without notice.
 
 ## Install from PowerShell Gallery
+
+The currently published Gallery version is `0.3.12-preview1`. The `0.4.0-preview1` webhook work is currently available from this repository for validation before the next Gallery publish.
 
 ```powershell
 Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease
@@ -29,10 +31,11 @@ PowerShell Gallery: [WindowsDeviceLink](https://www.powershellgallery.com/packag
 
 ## What this module is for
 
-Windows Autopilot Device Preparation Device Association introduces a pre-association step for physical Windows devices. WindowsDeviceLink focuses on the first two parts of that process:
+Windows Autopilot Device Preparation Device Association introduces a pre-association step for physical Windows devices. WindowsDeviceLink focuses on:
 
-1. Obtain the DeviceLink information from the physical device.
-2. Pre-associate the device with the tenant in Intune.
+1. obtaining the DeviceLink identity from the physical device;
+2. optionally exporting the official Windows-generated DeviceLink CSV;
+3. pre-associating the device with Intune either directly or through a webhook/automation layer.
 
 The association itself is completed later by Windows during OOBE.
 
@@ -42,10 +45,12 @@ This is **not** classic Windows Autopilot V1 hardware-hash registration.
 
 - Generate DeviceLink information on AMD64 Windows 11.
 - Generate DeviceLink information in AMD64 Windows PE.
-- Export the official Windows-generated `.devicelink.csv` format.
-- Pre-associate the device directly in Intune using Microsoft Graph.
-- Use device-code authentication.
-- Use app-registration authentication with client secret, certificate, access token, or environment variables.
+- Export the official Windows-generated `.devicelink.csv`.
+- Pre-associate directly in Intune using Microsoft Graph.
+- Send a richer DeviceLink payload to a webhook for centralized automation.
+- Include an optional tenant ID for multi-tenant routing on the receiving side.
+- Include an optional API key in the `X-WindowsDeviceLink-Key` header.
+- Use explicit online methods so each flow only accepts its relevant parameters.
 - Detect whether the current Windows / WinPE environment can access the DeviceLink runtime.
 
 ## Important WinPE note
@@ -79,8 +84,8 @@ See [`src/WindowsDeviceLink/Runtime/README.md`](src/WindowsDeviceLink/Runtime/RE
 - UEFI firmware.
 - 64-bit Windows PowerShell 5.1.
 - Windows 11 or compatible AMD64 Windows PE.
-- For online pre-association: Microsoft Graph permission `DeviceManagementServiceConfig.ReadWrite.All`.
 - For WinPE: a compatible user-supplied `Windows.Management.Service.dll`.
+- For direct Graph pre-association: Microsoft Graph permission `DeviceManagementServiceConfig.ReadWrite.All`.
 
 ## Quick start
 
@@ -96,7 +101,7 @@ $deviceLink = Get-WindowsDeviceLink
 $deviceLink | Format-List *
 ```
 
-The DeviceLink payload contains device identity information. Do not publish DeviceLink payloads, exported CSVs, serial numbers, SMBIOS UUIDs, or Link IDs.
+Treat DeviceLink payloads and related device identity fields as sensitive operational data. Do not publish DeviceLink payloads, exported CSVs, serial numbers, SMBIOS UUIDs, or Link IDs.
 
 ## Export the official DeviceLink CSV
 
@@ -112,13 +117,38 @@ Example filename:
 ABC1234_Contoso-Computers_Model-123_2026-09-06.devicelink.csv
 ```
 
-## Pre-associate directly in Intune
+## Online mode
+
+Starting with `0.4.0-preview1`, `-Online` requires an explicit `-Method`.
+
+```powershell
+Get-WindowsDeviceLink -Online -Method <method> ...
+```
+
+Supported methods:
+
+| Method | Required input |
+|---|---|
+| `DeviceCode` | `TenantId` |
+| `Interactive` | `TenantId` |
+| `ClientSecret` | `TenantId`, `ClientId`, `ClientSecret` |
+| `AccessToken` | `TenantId`, `AccessToken` |
+| `Certificate` | `TenantId`, `ClientId`, `Certificate` |
+| `CertificateThumbprint` | `TenantId`, `ClientId`, `CertificateThumbprint` |
+| `CertificateSubjectName` | `TenantId`, `ClientId`, `CertificateSubjectName` |
+| `EnvironmentVariable` | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` |
+| `ManagedIdentity` | no required additional parameter; optional `ClientId` |
+| `Webhook` | `WebhookUri`; optional `WebhookApiKey` and `TenantId` |
+
+Parameters that do not belong to the selected method are rejected before DeviceLink generation starts.
+
+### Direct DeviceCode example
 
 ```powershell
 Get-WindowsDeviceLink `
     -Online `
-    -TenantId '<tenant-id>' `
-    -UseDeviceCode
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
 ```
 
 The module submits the DeviceLink to:
@@ -129,31 +159,151 @@ POST /beta/deviceManagement/tenantAssociatedDevices/importTenantAssociatedDevice
 
 A successful response normally returns `AssociationState : preassociated`.
 
-### Export and pre-associate in one command
+### Client secret example
+
+```powershell
+$secret = Read-Host 'Client secret' -AsSecureString
+
+Get-WindowsDeviceLink `
+    -Online `
+    -Method ClientSecret `
+    -TenantId '<tenant-id>' `
+    -ClientId '<app-id>' `
+    -ClientSecret $secret
+```
+
+### Existing access token
+
+```powershell
+$token = ConvertTo-SecureString '<access-token>' -AsPlainText -Force
+
+Get-WindowsDeviceLink `
+    -Online `
+    -Method AccessToken `
+    -TenantId '<tenant-id>' `
+    -AccessToken $token
+```
+
+### Environment variables
+
+Required variables:
+
+```text
+AZURE_TENANT_ID
+AZURE_CLIENT_ID
+AZURE_CLIENT_SECRET
+```
+
+Then:
+
+```powershell
+Get-WindowsDeviceLink -Online -Method EnvironmentVariable
+```
+
+## Webhook automation
+
+The webhook method is an optional transport for unattended or centralized workflows where Graph credentials should not exist on the Windows / WinPE device.
+
+```text
+Windows / WinPE
+    -> WindowsDeviceLink
+    -> HTTPS webhook
+    -> automation / runbook
+    -> tenant routing and centralized authentication
+    -> Microsoft Graph
+    -> DeviceLink pre-association
+```
+
+On the device only the webhook connection information is required. The device does **not** need a Graph client secret, Graph certificate, or DeviceCode interaction when using `-Method Webhook`.
+
+### Basic webhook call
 
 ```powershell
 Get-WindowsDeviceLink `
-    -OutputDirectory 'C:\DeviceLink' `
     -Online `
-    -TenantId '<tenant-id>' `
-    -UseDeviceCode
+    -Method Webhook `
+    -WebhookUri '<webhook-url>'
 ```
 
-## Authentication validation
+### Webhook with API key and tenant routing
 
-The following methods have been validated successfully on both Windows 11 and AMD64 Windows PE:
+For unattended use, obtain the API key from your deployment or secrets mechanism instead of prompting for it.
 
-| Method | Windows 11 | Windows PE |
-|---|---:|---:|
-| Device code | Yes | Yes |
-| Client secret | Yes | Yes |
-| Existing access token | Yes | Yes |
-| Environment variables | Yes | Yes |
-| Certificate object | Yes | Yes |
-| Certificate thumbprint | Yes | Yes |
-| Certificate subject name | Yes | Yes |
+```powershell
+$webhookKey = $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY
 
-See [`TESTING.md`](TESTING.md) for the validation matrix.
+Get-WindowsDeviceLink `
+    -Online `
+    -Method Webhook `
+    -WebhookUri '<webhook-url>' `
+    -WebhookApiKey $webhookKey `
+    -TenantId '<target-tenant-id>'
+```
+
+`WebhookApiKey` is optional at module level because some webhook platforms already provide their own authentication. When supplied, it is sent only in:
+
+```text
+X-WindowsDeviceLink-Key
+```
+
+It is not added to the JSON body.
+
+`TenantId` is optional for webhook mode. It is routing information for the receiving automation layer, not local Graph authentication on the device.
+
+### Webhook payload
+
+Schema version 1 contains:
+
+- request ID and request type;
+- optional target tenant ID;
+- serial number;
+- manufacturer / model;
+- SMBIOS UUID;
+- Link ID;
+- DeviceLink creation time;
+- complete base64 DeviceLink payload;
+- source environment, architecture, module version, PowerShell version and DeviceLink DLL/runtime information.
+
+Only the actual `deviceLink` needs to be forwarded to the Graph import action. The additional fields are available for routing, diagnostics and optional logging/CMDB integration.
+
+## Included Azure Automation receiver
+
+An optional receiving implementation is included:
+
+```text
+runbooks/Register-WindowsDeviceLinkWebhook.ps1
+```
+
+See [`runbooks/README.md`](runbooks/README.md) for setup instructions.
+
+The sample receiver supports:
+
+- webhook API-key validation;
+- optional default tenant configuration;
+- tenant routing through `WindowsDeviceLinkTenantConfiguration`;
+- Managed Identity authentication;
+- certificate-based authentication stored centrally in Azure Automation;
+- Graph DeviceLink pre-association;
+- targeted duplicate / HTTP 409 errors.
+
+The receiving runbook is an optional companion. WindowsDeviceLink does not require Azure Automation for local generation, CSV export or direct Graph registration.
+
+## Validation status
+
+The original direct methods have been validated successfully on both Windows 11 and AMD64 Windows PE in the 0.3.x line.
+
+The `0.4.0-preview1` webhook route has been validated end-to-end on Windows 11 with:
+
+- webhook transport;
+- request headers and JSON payload;
+- API-key validation;
+- incorrect API-key rejection before Graph registration;
+- tenant configuration routing;
+- Azure Automation Runtime Environment using PowerShell 7.4 and `Microsoft.Graph.Authentication`;
+- Managed Identity Graph authentication;
+- successful DeviceLink pre-association returning `associationState = preassociated`.
+
+See [`TESTING.md`](TESTING.md) for the validation matrix and remaining regression items.
 
 ## Public commands
 
@@ -167,7 +317,9 @@ See [`TESTING.md`](TESTING.md) for the validation matrix.
 
 ## Scope
 
-Current preview: `0.3.12-preview1`.
+Repository preview: `0.4.0-preview1`.
+
+Currently published PowerShell Gallery preview: `0.3.12-preview1`.
 
 In scope:
 
@@ -175,8 +327,10 @@ In scope:
 - AMD64 Windows PE;
 - DeviceLink generation;
 - official DeviceLink CSV export;
-- Windows Autopilot Device Preparation Device Association pre-association;
-- delegated device-code and app-registration authentication.
+- direct Windows Autopilot Device Preparation Device Association pre-association;
+- delegated and app-registration authentication;
+- webhook transport for centralized automation;
+- optional Azure Automation receiver example.
 
 Not currently in scope:
 
