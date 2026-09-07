@@ -1,19 +1,26 @@
 <#
-WindowsDeviceLink online-method parameter regression tests.
+WindowsDeviceLink online-method regression tests.
 
-These tests exercise validation before DeviceLink generation. They do not require
-Graph credentials, TPM access, or a live webhook.
+These tests intentionally exercise parameter validation before DeviceLink generation.
+They do not require Graph credentials, TPM access, or a live webhook.
+
+Optional live webhook validation can be enabled with -WebhookUri. That test does
+require DeviceLink support on the machine running the script.
 #>
 
 [CmdletBinding()]
 param(
-    [string]$ModulePath
+    [string]$ModulePath,
+    [uri]$WebhookUri,
+    [string]$WebhookApiKey,
+    [string]$TenantId
 )
 
 $ErrorActionPreference = 'Stop'
 
 function Resolve-ModulePath {
     if ($ModulePath) { return (Resolve-Path -LiteralPath $ModulePath).Path }
+
     $candidate = Join-Path $PSScriptRoot '..\src\WindowsDeviceLink\WindowsDeviceLink.psd1'
     if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
         throw "WindowsDeviceLink manifest not found: $candidate"
@@ -40,7 +47,8 @@ function Assert-Throws {
     }
 }
 
-Import-Module (Resolve-ModulePath) -Force
+$resolvedModulePath = Resolve-ModulePath
+Import-Module $resolvedModulePath -Force
 
 Assert-Throws -Name 'Online requires Method' -ExpectedMessage '-Method is required with -Online' -ScriptBlock {
     Get-WindowsDeviceLink -Online
@@ -48,6 +56,15 @@ Assert-Throws -Name 'Online requires Method' -ExpectedMessage '-Method is requir
 
 Assert-Throws -Name 'Webhook requires WebhookUri' -ExpectedMessage '-WebhookUri is required for -Method Webhook' -ScriptBlock {
     Get-WindowsDeviceLink -Online -Method Webhook
+}
+
+$testSecret = ConvertTo-SecureString 'not-a-real-secret' -AsPlainText -Force
+Assert-Throws -Name 'Webhook rejects ClientSecret' -ExpectedMessage 'not valid with -Method Webhook' -ScriptBlock {
+    Get-WindowsDeviceLink `
+        -Online `
+        -Method Webhook `
+        -WebhookUri 'https://example.invalid/' `
+        -ClientSecret $testSecret
 }
 
 Assert-Throws -Name 'DeviceCode requires TenantId' -ExpectedMessage '-TenantId is required for -Method DeviceCode' -ScriptBlock {
@@ -64,3 +81,22 @@ Assert-Throws -Name 'AccessToken requires token' -ExpectedMessage '-TenantId and
 
 Write-Host ''
 Write-Host 'Parameter validation regression set passed.'
+
+if ($PSBoundParameters.ContainsKey('WebhookUri')) {
+    Write-Host ''
+    Write-Host 'Running optional live webhook test...'
+
+    $parameters = @{
+        Online = $true
+        Method = 'Webhook'
+        WebhookUri = $WebhookUri
+    }
+    if ($PSBoundParameters.ContainsKey('WebhookApiKey')) { $parameters.WebhookApiKey = $WebhookApiKey }
+    if ($TenantId) { $parameters.TenantId = $TenantId }
+
+    $result = Get-WindowsDeviceLink @parameters
+    if (-not $result.RequestId) { throw 'FAIL: live webhook test returned no RequestId.' }
+    if (-not $result.SerialNumber) { throw 'FAIL: live webhook test returned no SerialNumber.' }
+
+    Write-Host "PASS: live webhook transport - RequestId $($result.RequestId)"
+}
