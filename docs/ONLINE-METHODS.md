@@ -15,6 +15,26 @@
 | `ManagedIdentity` | Azure-hosted execution with an identity | No | Optional `ClientId` |
 | `Webhook` | Unattended endpoint / WinPE / multi-tenant automation | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
 
+## DeviceCode client ID
+
+When `-Method DeviceCode` is used without an explicit `-ClientId`, WindowsDeviceLink uses this well-known Microsoft public client ID:
+
+```text
+14d82eec-204b-4c2f-b7e8-296a70dab67e
+```
+
+This is the Microsoft Graph PowerShell / Graph Command Line Tools public client ID. It is not a customer-specific application registration, tenant identifier, client secret, certificate, or other confidential credential. Public client IDs are identifiers and are not secrets.
+
+You can override it by supplying your own public client application ID:
+
+```powershell
+Get-WindowsDeviceLink `
+    -Online `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>' `
+    -ClientId '<public-client-id>'
+```
+
 ## Recommended patterns
 
 ### Manual administration or testing
