@@ -1,8 +1,8 @@
 # WindowsDeviceLink validation matrix
 
-Last updated: 2026-09-07
+Last updated: 2026-09-14
 
-The primary Windows Autopilot Device Preparation Device Association **pre-association** workflow has been validated successfully on both Windows 11 and AMD64 Windows PE.
+The primary Windows Autopilot Device Preparation Device Association workflow has been validated on physical AMD64 hardware across Windows 11 and AMD64 Windows PE.
 
 ## Confirmed direct functionality
 
@@ -22,12 +22,15 @@ The primary Windows Autopilot Device Preparation Device Association **pre-associ
 | Certificate object | Pass | Pass |
 | Certificate thumbprint | Pass | Pass |
 | Certificate subject name | Pass | Pass |
-| Device Association removal by serial number | Pass | Not yet repeated |
-| Device Association removal by association ID | Pass | Not yet repeated |
+| Device Association removal by serial number | Pass | Pass |
+| Device Association removal by association ID | Pass | Not repeated |
+| Firmware-state read | Pass | Pass |
+| Firmware-state clear | Pass | Pass |
+| Post-clear firmware verification | Pass | Pass |
 
-## 0.4.x online method validation
+## Online method validation
 
-The high-level `Get-WindowsDeviceLink -Online` interface requires an explicit `-Method`.
+`Get-WindowsDeviceLink -Online` requires an explicit `-Method`.
 
 Validated parameter behavior:
 
@@ -40,79 +43,138 @@ Validated parameter behavior:
 | `-Method ClientSecret` with missing required input | Pass - rejected with targeted error. |
 | `-Method AccessToken` without token | Pass - rejected with targeted error. |
 
-The complete parameter regression set passed on 2026-09-07.
-
-### Live direct-method regression
-
-The following `0.4.1-preview1` flows were repeated successfully on Windows 11:
-
-- `-Method DeviceCode` -> native OAuth -> direct Graph registration -> `preassociated`;
-- `-Method ClientSecret` -> native OAuth client credentials -> direct Graph REST -> `preassociated`;
-- `-Method AccessToken` -> externally obtained app-only token -> Graph -> `preassociated`;
-- `-Method EnvironmentVariable` -> environment-sourced client credentials -> native OAuth -> direct Graph REST -> `preassociated`;
-- `-Method Certificate` -> certificate authentication -> `preassociated`;
-- `-Method CertificateThumbprint` -> certificate-store lookup -> `preassociated`;
-- `-Method CertificateSubjectName` -> certificate-store lookup -> `preassociated`.
-
-Each of these direct methods also produced the targeted HTTP 409 duplicate error when the DeviceLink pre-association already existed.
+The main Windows 11 registration methods were repeated successfully using DeviceCode, ClientSecret, AccessToken, EnvironmentVariable, Certificate, CertificateThumbprint and CertificateSubjectName. Each also produced the targeted HTTP 409 duplicate error when appropriate.
 
 ClientSecret and EnvironmentVariable use native OAuth + direct Graph REST on both Windows and WinPE and do not require `Microsoft.Graph.Authentication` for those methods.
 
-`Interactive` and local `ManagedIdentity` remain lower priority because they depend on different user/host conditions and are not required for the primary endpoint and WinPE scenarios.
+## DeviceCode public client ID
 
-## 0.4.2 association removal validation
+The default DeviceCode client ID is:
 
-The Device Association removal operation was derived from the Intune admin center request and then verified as a standalone Microsoft Graph beta request:
+```text
+14d82eec-204b-4c2f-b7e8-296a70dab67e
+```
+
+This is Microsoft's well-known public Graph PowerShell / Graph Command Line Tools client ID. It is intentionally public and is not a customer-specific app registration, secret, certificate, or tenant identifier.
+
+## Device Association removal validation
+
+The Device Association removal operation was derived from the Intune admin center request and independently verified as:
 
 ```text
 DELETE /deviceManagement/tenantAssociatedDevices/{associationId}
 ```
 
-Validated successfully on Windows 11:
+Validated:
 
 - standalone DELETE of a `preassociated` record;
-- `Remove-WindowsDeviceLinkAssociation -SerialNumber ... -Method DeviceCode`;
-- serial-number lookup resolving the correct association ID before deletion;
-- `Remove-WindowsDeviceLinkAssociation -AssociationId ... -Method DeviceCode`;
-- successful removal result with `Removed = True`.
+- `Remove-WindowsDeviceLinkAssociation -SerialNumber ... -Method DeviceCode` on Windows 11;
+- serial-number lookup resolving the correct association ID;
+- `Remove-WindowsDeviceLinkAssociation -AssociationId ... -Method DeviceCode` on Windows 11;
+- successful removal result with `Removed = True`;
+- `Remove-WindowsDeviceLinkAssociation -SerialNumber ... -Method DeviceCode` from AMD64 WinPE.
 
-`-SerialNumber` is the normal user-facing route. `-AssociationId` is the exact/advanced route when the record ID is already known or a serial-number lookup is ambiguous.
+The cmdlet targets Device Association records (`tenantAssociatedDevices`) and does **not** use the classic Autopilot V1 deletion API.
 
-The cmdlet targets Device Association records (`tenantAssociatedDevices`) and does **not** use the classic Autopilot V1 `windowsAutopilotDeviceIdentities` deletion API.
+## Firmware lifecycle validation
+
+Validated UEFI namespace:
+
+```text
+{B3DE75DA-819C-4FD5-9F01-C3D49E8CBBD7}
+```
+
+Validated variables:
+
+```text
+DeviceLinkId
+DeviceLinkJwtCompressed
+DeviceLinkJwtLastWrite
+DeviceLinkCreationTimeUtc
+```
+
+The raw `DeviceLinkJwtCompressed` value is treated as sensitive and must not be logged or published.
+
+### Clean baseline
+
+On a clean test device all four variables were absent.
+
+### DeviceLink generation
+
+After `Get-WindowsDeviceLink`, local firmware contained:
+
+```text
+DeviceLinkId
+DeviceLinkCreationTimeUtc
+```
+
+The JWT variables were absent.
+
+This behavior was observed in AMD64 WinPE.
+
+### Preassociation
+
+Creating a server-side preassociation from WinPE did not add the JWT variables. Local state remained:
+
+```text
+DeviceLinkId
+DeviceLinkCreationTimeUtc
+```
+
+### Fully associated device
+
+On a fully associated Windows device, all four variables were present:
+
+```text
+DeviceLinkId
+DeviceLinkJwtCompressed
+DeviceLinkJwtLastWrite
+DeviceLinkCreationTimeUtc
+```
+
+### Server-side removal does not clear local firmware
+
+Removing the server-side Device Association record did not remove local firmware state.
+
+Deleting only `DeviceLinkId` was insufficient on a fully associated device because the remaining DeviceLink state allowed it to reappear.
+
+### Full Windows cleanup
+
+Deleting all four known variables succeeded in full Windows. Immediate verification showed all four absent with Win32 error `203` (`ERROR_ENVVAR_NOT_FOUND`).
+
+### AMD64 WinPE cleanup
+
+The same native UEFI read/write mechanism was validated in WinPE:
+
+1. read clean firmware state;
+2. generate DeviceLink;
+3. verify `DeviceLinkId` and `DeviceLinkCreationTimeUtc` appeared;
+4. create Graph preassociation;
+5. verify firmware state remained unchanged;
+6. remove the server-side association from WinPE;
+7. delete the local DeviceLink firmware variables from WinPE;
+8. verify all four known variables were absent afterward.
+
+This establishes AMD64 WinPE as a viable control point for Device Association cleanup and tenant-move workflows.
 
 ## Webhook validation
 
 The webhook route has been validated end-to-end on Windows 11.
 
-The schema contract is documented in [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
+Confirmed:
 
-Confirmed module behavior:
-
-- HTTPS POST sent successfully;
-- schema header sent;
-- request ID header sent;
-- `X-WindowsDeviceLink-Key` sent when supplied;
-- API key absent from JSON body;
-- payload contains DeviceLink plus device/runtime metadata;
-- optional `tenantId` included for routing;
-- Azure Automation webhook accepts request and starts a job;
-- targeted client-side errors exist for common HTTP 400, 401, 403, 404, 408, 429 and 5xx failures.
-
-Confirmed sample Azure Automation receiver behavior:
-
-- PowerShell 7.4 Runtime Environment;
-- `Microsoft.Graph.Authentication` package;
-- request parsing and schema validation;
-- API-key validation using `WindowsDeviceLinkWebhookApiKey`;
-- correct API key accepted;
-- incorrect API key rejected before Graph registration;
-- `WindowsDeviceLinkTenantConfiguration` routing lookup;
+- HTTPS POST;
+- schema and request ID headers;
+- optional `X-WindowsDeviceLink-Key`;
+- API key excluded from JSON body;
+- optional tenant routing;
+- Azure Automation PowerShell 7.4 receiver;
+- API-key validation;
 - Managed Identity Graph authentication;
-- successful Graph DeviceLink pre-association;
-- `associationState = preassociated` returned;
+- successful preassociation;
 - targeted duplicate / HTTP 409 handling.
 
-The complete Windows 11 webhook route was repeated successfully against `0.4.1-preview1` on 2026-09-07.
+See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Notes
 
@@ -120,22 +182,28 @@ The complete Windows 11 webhook route was repeated successfully against `0.4.1-p
 - WinPE uses direct DLL activation.
 - The public repository and PowerShell Gallery package do **not** redistribute `Windows.Management.Service.dll`; WinPE users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
-- Device-code authentication uses direct OAuth 2.0 + Graph REST.
-- Client-secret and environment-variable authentication use native OAuth client credentials + direct Graph REST on both Windows and WinPE.
+- Firmware access requires `SeSystemEnvironmentPrivilege`; the development firmware cmdlets enable it in the current process.
+
+## Current 0.4.3-preview1 development focus
+
+Development adds:
+
+```powershell
+Get-WindowsDeviceLinkFirmwareState
+Clear-WindowsDeviceLinkFirmwareState
+```
+
+Both include comment-based help and are intended to work in full Windows and AMD64 WinPE.
+
+Before publishing `0.4.3-preview1`, repeat the new cmdlets themselves (not only the underlying test scripts) on at least Windows 11 and AMD64 WinPE, validate `-WhatIf`/confirmation behavior for the clear command, run packaging checks, and perform a final public-repository secret/identifier scan.
 
 ## Remaining validation
 
-- Repeat Device Association removal in AMD64 WinPE.
-- Repeat removal with additional authentication methods.
-- Validate webhook transport in AMD64 WinPE.
-- Validate a second target tenant through the same webhook/runbook routing table.
-- Additional Windows 11 and WinPE builds.
-- Additional OEMs/models.
-- Additional file-path/failure edge cases.
+- Live regression of the new firmware cmdlets on Windows 11.
+- Live regression of the new firmware cmdlets on AMD64 WinPE.
+- `Clear-WindowsDeviceLinkFirmwareState -WhatIf` and confirmation behavior.
+- Additional authentication methods for association removal.
+- Webhook transport in AMD64 WinPE.
+- Second target tenant through the same webhook/runbook routing table.
+- Additional Windows 11 / WinPE builds and OEMs/models.
 - Non-Global Microsoft clouds.
-
-## Association lifecycle
-
-`0.4.2-preview1` adds removal of Device Association records from Intune/Graph.
-
-The currently validated removal scenario is a **preassociated** record. For a device that is already fully associated, removing the server-side record alone may not clear device-side tenant affinity. Device-side/UEFI decommissioning is separate from deleting the `tenantAssociatedDevices` record and remains outside the currently validated module behavior.
