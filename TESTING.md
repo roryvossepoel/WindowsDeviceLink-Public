@@ -1,6 +1,6 @@
 # WindowsDeviceLink validation matrix
 
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 
 The primary Windows Autopilot Device Preparation Device Association workflow has been validated on physical AMD64 hardware across Windows 11 and AMD64 Windows PE.
 
@@ -24,9 +24,11 @@ The primary Windows Autopilot Device Preparation Device Association workflow has
 | Certificate subject name | Pass | Pass |
 | Device Association removal by serial number | Pass | Pass |
 | Device Association removal by association ID | Pass | Not repeated |
-| Firmware-state read | Pass | Pass |
-| Firmware-state clear | Pass | Pass |
+| `Get-WindowsDeviceLinkFirmwareState` | Pass | Pass |
+| `Clear-WindowsDeviceLinkFirmwareState` | Pass | Pass |
+| Firmware clear `-WhatIf` | Pass | Pass |
 | Post-clear firmware verification | Pass | Pass |
+| Reboot regeneration observation | Pass | Pass (clear), rebooted to Windows |
 
 ## Online method validation
 
@@ -101,50 +103,23 @@ On a clean test device all four variables were absent.
 
 ### DeviceLink generation
 
-After `Get-WindowsDeviceLink`, local firmware contained:
-
-```text
-DeviceLinkId
-DeviceLinkCreationTimeUtc
-```
-
-The JWT variables were absent.
-
-This behavior was observed in AMD64 WinPE.
+After `Get-WindowsDeviceLink`, local firmware contained `DeviceLinkId` and `DeviceLinkCreationTimeUtc`. The JWT variables were absent. This behavior was observed in AMD64 WinPE.
 
 ### Preassociation
 
-Creating a server-side preassociation from WinPE did not add the JWT variables. Local state remained:
-
-```text
-DeviceLinkId
-DeviceLinkCreationTimeUtc
-```
+Creating a server-side preassociation from WinPE did not add the JWT variables. Local state remained `DeviceLinkId` plus `DeviceLinkCreationTimeUtc`.
 
 ### Fully associated device
 
-On a fully associated Windows device, all four variables were present:
-
-```text
-DeviceLinkId
-DeviceLinkJwtCompressed
-DeviceLinkJwtLastWrite
-DeviceLinkCreationTimeUtc
-```
+On a fully associated Windows device, all four variables were present.
 
 ### Server-side removal does not clear local firmware
 
-Removing the server-side Device Association record did not remove local firmware state.
+Removing the server-side Device Association record did not remove local firmware state. Deleting only `DeviceLinkId` was insufficient on the fully associated test device because the remaining DeviceLink state allowed it to reappear.
 
-Deleting only `DeviceLinkId` was insufficient on a fully associated device because the remaining DeviceLink state allowed it to reappear.
+### AMD64 WinPE lifecycle
 
-### Full Windows cleanup
-
-Deleting all four known variables succeeded in full Windows. Immediate verification showed all four absent with Win32 error `203` (`ERROR_ENVVAR_NOT_FOUND`).
-
-### AMD64 WinPE cleanup
-
-The same native UEFI read/write mechanism was validated in WinPE:
+The native UEFI mechanism and module workflow were validated in WinPE:
 
 1. read clean firmware state;
 2. generate DeviceLink;
@@ -155,42 +130,44 @@ The same native UEFI read/write mechanism was validated in WinPE:
 7. delete the local DeviceLink firmware variables from WinPE;
 8. verify all four known variables were absent afterward.
 
-This establishes AMD64 WinPE as a viable control point for Device Association cleanup and tenant-move workflows.
+### Full Windows cleanup and reboot regeneration
+
+The `0.4.3` firmware cmdlets were then exercised directly in full Windows on the same physical device.
+
+Validated sequence:
+
+1. after boot, `Get-WindowsDeviceLinkFirmwareState` returned `DeviceLinkId` and `DeviceLinkCreationTimeUtc` as present and both JWT variables as absent;
+2. Intune contained no Device Association record for the device;
+3. `Clear-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru` removed the two present variables;
+4. automatic post-clear verification returned all four variables absent with Win32 error `203`;
+5. the device was restarted normally;
+6. no `Get-WindowsDeviceLink` command was run after restart;
+7. `Get-WindowsDeviceLinkFirmwareState` again returned `DeviceLinkId` and `DeviceLinkCreationTimeUtc` as present while both JWT variables remained absent;
+8. `Clear-WindowsDeviceLinkFirmwareState -WhatIf` in full Windows correctly invoked `ShouldProcess` without modifying state.
+
+This demonstrates on the tested device that Windows can recreate the base DeviceLink identity variables after a normal boot even when there is no server-side Device Association record. `DeviceLinkId` and `DeviceLinkCreationTimeUtc` alone must therefore not be treated as proof of tenant association.
+
+The safe firmware-state cmdlet intentionally does not return raw values, so this regression did not determine whether the regenerated `DeviceLinkId` is identical to the pre-clear value or newly generated.
 
 ## 0.4.3 firmware cmdlet validation
 
-The new firmware cmdlets were exercised directly in AMD64 WinPE, not only through the earlier test scripts.
+The new cmdlets have now been exercised directly in both full Windows and AMD64 WinPE.
 
 Validated:
 
-- `Get-WindowsDeviceLinkFirmwareState` returns the four known variables with environment, namespace, presence, size and Win32 error metadata;
-- the cmdlet does not expose raw firmware contents;
-- empty state returns `Present = False` and Win32 error `203` for all four variables;
-- `Clear-WindowsDeviceLinkFirmwareState -WhatIf` honors `ShouldProcess` and performs no write;
-- `Clear-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru` removes present DeviceLink firmware variables;
-- the clear cmdlet skips variables that are already absent;
-- the clear cmdlet verifies post-removal state automatically;
-- `-PassThru` returned all four variables as absent after cleanup;
-- successful cleanup reported `DeviceLink firmware state cleared and verified successfully.`
-
-The new cmdlets therefore have a successful live regression in AMD64 WinPE. A final live regression of these cmdlets in full Windows remains desirable before publishing `0.4.3-preview1`.
+- `Get-WindowsDeviceLinkFirmwareState` returns environment, namespace, name, presence, size and Win32 error metadata;
+- raw firmware contents are not exposed;
+- empty state returns `Present = False` and Win32 error `203`;
+- `Clear-WindowsDeviceLinkFirmwareState -WhatIf` honors `ShouldProcess` in Windows and WinPE;
+- `Clear-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru` removes present variables;
+- already absent variables are skipped;
+- post-removal state is automatically verified;
+- `-PassThru` returns the verified state;
+- successful cleanup reports `DeviceLink firmware state cleared and verified successfully.`
 
 ## Webhook validation
 
-The webhook route has been validated end-to-end on Windows 11.
-
-Confirmed:
-
-- HTTPS POST;
-- schema and request ID headers;
-- optional `X-WindowsDeviceLink-Key`;
-- API key excluded from JSON body;
-- optional tenant routing;
-- Azure Automation PowerShell 7.4 receiver;
-- API-key validation;
-- Managed Identity Graph authentication;
-- successful preassociation;
-- targeted duplicate / HTTP 409 handling.
+The webhook route has been validated end-to-end on Windows 11, including HTTPS POST, schema/request ID headers, optional API-key header, tenant routing, Azure Automation PowerShell 7.4, Managed Identity Graph authentication, successful preassociation and targeted duplicate handling.
 
 See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
@@ -201,23 +178,17 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 - The public repository and PowerShell Gallery package do **not** redistribute `Windows.Management.Service.dll`; WinPE users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
 - Firmware access requires `SeSystemEnvironmentPrivilege`; the firmware cmdlets enable it in the current process.
+- Immediate firmware clear verification and persistent absence across future Windows boots are different conditions.
 
 ## Current 0.4.3-preview1 development focus
 
-Development adds:
-
-```powershell
-Get-WindowsDeviceLinkFirmwareState
-Clear-WindowsDeviceLinkFirmwareState
-```
-
-Both include comment-based help and work in the validated AMD64 WinPE path. Before publishing `0.4.3-preview1`, repeat the new cmdlets in full Windows, run packaging checks, review the public documentation, and perform a final public-repository secret/identifier scan.
+The live firmware cmdlet regression is now complete on the tested Windows 11 and AMD64 WinPE paths. Before publishing `0.4.3-preview1`, remaining release work is packaging validation, final documentation/cmdlet-name review, and a final public-repository secret/identifier scan.
 
 ## Remaining validation
 
-- Live regression of the new firmware cmdlets on Windows 11.
 - Additional authentication methods for association removal.
 - Webhook transport in AMD64 WinPE.
 - Second target tenant through the same webhook/runbook routing table.
 - Additional Windows 11 / WinPE builds and OEMs/models.
+- Determine whether regenerated `DeviceLinkId` is identical or newly generated, if a safe test method is added.
 - Non-Global Microsoft clouds.
