@@ -137,7 +137,7 @@ Conclusion: the reset removes the old local DeviceLink identity. Windows can gen
 
 ## 0.4.3 firmware cmdlet validation
 
-The firmware implementation has been exercised directly in both full Windows and AMD64 WinPE. The development API now uses:
+The firmware implementation has been exercised directly in both full Windows and AMD64 WinPE. The published API uses:
 
 ```powershell
 Get-WindowsDeviceLinkFirmwareState
@@ -146,7 +146,7 @@ Reset-WindowsDeviceLinkFirmwareState
 
 Validated behavior includes safe metadata-only reads, `ShouldProcess` / `-WhatIf`, noninteractive reset with `-Confirm:$false`, `-PassThru`, skipping already absent variables, and immediate post-reset verification.
 
-`Reset-WindowsDeviceLinkFirmwareState` replaces the earlier development-only `Clear-WindowsDeviceLinkFirmwareState` name before Gallery publication because reset more accurately describes the lifecycle: the old identity is removed and Windows may later create a new identity.
+`Reset-WindowsDeviceLinkFirmwareState` replaced the earlier development-only `Clear-WindowsDeviceLinkFirmwareState` name before Gallery publication because reset more accurately describes the lifecycle: the old identity is removed and Windows may later create a new identity.
 
 ## Webhook validation
 
@@ -162,9 +162,9 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
 - Firmware access requires `SeSystemEnvironmentPrivilege`; the firmware cmdlets enable it in the current process.
 
-## Current 0.4.3-preview1 development focus
+## Published preview
 
-The firmware lifecycle is now proven end-to-end on the tested physical device, including reset, new identity generation after reboot, and successful re-preassociation. Before publishing `0.4.3-preview1`, remaining release work is a quick regression of the final `Reset-WindowsDeviceLinkFirmwareState` name, packaging validation, final documentation review, and a final public-repository secret/identifier scan.
+`WindowsDeviceLink 0.4.3-preview1` has been published to the PowerShell Gallery after successful package build and release validation in GitHub Actions.
 
 ## Remaining validation
 
