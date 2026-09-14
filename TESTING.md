@@ -157,6 +157,24 @@ The same native UEFI read/write mechanism was validated in WinPE:
 
 This establishes AMD64 WinPE as a viable control point for Device Association cleanup and tenant-move workflows.
 
+## 0.4.3 firmware cmdlet validation
+
+The new firmware cmdlets were exercised directly in AMD64 WinPE, not only through the earlier test scripts.
+
+Validated:
+
+- `Get-WindowsDeviceLinkFirmwareState` returns the four known variables with environment, namespace, presence, size and Win32 error metadata;
+- the cmdlet does not expose raw firmware contents;
+- empty state returns `Present = False` and Win32 error `203` for all four variables;
+- `Clear-WindowsDeviceLinkFirmwareState -WhatIf` honors `ShouldProcess` and performs no write;
+- `Clear-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru` removes present DeviceLink firmware variables;
+- the clear cmdlet skips variables that are already absent;
+- the clear cmdlet verifies post-removal state automatically;
+- `-PassThru` returned all four variables as absent after cleanup;
+- successful cleanup reported `DeviceLink firmware state cleared and verified successfully.`
+
+The new cmdlets therefore have a successful live regression in AMD64 WinPE. A final live regression of these cmdlets in full Windows remains desirable before publishing `0.4.3-preview1`.
+
 ## Webhook validation
 
 The webhook route has been validated end-to-end on Windows 11.
@@ -182,7 +200,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 - WinPE uses direct DLL activation.
 - The public repository and PowerShell Gallery package do **not** redistribute `Windows.Management.Service.dll`; WinPE users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
-- Firmware access requires `SeSystemEnvironmentPrivilege`; the development firmware cmdlets enable it in the current process.
+- Firmware access requires `SeSystemEnvironmentPrivilege`; the firmware cmdlets enable it in the current process.
 
 ## Current 0.4.3-preview1 development focus
 
@@ -193,15 +211,11 @@ Get-WindowsDeviceLinkFirmwareState
 Clear-WindowsDeviceLinkFirmwareState
 ```
 
-Both include comment-based help and are intended to work in full Windows and AMD64 WinPE.
-
-Before publishing `0.4.3-preview1`, repeat the new cmdlets themselves (not only the underlying test scripts) on at least Windows 11 and AMD64 WinPE, validate `-WhatIf`/confirmation behavior for the clear command, run packaging checks, and perform a final public-repository secret/identifier scan.
+Both include comment-based help and work in the validated AMD64 WinPE path. Before publishing `0.4.3-preview1`, repeat the new cmdlets in full Windows, run packaging checks, review the public documentation, and perform a final public-repository secret/identifier scan.
 
 ## Remaining validation
 
 - Live regression of the new firmware cmdlets on Windows 11.
-- Live regression of the new firmware cmdlets on AMD64 WinPE.
-- `Clear-WindowsDeviceLinkFirmwareState -WhatIf` and confirmation behavior.
 - Additional authentication methods for association removal.
 - Webhook transport in AMD64 WinPE.
 - Second target tenant through the same webhook/runbook routing table.
