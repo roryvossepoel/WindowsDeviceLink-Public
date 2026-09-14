@@ -66,7 +66,10 @@ For controlled automation or WinPE:
 Clear-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru
 ```
 
-The cmdlet verifies afterward that none of the known DeviceLink variables remain.
+The cmdlet verifies immediately afterward that none of the known DeviceLink variables remain.
+
+> [!IMPORTANT]
+> Immediate successful verification does not mean every DeviceLink variable will remain absent after a later Windows boot. Testing confirmed that Windows can recreate the local DeviceLink identity variables after reboot. See **Identity regeneration after reboot** below.
 
 ## Server-side removal is separate
 
@@ -90,7 +93,7 @@ Keep these operations separate unless the caller intentionally combines them.
 
 ## Validated lifecycle observations
 
-Testing on physical AMD64 hardware confirmed:
+Testing on physical AMD64 hardware confirmed the following behavior.
 
 ### Clean device
 
@@ -128,7 +131,33 @@ Deleting the `tenantAssociatedDevices` record did not remove the local firmware 
 
 ### Local cleanup
 
-Removing all four variables succeeded and was verified immediately afterward.
+Removing all four variables succeeded in both full Windows and AMD64 WinPE and was verified immediately afterward. All four returned `Present = False` and Win32 error `203`.
+
+### Identity regeneration after reboot
+
+A controlled test established an important distinction between local DeviceLink identity and server-side Device Association state:
+
+1. the server-side Device Association record was removed;
+2. Intune showed no Device Association record for the device;
+3. all four local DeviceLink UEFI variables were cleared and immediately verified absent;
+4. the device was rebooted into full Windows;
+5. no `Get-WindowsDeviceLink` command was run after reboot;
+6. `Get-WindowsDeviceLinkFirmwareState` then showed:
+
+```text
+DeviceLinkId                Present
+DeviceLinkCreationTimeUtc   Present
+DeviceLinkJwtCompressed     Absent
+DeviceLinkJwtLastWrite      Absent
+```
+
+The same base-state pattern had already been observed after explicit DeviceLink generation.
+
+This demonstrates on the tested device that Windows can recreate `DeviceLinkId` and `DeviceLinkCreationTimeUtc` during/after a normal Windows boot even when no Device Association record exists in Intune. Their presence alone must therefore **not** be interpreted as proof that the device is associated with a tenant.
+
+In the validated fully associated state, the two JWT-related variables were also present. Their exact semantics should not be inferred beyond the observed lifecycle behavior without additional Microsoft documentation or testing.
+
+The firmware cmdlet intentionally does not expose raw values, so this test did not determine whether the regenerated `DeviceLinkId` is byte-for-byte identical to the value that existed before cleanup or a newly generated identity.
 
 ## Windows PE
 
@@ -143,7 +172,7 @@ Validated in WinPE:
 - firmware state removal;
 - verification that all known firmware variables were absent afterward.
 
-Windows PE therefore provides a useful control point for reinstallation and tenant-to-tenant migration workflows.
+Windows PE therefore provides a useful control point for reinstallation and tenant-to-tenant migration workflows. Be aware that a subsequent full Windows boot can recreate the base DeviceLink identity variables as described above.
 
 ## Privilege requirement
 
@@ -155,3 +184,5 @@ Firmware access requires `SeSystemEnvironmentPrivilege`. WindowsDeviceLink enabl
 - Do not expose the raw JWT-compressed value in logs.
 - Use `-WhatIf` / confirmation behavior for destructive operations where appropriate.
 - Treat server-side removal and local firmware cleanup as separate lifecycle operations.
+- Do not treat `DeviceLinkId` or `DeviceLinkCreationTimeUtc` alone as evidence of an active tenant association.
+- Expect the base DeviceLink identity variables to be recreated by Windows on the validated hardware after reboot.
