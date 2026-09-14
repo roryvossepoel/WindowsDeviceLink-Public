@@ -5,17 +5,17 @@
     Author            = 'Rory Vossepoel'
     CompanyName       = 'Community'
     Copyright         = '(c) 2026 Rory Vossepoel. MIT License.'
-    Description       = 'Generate TPM-backed DeviceLink identity information, inspect and clear local DeviceLink firmware state, export the official Windows-generated .devicelink.csv, pre-associate physical Windows devices with Microsoft Intune for Windows Autopilot Device Preparation Device Association, and remove Device Association records. Supports AMD64 Windows 11 and Windows PE, multiple online authentication methods, and optional webhook-based registration for unattended and multi-tenant automation.'
+    Description       = 'Generate TPM-backed DeviceLink identity information, inspect and reset local DeviceLink firmware state, export the official Windows-generated .devicelink.csv, pre-associate physical Windows devices with Microsoft Intune for Windows Autopilot Device Preparation Device Association, and remove Device Association records. Supports AMD64 Windows 11 and Windows PE, multiple online authentication methods, and optional webhook-based registration for unattended and multi-tenant automation.'
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop')
     FunctionsToExport = @(
-        'Clear-WindowsDeviceLinkFirmwareState'
         'Connect-WindowsDeviceLink'
         'Export-WindowsDeviceLinkCsv'
         'Get-WindowsDeviceLink'
         'Get-WindowsDeviceLinkFirmwareState'
         'Register-WindowsDeviceLink'
         'Remove-WindowsDeviceLinkAssociation'
+        'Reset-WindowsDeviceLinkFirmwareState'
         'Test-WindowsDeviceLinkSupport'
     )
     CmdletsToExport   = @()
