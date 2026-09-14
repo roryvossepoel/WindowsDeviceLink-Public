@@ -13,13 +13,11 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 
 ## Install from PowerShell Gallery
 
-The currently published Gallery preview is `0.4.2-preview1`.
+The currently published Gallery preview is `0.4.3-preview1`.
 
 ```powershell
 Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease
 ```
-
-This repository contains `0.4.3-preview1` development changes. The firmware-state cmdlets are not part of the published `0.4.2-preview1` package yet.
 
 ## What this module is for
 
@@ -112,7 +110,7 @@ DeviceLinkCreationTimeUtc
 
 ## Reset local firmware state
 
-Development version `0.4.3-preview1` adds:
+`0.4.3-preview1` adds:
 
 ```powershell
 Reset-WindowsDeviceLinkFirmwareState
@@ -218,9 +216,7 @@ See [`TESTING.md`](TESTING.md) for the validation matrix.
 
 ## Scope
 
-Currently published Gallery preview: `0.4.2-preview1`.
-
-Current repository development version: `0.4.3-preview1`.
+Currently published Gallery preview: `0.4.3-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association preassociation/removal, local firmware inspection/reset, multiple authentication methods, webhook transport and the optional Azure Automation receiver.
 
