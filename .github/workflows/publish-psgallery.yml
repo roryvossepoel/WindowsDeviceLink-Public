@@ -1,0 +1,76 @@
+name: Publish PowerShell Gallery
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/publish-psgallery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Publish WindowsDeviceLink 0.4.3-preview1'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Gallery package
+        shell: powershell
+        run: .\tools\New-GalleryPackage.ps1
+
+      - name: Validate release package
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packagePath = Join-Path $PWD 'out\WindowsDeviceLink'
+          $manifestPath = Join-Path $packagePath 'WindowsDeviceLink.psd1'
+          $manifest = Test-ModuleManifest -Path $manifestPath -ErrorAction Stop
+
+          if ($manifest.Version.ToString() -ne '0.4.3') {
+              throw "Unexpected module version: $($manifest.Version)"
+          }
+
+          $manifestData = Import-PowerShellDataFile -Path $manifestPath
+          if ($manifestData.PrivateData.PSData.Prerelease -ne 'preview1') {
+              throw "Unexpected prerelease label: $($manifestData.PrivateData.PSData.Prerelease)"
+          }
+
+          if ('Clear-WindowsDeviceLinkFirmwareState' -in $manifest.ExportedFunctions.Keys) {
+              throw 'Deprecated pre-release command name is still exported.'
+          }
+
+          if ('Reset-WindowsDeviceLinkFirmwareState' -notin $manifest.ExportedFunctions.Keys) {
+              throw 'Reset-WindowsDeviceLinkFirmwareState is not exported.'
+          }
+
+          $forbiddenDll = Join-Path $packagePath 'Runtime\Windows.Management.Service.dll'
+          if (Test-Path -LiteralPath $forbiddenDll) {
+              throw 'Windows.Management.Service.dll must not be included in the Gallery package.'
+          }
+
+          Write-Host 'Release package validation passed for WindowsDeviceLink 0.4.3-preview1.'
+
+      - name: Publish WindowsDeviceLink 0.4.3-preview1
+        shell: powershell
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) {
+              throw 'PSGALLERY_API_KEY is not available.'
+          }
+
+          Publish-Module `
+              -Path (Join-Path $PWD 'out\WindowsDeviceLink') `
+              -Repository PSGallery `
+              -NuGetApiKey $env:PSGALLERY_API_KEY `
+              -Force
+
+          Write-Host 'Publish-Module completed.'
