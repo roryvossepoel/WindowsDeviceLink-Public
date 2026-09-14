@@ -1,33 +1,27 @@
-# Next step: local Device Association lifecycle and WinPE
+# Device Association lifecycle: validated findings and next release
 
-This document captures the Device Association lifecycle investigation after `0.4.2-preview1`.
+This document records the firmware-lifecycle investigation completed after `0.4.2-preview1` and the remaining work before `0.4.3-preview1` is published.
 
 ## Goal
 
-Extend WindowsDeviceLink beyond server-side Device Association removal so that an already **associated** device can be safely prepared for decommissioning or tenant-to-tenant migration.
+Support safe Device Association decommissioning and tenant-to-tenant migration across full Windows and AMD64 Windows PE.
 
-The remaining question is whether the local Device Association / tenant-affinity state stored in UEFI can be inspected and cleared from AMD64 Windows PE in the same way that is now validated in full Windows.
+A complete lifecycle can require two separate operations:
 
-## Why this matters
+1. server-side removal of the Intune `tenantAssociatedDevices` record;
+2. local removal of DeviceLink firmware state.
 
-Removing the `tenantAssociatedDevices` record from Intune does not clear the local UEFI Device Association state.
+These operations are intentionally kept separate in WindowsDeviceLink.
 
-A complete lifecycle workflow therefore needs both:
+## Validated UEFI state
 
-1. local UEFI state handling on the device;
-2. removal of the server-side `tenantAssociatedDevices` record.
-
-This is especially relevant for tenant-to-tenant moves and WinPE-based deployment workflows.
-
-## Current UEFI namespace and variables
-
-Validated namespace:
+Namespace:
 
 ```text
 {B3DE75DA-819C-4FD5-9F01-C3D49E8CBBD7}
 ```
 
-Validated current variables:
+Current validated variables:
 
 ```text
 DeviceLinkId
@@ -36,177 +30,112 @@ DeviceLinkJwtLastWrite
 DeviceLinkCreationTimeUtc
 ```
 
-Do not log or publish the raw value of `DeviceLinkJwtCompressed`.
+Never log or publish raw `DeviceLinkJwtCompressed` content.
 
 ## Full Windows findings
 
-The following behavior has been validated on physical hardware with current Windows 11 25H2 support for Device Association.
+Validated on physical Windows 11 hardware:
 
-### Clean baseline
+- clean baseline: all four variables absent;
+- fully associated device: all four variables present;
+- deleting the server-side Device Association record does not clear local firmware state;
+- deleting only `DeviceLinkId` is insufficient on a fully associated device;
+- deleting all four known variables succeeds;
+- immediate readback confirms all four are absent with Win32 error `203` (`ERROR_ENVVAR_NOT_FOUND`).
 
-Before DeviceLink generation / pre-association, all four variables were absent.
+## AMD64 WinPE findings
 
-### Pre-associated state
+Validated on physical AMD64 WinPE:
 
-After DeviceLink generation and successful Graph pre-association:
+1. DeviceLink runtime support succeeds using direct DLL activation;
+2. direct firmware read works after enabling `SeSystemEnvironmentPrivilege`;
+3. clean firmware state is readable;
+4. `Get-WindowsDeviceLink` succeeds;
+5. DeviceLink generation creates `DeviceLinkId` and `DeviceLinkCreationTimeUtc`;
+6. Graph preassociation succeeds from WinPE;
+7. preassociation does not add the JWT firmware variables;
+8. server-side Device Association removal by serial number succeeds from WinPE;
+9. local DeviceLink firmware deletion succeeds from WinPE;
+10. post-delete readback confirms all four known variables are absent.
 
-- `DeviceLinkId` was present;
-- the additional association variables were not yet present.
+No external `UEFI` / `UEFIv2` PowerShell module is required.
 
-### Associated state
+## Native implementation
 
-After the device reached `Association state = Associated` in Intune, all four current variables were present:
-
-```text
-DeviceLinkId                Present
-DeviceLinkJwtCompressed     Present
-DeviceLinkJwtLastWrite      Present
-DeviceLinkCreationTimeUtc   Present
-```
-
-### Server-side removal does not clear UEFI state
-
-The Device Association record was removed successfully with:
-
-```powershell
-Remove-WindowsDeviceLinkAssociation
-```
-
-and the device was removed from Intune, but the local DeviceLink UEFI state remained present.
-
-### Local removal is validated in full Windows
-
-Deleting all four variables with the Windows firmware API succeeded. A direct readback immediately afterward returned `ERROR_ENVVAR_NOT_FOUND` (`203`) for each variable.
-
-Removing only `DeviceLinkId` is not sufficient; the complete set of current Device Association variables must be handled together.
-
-## Native implementation direction
-
-The external `UEFI` / `UEFIv2` PowerShell modules are not required for this project.
-
-Direct Windows APIs have been validated successfully:
+The validated native APIs are:
 
 ```text
 GetFirmwareEnvironmentVariable
 SetFirmwareEnvironmentVariable
 ```
 
-Access requires `SeSystemEnvironmentPrivilege`. The privilege exists in an elevated Windows PowerShell token but may be disabled and must be enabled for the current process before firmware access.
+Firmware access requires `SeSystemEnvironmentPrivilege`. The module enables the privilege in the current process.
 
-A reusable read-only probe is available at:
-
-```text
-tests/DeviceLink-Firmware-State.ps1
-```
-
-The script:
-
-- enables `SeSystemEnvironmentPrivilege` in the current process;
-- reads only the four known DeviceLink variables;
-- returns presence, size, environment and Win32 error metadata;
-- never returns the raw firmware values;
-- detects Windows versus Windows PE.
-
-## Next test: AMD64 WinPE
-
-The next session should start read-only.
-
-Boot an **already associated** physical device into AMD64 WinPE and run:
+Development cmdlets now exist:
 
 ```powershell
-.\tests\DeviceLink-Firmware-State.ps1
+Get-WindowsDeviceLinkFirmwareState
+Clear-WindowsDeviceLinkFirmwareState
 ```
 
-Validate:
+The read command returns safe metadata only. The clear command uses confirmation semantics, removes only currently present known DeviceLink variables, and verifies the post-removal state.
 
-1. `SeSystemEnvironmentPrivilege` can be enabled in WinPE;
-2. the four DeviceLink UEFI variables are readable;
-3. the same namespace and variable names are visible;
-4. `GetFirmwareEnvironmentVariable` behaves consistently with full Windows;
-5. no extra PowerShell or external UEFI module dependency is required.
-
-Do not clear any UEFI state during the first WinPE test.
-
-## After WinPE read validation
-
-If read-only access succeeds, perform a controlled WinPE clear test on a disposable / controlled associated device:
-
-1. capture firmware-state metadata before removal;
-2. remove all four known DeviceLink UEFI variables;
-3. immediately verify that all four are absent;
-4. reboot and verify they remain absent;
-5. verify the old association does not regenerate unexpectedly;
-6. remove any remaining server-side `tenantAssociatedDevices` record as appropriate.
-
-WinPE write support must be treated as separately validated from full Windows.
+See [`FIRMWARE-STATE.md`](FIRMWARE-STATE.md).
 
 ## Server-side cleanup
 
-The already validated command is:
+Validated command:
 
 ```powershell
-Remove-WindowsDeviceLinkAssociation \
-    -SerialNumber '<serial>' \
-    -Method <method> \
+Remove-WindowsDeviceLinkAssociation `
+    -SerialNumber '<serial-number>' `
+    -Method DeviceCode `
     -TenantId '<tenant-id>'
 ```
 
-or the advanced `-AssociationId` route.
-
-Validated Graph delete operation:
+Validated Graph operation:
 
 ```http
 DELETE /deviceManagement/tenantAssociatedDevices/{associationId}
 ```
 
-This is the Device Association API and is not the classic Autopilot V1 deletion API.
+This is Device Association, not classic Autopilot V1.
 
 ## Target tenant-to-tenant workflow
 
-If local UEFI removal is proven safe in WinPE, the target workflow is:
+A future controlled workflow can use WinPE as the orchestration point:
 
 ```text
 Boot WinPE
--> inspect current Device Association UEFI state
--> clear old Device Association UEFI variables
+-> inspect local DeviceLink firmware state
+-> authenticate to the source tenant
 -> remove old tenantAssociatedDevices record
--> generate/read DeviceLink identity as required
--> create pre-association in the target tenant
+-> clear old local DeviceLink firmware state
+-> generate a fresh/current DeviceLink identity
+-> pre-associate with the target tenant
 -> install Windows
 -> continue OOBE / Device Preparation
 ```
 
-## Candidate module design
+Do not combine these steps into one high-level destructive command until the separate operations and error cases are sufficiently exercised.
 
-Do not publish these commands until WinPE behavior is validated.
+## Remaining work before 0.4.3-preview1
 
-Candidate read-only command:
-
-```powershell
-Get-WindowsDeviceLinkFirmwareState
-```
-
-Candidate local-clear command:
-
-```powershell
-Clear-WindowsDeviceLinkFirmwareState
-```
-
-Existing server-side command:
-
-```powershell
-Remove-WindowsDeviceLinkAssociation
-```
-
-Keeping local firmware modification and Graph deletion separate initially remains the safer design.
+1. Live-test `Get-WindowsDeviceLinkFirmwareState` itself on Windows 11.
+2. Live-test `Get-WindowsDeviceLinkFirmwareState` itself in AMD64 WinPE.
+3. Live-test `Clear-WindowsDeviceLinkFirmwareState` in a controlled scenario.
+4. Validate `-WhatIf`, confirmation, no-state, and `-PassThru` behavior.
+5. Review public cmdlet naming one final time.
+6. Ensure every public cmdlet has useful comment-based help and examples.
+7. Run the Gallery packaging safety check.
+8. Run a final public-repository scan for customer IDs, serial numbers, secrets, webhook tokens, and test values.
+9. Publish `0.4.3-preview1` only after those checks pass.
 
 ## Safety requirements
 
-- Read-only WinPE validation comes first.
-- Never log or publish raw `DeviceLinkJwtCompressed` content.
+- Never return/log raw JWT firmware contents.
 - Only operate in the validated DeviceLink UEFI namespace.
-- Only touch the four known Device Association variables.
-- Do not assume reset/reinstall removes tenant affinity.
+- Only touch known DeviceLink variables.
+- Keep server-side Graph deletion and local firmware cleanup distinguishable.
 - Do not use classic Autopilot V1 delete APIs for Device Association records.
-- Be explicit about whether the device is `preassociated` or fully `associated`.
-- WinPE write support must be validated independently from full Windows.
+- Treat customer-specific client IDs, tenant IDs, serial numbers, certificates, secrets, and webhook tokens as non-public test data.
