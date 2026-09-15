@@ -17,9 +17,15 @@ Register-WindowsDeviceLink
 
 Remove-WindowsDeviceLinkAssociation
     Remove the tenant-side Intune Device Association
+
+Get-WindowsDeviceLinkStatus -Online
+    Combine local diagnostics with tenant-side state
+
+Initialize-WindowsDeviceLink
+    Safely ensure a validated LocalOnly device is preassociated
 ```
 
-`Get-WindowsDeviceLink -Online` has been removed. This is an intentional breaking preview change: a `Get-*` command no longer changes cloud state.
+`Get-WindowsDeviceLink -Online` has been removed. This is an intentional breaking preview change: local identity retrieval no longer changes meaning when a switch is supplied.
 
 ## Authentication methods
 
@@ -38,7 +44,7 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 | `ManagedIdentity` | Azure-hosted execution with an identity | No | Optional `ClientId` |
 | `Webhook` | Registration through an automation endpoint | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
 
-`Webhook` applies to `Register-WindowsDeviceLink`. Association lookup/removal are direct tenant-side Graph operations.
+`Webhook` applies to `Register-WindowsDeviceLink`. Association lookup/removal and online diagnostics are direct tenant-side Graph operations. `Initialize-WindowsDeviceLink` intentionally excludes Webhook because it must read and verify tenant-side state as part of its idempotent workflow.
 
 ## DeviceCode client ID
 
@@ -88,9 +94,42 @@ Get-WindowsDeviceLinkAssociation `
 
 The returned object uses the type name `Windows.DeviceLink.Association` and contains the association state, managed-device linkage, timestamps and Device Preparation policy information returned by Microsoft Graph.
 
+### Serial-number lookup note
+
+Live validation showed that the Graph beta endpoint can accept a `serialNumber` filter yet return no match for a record that is present. The module therefore retains a paged client-side matching fallback. This produced correct results for both existing and absent associations, but may be inefficient with large Device Association populations. The behavior is tracked in GitHub issue #1 and should be retested as the beta API evolves.
+
+## Combined online status
+
+`Get-WindowsDeviceLinkStatus` is local by default. Add `-Online` only when tenant correlation is required:
+
+```powershell
+Get-WindowsDeviceLinkStatus `
+    -Online `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+A confirmed lookup with no record returns `CloudChecked=True`, `AssociationPresent=False`, and `AssociationState=NotAssociated`. Authentication/Graph failures instead return `AssociationState=Unknown` plus `AssociationError`; they are not treated as proof that no association exists.
+
+## Safe initialization
+
+For the common workflow “preassociate this device if it is locally healthy and not already known to the tenant”:
+
+```powershell
+Initialize-WindowsDeviceLink `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+The initializer obtains combined status, classifies it, and only registers from the validated `LocalOnly` state. It then verifies the result using the read path. `Preassociated` and `Associated` return `Action=None`; unexpected or incomplete states are blocked. It never resets firmware, removes associations, or reboots.
+
+With `-Method DeviceCode`, one access token is obtained at the start and reused for lookup, registration, and verification. The token is kept in memory only for the run and is not included in the result object.
+
+`-WhatIf` still performs the required read-only cloud lookup so it can determine whether registration would be needed, but it suppresses the registration write.
+
 ## Unattended endpoint or WinPE
 
-Prefer `Webhook` when Graph secrets or certificates should not be stored on the endpoint:
+Prefer `Webhook` for direct registration when Graph secrets or certificates should not be stored on the endpoint:
 
 ```powershell
 $deviceLink = Get-WindowsDeviceLink
@@ -103,6 +142,8 @@ $deviceLink | Register-WindowsDeviceLink `
 ```
 
 The receiving automation layer owns tenant routing and Graph authentication.
+
+For idempotent `Initialize-WindowsDeviceLink`, use one of its supported direct authentication methods because initialization requires tenant-side lookup and verification.
 
 ## Existing Graph SDK session
 
