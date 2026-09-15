@@ -27,6 +27,8 @@ The primary Windows Autopilot Device Preparation Device Association workflow has
 | Device Association lookup by association ID | Pass | Not repeated |
 | Device Association removal by serial number | Pass | Pass |
 | Device Association removal by association ID | Pass | Not repeated |
+| `Get-WindowsDeviceLinkStatus` local status | Pass | Not repeated |
+| `Get-WindowsDeviceLinkStatus -Online` with preassociation | Pass | Not repeated |
 | `Get-WindowsDeviceLinkFirmwareState` | Pass | Pass |
 | Firmware reset operation | Pass | Pass |
 | Firmware reset `-WhatIf` | Pass | Pass |
@@ -38,7 +40,7 @@ The primary Windows Autopilot Device Preparation Device Association workflow has
 | Published package firmware read | Pass | Pass |
 | Published package reset `-WhatIf` | Pass | Pass |
 
-## 0.4.4 command-boundary and Device Association lookup validation
+## 0.4.4 command-boundary, Device Association and status validation
 
 `0.4.4-preview1` separates the local DeviceLink identity from tenant-side Device Association state.
 
@@ -46,43 +48,38 @@ The intended command boundaries are:
 
 ```text
 Get-WindowsDeviceLink
-    -> local physical-device identity only
+    local DeviceLink identity only
 
 Get-WindowsDeviceLinkFirmwareState
-    -> local UEFI DeviceLink state only
+    local UEFI state only
 
 Get-WindowsDeviceLinkAssociation
-    -> read-only tenant-side Intune / Graph Device Association lookup
+    tenant-side Intune/Graph Device Association only
 
-Register-WindowsDeviceLink
-    -> explicit tenant-side preassociation write
-
-Remove-WindowsDeviceLinkAssociation
-    -> explicit tenant-side association removal
+Get-WindowsDeviceLinkStatus
+    combined diagnostic view; local by default, cloud only with -Online
 ```
 
-Validated on physical Windows 11 hardware from the `0.4.4-preview1` development source:
+Validated on a physical AMD64 Windows 11 device:
 
-- module imported as base version `0.4.4` and exported `Get-WindowsDeviceLinkAssociation`;
-- `Get-WindowsDeviceLink` continued to return the local DeviceLink identity without authentication or Graph access;
-- `Get-WindowsDeviceLink -Online` was rejected by PowerShell parameter binding because `-Online` no longer exists;
-- `Get-WindowsDeviceLinkAssociation -SerialNumber ... -Method DeviceCode` returned no object for a device with no tenant-side Device Association;
-- the no-match path exercised both the Graph filtered lookup and the client-side fallback without creating or modifying an association;
-- the same local DeviceLink was then explicitly submitted through `Register-WindowsDeviceLink -Method DeviceCode`, which returned `associationState = preassociated`;
-- `Get-WindowsDeviceLinkAssociation` subsequently returned that preassociated record by serial number;
-- direct lookup of the same record by `-AssociationId` returned the same association ID, serial number, state, manufacturer/model and timestamps.
+- `Get-WindowsDeviceLink` returned the local identity without authentication or Graph activity;
+- the former `Get-WindowsDeviceLink -Online` parameter is no longer present;
+- Device Association lookup by serial number returned no result before registration;
+- `Register-WindowsDeviceLink -Method DeviceCode` created a `preassociated` record;
+- `Get-WindowsDeviceLinkAssociation` then returned that same record by serial number;
+- direct lookup by association ID returned the same record;
+- `Get-WindowsDeviceLinkStatus` returned support/runtime, local identity and firmware state without performing cloud authentication;
+- the local preassociated state showed two of four known firmware variables present: `DeviceLinkId` and `DeviceLinkCreationTimeUtc`;
+- `Get-WindowsDeviceLinkStatus -Online -Method DeviceCode` combined the same local state with the tenant-side `preassociated` Device Association in one result;
+- in that combined result, `CloudChecked=True`, `AssociationPresent=True`, `AssociationState=preassociated`, the association ID and preassociation timestamp were populated, and no association error was returned.
 
-No tenant IDs, serial numbers, association IDs, DeviceLink payloads or other live test identifiers are recorded in this document.
-
-Conclusion: local DeviceLink retrieval, explicit registration, and read-only tenant association lookup are now distinct and independently validated operations.
+No tenant IDs, serial numbers, Link IDs, SMBIOS UUIDs, association IDs or device-code values from the live validation are retained in this document.
 
 ## Online method validation
 
-Starting with `0.4.4-preview1`, online authentication parameters belong to the command that performs the online operation. `Get-WindowsDeviceLink` is local-only.
+The `0.4.4-preview1` API places authentication on explicit tenant-side operations rather than on `Get-WindowsDeviceLink`.
 
-Validated parameter behavior includes rejecting method-specific inputs when required values are missing and rejecting parameters that do not belong to the selected authentication method. The main Windows 11 registration methods were previously exercised successfully using DeviceCode, ClientSecret, AccessToken, EnvironmentVariable, Certificate, CertificateThumbprint and CertificateSubjectName. Each also produced the targeted HTTP 409 duplicate error when appropriate.
-
-ClientSecret and EnvironmentVariable use native OAuth + direct Graph REST on both Windows and WinPE and do not require `Microsoft.Graph.Authentication` for those methods.
+Validated parameter behavior and authentication methods continue to cover DeviceCode, Interactive, ClientSecret, AccessToken, Certificate, CertificateThumbprint, CertificateSubjectName, EnvironmentVariable and ManagedIdentity where applicable. Webhook registration remains an explicit `Register-WindowsDeviceLink -Method Webhook` operation.
 
 ## DeviceCode public client ID
 
@@ -237,14 +234,14 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.4.3-preview1` is the currently published PowerShell Gallery preview. `0.4.4-preview1` is under development and has not yet been published.
+`WindowsDeviceLink 0.4.3-preview1` is the currently published PowerShell Gallery release. `0.4.4-preview1` is under active validation in the public repository and is not yet published.
 
 ## Remaining validation / future work
 
-- `Get-WindowsDeviceLinkStatus` combined local/cloud diagnostics.
-- Trusted code signing; SignPath Foundation application submitted.
+- `Get-WindowsDeviceLinkStatus -Online` with no Device Association (`NotAssociated`).
+- `Get-WindowsDeviceLinkStatus` in AMD64 WinPE.
+- Trusted code signing; SignPath Foundation application is in progress.
 - Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
-- `0.4.4-preview1` WinPE regression tests after the command-boundary refactor.
 - Webhook transport in AMD64 WinPE.
 - Second target tenant through the same webhook/runbook routing table.
 - Additional Windows 11 / WinPE builds and OEMs/models.
