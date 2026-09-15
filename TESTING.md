@@ -30,6 +30,10 @@ The primary Windows Autopilot Device Preparation Device Association workflow has
 | Post-reset firmware verification | Pass | Pass |
 | New identity after reset/reboot | Pass | Pass (reset), rebooted to Windows |
 | Re-preassociation with new identity | Pass | Pass (identity created after WinPE reset) |
+| Published PSGallery package import | Pass | Pass |
+| Published package support probe | Pass | Pass with user-supplied DLL |
+| Published package firmware read | Pass | Pass |
+| Published package reset `-WhatIf` | Pass | Pass |
 
 ## Online method validation
 
@@ -131,7 +135,8 @@ A controlled end-to-end test established that the reset removes the old identity
 7. the post-boot DeviceLinkId SHA-256 fingerprint differed from the pre-reset fingerprint and the creation time changed;
 8. `Get-WindowsDeviceLink` returned the new identity;
 9. the new identity was successfully pre-associated;
-10. Intune showed a new `Pre-associated` record for the same physical device.
+10. Intune showed a new `Pre-associated` record for the same physical device;
+11. after the subsequent Windows restart, Intune reported the new Device Association as `Associated` and all four known DeviceLink firmware variables were present again.
 
 Conclusion: the reset removes the old local DeviceLink identity. Windows can generate a **new** base identity after reboot. The reappearance of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` is therefore expected regeneration, not restoration of the removed identity or tenant association.
 
@@ -148,6 +153,43 @@ Validated behavior includes safe metadata-only reads, `ShouldProcess` / `-WhatIf
 
 `Reset-WindowsDeviceLinkFirmwareState` replaced the earlier development-only `Clear-WindowsDeviceLinkFirmwareState` name before Gallery publication because reset more accurately describes the lifecycle: the old identity is removed and Windows may later create a new identity.
 
+## Published 0.4.3-preview1 Gallery smoke test
+
+The actual package published to PSGallery was tested after publication, rather than relying only on the repository checkout/build output.
+
+### Windows 11 OOBE
+
+Validated from the installed Gallery package:
+
+- `Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease -Force` succeeded;
+- module version/path confirmed the Gallery installation rather than a development checkout;
+- `Test-WindowsDeviceLinkSupport` passed;
+- `Get-WindowsDeviceLinkFirmwareState` passed on the associated test device;
+- all four known firmware variables were present in the associated state;
+- `Reset-WindowsDeviceLinkFirmwareState -WhatIf` correctly invoked `ShouldProcess` without modifying state.
+
+### AMD64 Windows PE
+
+The same published package was then tested in WinPE.
+
+Observed environment included PowerShellGet `2.2.5` as the active `Install-Module` provider, with older PowerShellGet/PackageManagement versions also present on disk.
+
+Validated findings:
+
+- normal `Install-Module ... -AllowPrerelease -Force` failed in the tested WinPE with `InvalidModuleAuthenticodeSignature`;
+- `Find-Module` and `Save-Module` succeeded;
+- the saved PSGallery package imported directly and reported version `0.4.3`;
+- the current preview package is not Authenticode signed;
+- `Install-Module ... -AllowPrerelease -SkipPublisherCheck -Force` succeeded;
+- without `Windows.Management.Service.dll`, `Test-WindowsDeviceLinkSupport` correctly reported WinPE/AMD64/direct-DLL mode but unsupported because the DLL was absent;
+- after a compatible user-supplied Microsoft DLL was placed in the module `Runtime` directory, the support probe succeeded;
+- `Get-WindowsDeviceLinkFirmwareState` returned the four known variables from the Gallery package;
+- `Reset-WindowsDeviceLinkFirmwareState -WhatIf` worked and did not modify state.
+
+The current WinPE `-SkipPublisherCheck` requirement is documented as a workaround for the unsigned preview and will be retested after trusted code signing is introduced.
+
+See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for the supported installation routes and troubleshooting guidance.
+
 ## Webhook validation
 
 The webhook route has been validated end-to-end on Windows 11, including HTTPS POST, schema/request ID headers, optional API-key header, tenant routing, Azure Automation PowerShell 7.4, Managed Identity Graph authentication, successful preassociation and targeted duplicate handling.
@@ -161,13 +203,16 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 - The public repository and PowerShell Gallery package do **not** redistribute `Windows.Management.Service.dll`; WinPE users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
 - Firmware access requires `SeSystemEnvironmentPrivilege`; the firmware cmdlets enable it in the current process.
+- PowerShellGet `Save-Module` does not exercise the same install/publisher-check path as `Install-Module`; both routes were tested separately in WinPE.
 
 ## Published preview
 
-`WindowsDeviceLink 0.4.3-preview1` has been published to the PowerShell Gallery after successful package build and release validation in GitHub Actions.
+`WindowsDeviceLink 0.4.3-preview1` has been published to the PowerShell Gallery after successful package build and release validation in GitHub Actions, followed by live smoke tests of the published package in Windows 11 OOBE and AMD64 WinPE.
 
-## Remaining validation
+## Remaining validation / future work
 
+- Trusted code signing; SignPath Foundation is the planned route to investigate.
+- Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
 - Additional authentication methods for association removal.
 - Webhook transport in AMD64 WinPE.
 - Second target tenant through the same webhook/runbook routing table.
