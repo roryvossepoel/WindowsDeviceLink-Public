@@ -41,11 +41,7 @@ jobs:
 
           $baseVersion = $manifest.Version.ToString()
           $prerelease = [string]$manifestData.PrivateData.PSData.Prerelease
-          $galleryVersion = if ([string]::IsNullOrWhiteSpace($prerelease)) {
-              $baseVersion
-          } else {
-              "$baseVersion-$prerelease"
-          }
+          $galleryVersion = if ([string]::IsNullOrWhiteSpace($prerelease)) { $baseVersion } else { "$baseVersion-$prerelease" }
 
           if (-not [string]::IsNullOrWhiteSpace($env:EXPECTED_VERSION) -and $env:EXPECTED_VERSION -ne $galleryVersion) {
               throw "Expected version '$($env:EXPECTED_VERSION)' does not match manifest version '$galleryVersion'."
@@ -53,6 +49,18 @@ jobs:
 
           if ('Clear-WindowsDeviceLinkFirmwareState' -in $manifest.ExportedFunctions.Keys) {
               throw 'Deprecated pre-release command name is still exported.'
+          }
+          if ('Get-WindowsDeviceLinkAssociation' -notin $manifest.ExportedFunctions.Keys) {
+              throw 'Get-WindowsDeviceLinkAssociation must be exported.'
+          }
+          if ('Register-WindowsDeviceLink' -notin $manifest.ExportedFunctions.Keys) {
+              throw 'Register-WindowsDeviceLink must be exported.'
+          }
+
+          Import-Module $manifestPath -Force
+          $localGet = Get-Command Get-WindowsDeviceLink -Module WindowsDeviceLink -ErrorAction Stop
+          if ($localGet.Parameters.ContainsKey('Online')) {
+              throw 'Get-WindowsDeviceLink still exposes deprecated -Online semantics.'
           }
 
           $forbiddenDll = Join-Path $packagePath 'Runtime\Windows.Management.Service.dll'
@@ -76,17 +84,12 @@ jobs:
           GALLERY_VERSION: ${{ steps.release.outputs.gallery_version }}
         run: |
           $ErrorActionPreference = 'Stop'
-
-          if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) {
-              throw 'PSGALLERY_API_KEY is not available.'
-          }
+          if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) { throw 'PSGALLERY_API_KEY is not available.' }
 
           Write-Host "Publishing WindowsDeviceLink $env:GALLERY_VERSION to PSGallery..."
-
           Publish-Module `
               -Path (Join-Path $PWD 'out\WindowsDeviceLink') `
               -Repository PSGallery `
               -NuGetApiKey $env:PSGALLERY_API_KEY `
               -Force
-
           Write-Host "Publish-Module completed for WindowsDeviceLink $env:GALLERY_VERSION."
