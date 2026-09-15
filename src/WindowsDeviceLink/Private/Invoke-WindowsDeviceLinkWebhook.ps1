@@ -34,7 +34,7 @@ function Invoke-WindowsDeviceLinkWebhook {
             model = $InputObject.Model
             smbiosUuid = $InputObject.SmbiosUuid
             linkId = $InputObject.LinkId
-            deviceLinkCreationTimeUtc = $InputObject.CreationTimeUtc
+            deviceLinkCreationTimeUtc = $InputObject.PayloadCreationTimeUtc
             deviceLink = $InputObject.DeviceLink
         }
         source = [ordered]@{
