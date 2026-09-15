@@ -11,6 +11,10 @@ function Get-WindowsDeviceLinkStatus {
     An online lookup that finds no association is reported as AssociationPresent = False and AssociationState = NotAssociated;
     this is a normal status result, not an error.
 
+    PayloadCreationTimeUtc is the timestamp contained in the newly generated DeviceLink payload. Live validation showed
+    that this value changes between payload generations while LinkId remains stable; it must not be interpreted as the
+    persistent local identity creation time.
+
     .EXAMPLE
     Get-WindowsDeviceLinkStatus | Format-List *
 
@@ -180,7 +184,7 @@ function Get-WindowsDeviceLinkStatus {
         Model                      = if ($deviceLink) { $deviceLink.Model } else { $null }
         SmbiosUuid                 = if ($deviceLink) { $deviceLink.SmbiosUuid } else { $null }
         LinkId                     = if ($deviceLink) { $deviceLink.LinkId } else { $null }
-        CreationTimeUtc            = if ($deviceLink) { $deviceLink.CreationTimeUtc } else { $null }
+        PayloadCreationTimeUtc     = if ($deviceLink) { $deviceLink.PayloadCreationTimeUtc } else { $null }
         IdentityError              = $identityError
         FirmwareChecked            = $null -eq $firmwareError
         FirmwareStateComplete      = if ($firmwareError) { $null } else { $firmwareStateComplete }
