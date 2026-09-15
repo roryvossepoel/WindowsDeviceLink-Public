@@ -3,7 +3,7 @@
 This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL.
 
 > [!IMPORTANT]
-> WindowsDeviceLink is currently preview software. The published version documented here is `0.4.3-preview1`.
+> WindowsDeviceLink is currently preview software. The published version documented here is `0.4.4-preview1`.
 
 ## Quick start - Windows 11
 
@@ -59,7 +59,7 @@ This distinction matters when multiple PowerShellGet versions are present. A Pow
 
 ## Prerelease support
 
-WindowsDeviceLink `0.4.3-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
+WindowsDeviceLink `0.4.4-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
 
 ```powershell
 Install-Module WindowsDeviceLink `
@@ -82,8 +82,6 @@ Check repository registration:
 ```powershell
 Get-PSRepository
 ```
-
-The normal repository entry is `PSGallery`.
 
 Check package discovery without installing anything:
 
@@ -127,16 +125,20 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-For `0.4.3-preview1`, the public commands include:
+For `0.4.4-preview1`, the public commands are:
 
 ```text
 Connect-WindowsDeviceLink
 Export-WindowsDeviceLinkCsv
 Get-WindowsDeviceLink
+Get-WindowsDeviceLinkAssociation
 Get-WindowsDeviceLinkFirmwareState
+Get-WindowsDeviceLinkStatus
+Initialize-WindowsDeviceLink
 Register-WindowsDeviceLink
 Remove-WindowsDeviceLinkAssociation
 Reset-WindowsDeviceLinkFirmwareState
+Test-WindowsDeviceLinkHealth
 Test-WindowsDeviceLinkSupport
 ```
 
@@ -166,8 +168,6 @@ AMD64 Windows PE
 
 WindowsDeviceLink currently targets 64-bit Windows PowerShell 5.1-compatible environments. Build WinPE with the PowerShell-related optional components and their dependencies appropriate to the ADK/WinPE version you use.
 
-The exact ADK optional-component package set can vary by Windows ADK release. Do not assume that a bare WinPE image contains PowerShellGet, PackageManagement, .NET support, networking cmdlets, or all certificate/trust functionality needed for Gallery operations.
-
 After booting WinPE, inspect the environment rather than assuming it is correct:
 
 ```powershell
@@ -182,40 +182,15 @@ Get-Command Install-Module |
 
 ### Validated WinPE PowerShellGet environment
 
-The `0.4.3-preview1` Gallery smoke test was performed in AMD64 WinPE with PowerShellGet `2.2.5` active. Multiple versions were present in the image, including the older inbox `1.0.0.1`, so checking the active command source was important.
+The Gallery smoke tests were performed in AMD64 WinPE with PowerShellGet `2.2.5` active. Multiple versions were present in the image, including the older inbox `1.0.0.1`, so checking the active command source was important.
 
 ### Current WinPE install behavior for unsigned preview packages
 
-During the validated `0.4.3-preview1` smoke test:
+The current preview remains unsigned while the SignPath Foundation application is in progress. In the validated AMD64 WinPE environment, normal `Install-Module ... -AllowPrerelease -Force` can fail with `InvalidModuleAuthenticodeSignature`, while `Find-Module`, `Save-Module`, direct import, and installation with `-SkipPublisherCheck` work.
 
-```powershell
-Install-Module WindowsDeviceLink `
-    -Repository PSGallery `
-    -AllowPrerelease `
-    -Force
-```
+This is documented as a WinPE installation limitation/workaround for the unsigned preview, not as a WindowsDeviceLink runtime failure.
 
-failed in the tested WinPE with:
-
-```text
-InvalidModuleAuthenticodeSignature
-```
-
-The same Gallery package installed normally in full Windows 11.
-
-Additional testing established:
-
-- `Find-Module` worked in WinPE;
-- `Save-Module` worked in WinPE;
-- the saved Gallery package imported and ran correctly;
-- WindowsDeviceLink `0.4.3-preview1` is not yet Authenticode signed;
-- `Install-Module ... -SkipPublisherCheck` succeeded in the same WinPE environment.
-
-This is therefore documented as a current WinPE installation limitation/workaround for the unsigned preview, not as a WindowsDeviceLink runtime failure.
-
-### Recommended WinPE installation for 0.4.3-preview1
-
-For the current unsigned preview, the directly validated installation command is:
+### Recommended WinPE installation for 0.4.4-preview1
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -229,11 +204,11 @@ Install-Module WindowsDeviceLink `
 
 `-SkipPublisherCheck` bypasses PowerShellGet's publisher check. Use it only when you intentionally trust the package source and understand the tradeoff. It is **not** required for the validated Windows 11 installation.
 
-The project plans to add trusted code signing in a later release and retest whether this WinPE workaround can then be removed.
+The project plans to add trusted code signing and retest whether this WinPE workaround can then be removed.
 
 ### WinPE fallback: Save-Module + Import-Module
 
-If `Install-Module` is undesirable or fails, `Save-Module` was also validated:
+If `Install-Module` is undesirable or fails, `Save-Module` is also validated:
 
 ```powershell
 New-Item -ItemType Directory -Path X:\Temp -Force | Out-Null
@@ -245,38 +220,29 @@ Save-Module WindowsDeviceLink `
     -Force
 ```
 
-Then import the saved version explicitly:
+Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.4.4`:
 
 ```powershell
-Import-Module 'X:\Temp\WindowsDeviceLink\0.4.3\WindowsDeviceLink.psd1' -Force
+Import-Module 'X:\Temp\WindowsDeviceLink\0.4.4\WindowsDeviceLink.psd1' -Force
 ```
-
-This still uses the package downloaded from PSGallery; it only avoids the `Install-Module` installation/publisher-check path.
 
 ## Windows.Management.Service.dll in WinPE
 
 The PowerShell Gallery package intentionally does **not** redistribute Microsoft's `Windows.Management.Service.dll`.
 
-A compatible AMD64 copy must be supplied by the user for DeviceLink runtime activation in WinPE.
-
-Place it in the installed/saved module's Runtime directory:
+A compatible AMD64 copy must be supplied by the user for DeviceLink runtime activation in WinPE. Place it in the installed/saved module's Runtime directory:
 
 ```text
 <WindowsDeviceLink module directory>\Runtime\Windows.Management.Service.dll
 ```
 
-For example, when testing a saved Gallery package:
+For example:
 
 ```text
-X:\Temp\WindowsDeviceLink\0.4.3\Runtime\Windows.Management.Service.dll
+X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.4.4\Runtime\Windows.Management.Service.dll
 ```
 
-Or pass the DLL explicitly when generating DeviceLink information:
-
-```powershell
-Get-WindowsDeviceLink `
-    -WindowsManagementServicePath 'E:\Path\Windows.Management.Service.dll'
-```
+Or pass the DLL explicitly to commands that expose `-WindowsManagementServicePath`.
 
 WindowsDeviceLink does not provide, download, or redistribute this DLL.
 
@@ -299,9 +265,32 @@ Architecture   : AMD64
 ActivationMode : DirectDll
 ```
 
-with a warning that `Windows.Management.Service.dll` was not found.
+After supplying a compatible DLL, the validated result reports support with direct-DLL activation. The installed `0.4.4-preview1` package has been smoke-tested this way on physical AMD64 WinPE hardware.
 
-After supplying a compatible DLL, the validated result is expected to report support with direct-DLL activation.
+## Validate status and health
+
+Local diagnostics:
+
+```powershell
+Get-WindowsDeviceLinkStatus | Format-List *
+
+Get-WindowsDeviceLinkStatus |
+    Test-WindowsDeviceLinkHealth |
+    Format-List *
+```
+
+Optional tenant correlation:
+
+```powershell
+Get-WindowsDeviceLinkStatus `
+    -Online `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>' |
+    Test-WindowsDeviceLinkHealth |
+    Format-List *
+```
+
+These paths have been validated in both Windows 11 and AMD64 WinPE.
 
 ## Firmware-state commands do not expose raw JWT data
 
@@ -310,6 +299,8 @@ After importing the module, firmware state can be inspected with:
 ```powershell
 Get-WindowsDeviceLinkFirmwareState
 ```
+
+Only the validated safe `DeviceLinkCreationTimeUtc` timestamp is decoded. Raw `DeviceLinkId` and JWT contents are not returned.
 
 For a non-destructive reset test:
 
@@ -368,9 +359,7 @@ Only install/update the NuGet provider if PackageManagement reports that it is r
 
 ### `InvalidModuleAuthenticodeSignature` in WinPE
 
-For the current unsigned `0.4.3-preview1` package, this was reproduced with `Install-Module` in the tested AMD64 WinPE while the same package installed normally in Windows 11.
-
-Validated workaround:
+For the current unsigned preview, use the validated workaround when the tested WinPE/PowerShellGet environment raises this publisher-check error:
 
 ```powershell
 Install-Module WindowsDeviceLink `
