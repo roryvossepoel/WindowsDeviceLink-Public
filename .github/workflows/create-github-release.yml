@@ -68,9 +68,28 @@ jobs:
               throw "Tag '$env:TAG' already exists. Releases are immutable; bump the manifest version instead."
           }
 
-          gh release view $env:TAG --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
+          # Query the GitHub API directly. A missing release is the expected state and
+          # should not be turned into a terminating NativeCommandError by Windows PowerShell.
+          $releaseApi = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:TAG"
+          $headers = @{
+              Authorization = "Bearer $env:GH_TOKEN"
+              Accept = 'application/vnd.github+json'
+              'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          try {
+              Invoke-RestMethod -Uri $releaseApi -Headers $headers -Method Get -ErrorAction Stop | Out-Null
               throw "GitHub release '$env:TAG' already exists."
+          }
+          catch {
+              $statusCode = $null
+              if ($_.Exception.Response) {
+                  $statusCode = [int]$_.Exception.Response.StatusCode
+              }
+
+              if ($statusCode -ne 404) {
+                  throw
+              }
           }
 
           Write-Host "Tag and release '$env:TAG' are available."
