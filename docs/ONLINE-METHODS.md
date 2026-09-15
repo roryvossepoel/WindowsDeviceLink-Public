@@ -1,6 +1,29 @@
 # Choosing an online method
 
-`Get-WindowsDeviceLink -Online` requires an explicit `-Method`.
+Starting with `0.4.4-preview1`, WindowsDeviceLink separates local DeviceLink identity from tenant-side Device Association operations.
+
+```text
+Get-WindowsDeviceLink
+    Local DeviceLink identity only
+
+Get-WindowsDeviceLinkFirmwareState
+    Local UEFI / firmware state only
+
+Get-WindowsDeviceLinkAssociation
+    Read the tenant-side Intune Device Association
+
+Register-WindowsDeviceLink
+    Create the tenant-side Intune pre-association
+
+Remove-WindowsDeviceLinkAssociation
+    Remove the tenant-side Intune Device Association
+```
+
+`Get-WindowsDeviceLink -Online` has been removed. This is an intentional breaking preview change: a `Get-*` command no longer changes cloud state.
+
+## Authentication methods
+
+The cloud cmdlets accept an explicit authentication `-Method` where authentication is required.
 
 | Method | Best fit | Credentials on device | Required input |
 |---|---|---:|---|
@@ -8,12 +31,14 @@
 | `Interactive` | Interactive Graph SDK workflow | No persistent secret | `TenantId` |
 | `ClientSecret` | Unattended direct Graph call | Yes | `TenantId`, `ClientId`, `ClientSecret` |
 | `AccessToken` | Caller already has a Graph token | Token in memory | `TenantId`, `AccessToken` |
-| `Certificate` | Unattended direct Graph call | Certificate/private key | `TenantId`, `ClientId`, `Certificate` |
+| `Certificate` | Unattended Graph SDK call | Certificate/private key | `TenantId`, `ClientId`, `Certificate` |
 | `CertificateThumbprint` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateThumbprint` |
 | `CertificateSubjectName` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateSubjectName` |
 | `EnvironmentVariable` | Existing client-credential automation | Yes | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` |
 | `ManagedIdentity` | Azure-hosted execution with an identity | No | Optional `ClientId` |
-| `Webhook` | Unattended endpoint / WinPE / multi-tenant automation | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
+| `Webhook` | Registration through an automation endpoint | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
+
+`Webhook` applies to `Register-WindowsDeviceLink`. Association lookup/removal are direct tenant-side Graph operations.
 
 ## DeviceCode client ID
 
@@ -23,38 +48,54 @@ When `-Method DeviceCode` is used without an explicit `-ClientId`, WindowsDevice
 14d82eec-204b-4c2f-b7e8-296a70dab67e
 ```
 
-This is the Microsoft Graph PowerShell / Graph Command Line Tools public client ID. It is not a customer-specific application registration, tenant identifier, client secret, certificate, or other confidential credential. Public client IDs are identifiers and are not secrets.
+This is the Microsoft Graph PowerShell / Graph Command Line Tools public client ID. It is not a customer-specific application registration, tenant identifier, client secret, certificate, or confidential credential. Public client IDs are identifiers, not secrets.
 
-You can override it by supplying your own public client application ID:
+You can override it with your own public client application ID.
 
-```powershell
-Get-WindowsDeviceLink `
-    -Online `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>' `
-    -ClientId '<public-client-id>'
-```
+## Manual pre-association
 
-## Recommended patterns
-
-### Manual administration or testing
-
-Use `DeviceCode` unless another interactive method is specifically required.
+First obtain the local identity, then explicitly register it:
 
 ```powershell
-Get-WindowsDeviceLink `
-    -Online `
+$deviceLink = Get-WindowsDeviceLink
+
+$deviceLink | Register-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>'
 ```
 
-### Unattended endpoint or WinPE
+This makes the state-changing cloud operation visible in the command name and pipeline.
 
-Prefer `Webhook` when Graph secrets or certificates should not be stored on the endpoint.
+## Query the tenant-side association
+
+By serial number:
 
 ```powershell
-Get-WindowsDeviceLink `
-    -Online `
+Get-WindowsDeviceLinkAssociation `
+    -SerialNumber '<serial-number>' `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+Or by the exact association ID:
+
+```powershell
+Get-WindowsDeviceLinkAssociation `
+    -AssociationId '<association-id>' `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+The returned object uses the type name `Windows.DeviceLink.Association` and contains the association state, managed-device linkage, timestamps and Device Preparation policy information returned by Microsoft Graph.
+
+## Unattended endpoint or WinPE
+
+Prefer `Webhook` when Graph secrets or certificates should not be stored on the endpoint:
+
+```powershell
+$deviceLink = Get-WindowsDeviceLink
+
+$deviceLink | Register-WindowsDeviceLink `
     -Method Webhook `
     -WebhookUri '<webhook-url>' `
     -WebhookApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
@@ -63,16 +104,15 @@ Get-WindowsDeviceLink `
 
 The receiving automation layer owns tenant routing and Graph authentication.
 
-### Direct unattended Graph call
+## Existing Graph SDK session
 
-Use a protected application credential such as a certificate where appropriate. The credential remains the responsibility of the caller.
+`Register-WindowsDeviceLink` retains the advanced connected-session pattern. If `Connect-WindowsDeviceLink` has already established a Microsoft Graph session, `-Method` can be omitted:
+
+```powershell
+Connect-WindowsDeviceLink -TenantId '<tenant-id>'
+Get-WindowsDeviceLink | Register-WindowsDeviceLink
+```
 
 ## Parameter validation
 
-WindowsDeviceLink rejects:
-
-- `-Online` without `-Method`;
-- required method inputs that are missing;
-- parameters that do not belong to the selected method.
-
-This validation happens before DeviceLink generation starts.
+WindowsDeviceLink rejects missing required method inputs and parameters that do not belong to the selected authentication method. `Get-WindowsDeviceLinkAssociation` also requires exactly one of `-SerialNumber` or `-AssociationId`.
