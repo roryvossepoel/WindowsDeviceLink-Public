@@ -32,19 +32,19 @@ function Get-WindowsDeviceLink {
     $decoded = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
 
     $deviceLink = [pscustomobject]@{
-        PSTypeName      = 'Windows.DeviceLink.Information'
-        Environment     = $support.Environment
-        SerialNumber    = $decoded.DeviceInfo.SerialNumber
-        Manufacturer    = $decoded.DeviceInfo.Manufacturer
-        Model           = $decoded.DeviceInfo.ModelName
-        SmbiosUuid      = $decoded.DeviceInfo.SmbiosUuid
-        LinkId          = $decoded.DeviceInfo.LinkId
-        CreationTimeUtc = $decoded.DeviceLinkCreationTimeUtc
-        DeviceLink      = $payload
-        DllSource       = $support.DllSource
-        ActivationMode  = $support.ActivationMode
-        DllPath         = $support.DllPath
-        DllVersion      = $support.DllVersion
+        PSTypeName             = 'Windows.DeviceLink.Information'
+        Environment            = $support.Environment
+        SerialNumber           = $decoded.DeviceInfo.SerialNumber
+        Manufacturer           = $decoded.DeviceInfo.Manufacturer
+        Model                  = $decoded.DeviceInfo.ModelName
+        SmbiosUuid             = $decoded.DeviceInfo.SmbiosUuid
+        LinkId                 = $decoded.DeviceInfo.LinkId
+        PayloadCreationTimeUtc = $decoded.DeviceLinkCreationTimeUtc
+        DeviceLink             = $payload
+        DllSource              = $support.DllSource
+        ActivationMode         = $support.ActivationMode
+        DllPath                = $support.DllPath
+        DllVersion             = $support.DllVersion
     }
 
     if ($PSBoundParameters.ContainsKey('OutputDirectory')) {
