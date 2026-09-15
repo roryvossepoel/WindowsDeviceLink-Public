@@ -229,6 +229,8 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 - [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - online authentication and registration methods.
 - [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
 - [`docs/REMOVE-ASSOCIATION.md`](docs/REMOVE-ASSOCIATION.md) - server-side Device Association removal.
+- [`docs/CODE-SIGNING.md`](docs/CODE-SIGNING.md) - code signing policy, roles and release provenance.
+- [`PRIVACY.md`](PRIVACY.md) - project privacy policy and administrator-initiated network transfers.
 - [`TESTING.md`](TESTING.md) - validation matrix and live test observations.
 
 ## Public commands
@@ -257,6 +259,16 @@ Currently published Gallery preview: `0.4.3-preview1`.
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association preassociation/removal, local firmware inspection/reset, multiple authentication methods, webhook transport and the optional Azure Automation receiver.
 
 Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot V1 management, or production support guarantees.
+
+## Code signing policy
+
+WindowsDeviceLink is applying for code signing through the SignPath Foundation. Until the application is approved and the signing integration is complete, current preview releases may remain unsigned.
+
+> **Free code signing provided by SignPath.io, certificate by SignPath Foundation.**
+
+Official signed artifacts will be built from the public source repository through the project's automated GitHub Actions release workflow and must be explicitly approved for signing. WindowsDeviceLink does not redistribute or sign Microsoft's `Windows.Management.Service.dll`.
+
+See [`docs/CODE-SIGNING.md`](docs/CODE-SIGNING.md) for the complete policy, team roles and provenance requirements, and [`PRIVACY.md`](PRIVACY.md) for the privacy policy.
 
 ## License
 
