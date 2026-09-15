@@ -15,6 +15,10 @@ function Get-WindowsDeviceLinkStatus {
     that this value changes between payload generations while LinkId remains stable; it must not be interpreted as the
     persistent local identity creation time.
 
+    FirmwareCreationTimeUtc is decoded from the local DeviceLinkCreationTimeUtc UEFI variable. Live validation showed
+    this firmware timestamp remained stable across repeated DeviceLink payload generations. The exact Windows lifecycle
+    event represented by this persistent timestamp is not claimed beyond the firmware variable's own name.
+
     .EXAMPLE
     Get-WindowsDeviceLinkStatus | Format-List *
 
@@ -120,6 +124,8 @@ function Get-WindowsDeviceLinkStatus {
     $firmwareExpectedCount = 4
     $firmwarePresentCount = $firmwarePresent.Count
     $firmwareStateComplete = $firmwarePresentCount -eq $firmwareExpectedCount
+    $firmwareCreationState = $firmwareState | Where-Object Name -eq 'DeviceLinkCreationTimeUtc' | Select-Object -First 1
+    $firmwareCreationTimeUtc = if ($firmwareCreationState) { $firmwareCreationState.ParsedUtc } else { $null }
 
     $association = $null
     $associationError = $null
@@ -185,6 +191,7 @@ function Get-WindowsDeviceLinkStatus {
         SmbiosUuid                 = if ($deviceLink) { $deviceLink.SmbiosUuid } else { $null }
         LinkId                     = if ($deviceLink) { $deviceLink.LinkId } else { $null }
         PayloadCreationTimeUtc     = if ($deviceLink) { $deviceLink.PayloadCreationTimeUtc } else { $null }
+        FirmwareCreationTimeUtc    = $firmwareCreationTimeUtc
         IdentityError              = $identityError
         FirmwareChecked            = $null -eq $firmwareError
         FirmwareStateComplete      = if ($firmwareError) { $null } else { $firmwareStateComplete }
