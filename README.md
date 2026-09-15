@@ -11,13 +11,41 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 > [!IMPORTANT]
 > This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the online registration/removal flows use Microsoft Graph beta endpoints. These can change without notice.
 
-## Install from PowerShell Gallery
+## Installation
 
 The currently published Gallery preview is `0.4.3-preview1`.
 
+### Windows 11
+
+Run 64-bit Windows PowerShell 5.1 as administrator:
+
 ```powershell
-Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease
+Install-Module WindowsDeviceLink `
+    -Repository PSGallery `
+    -AllowPrerelease `
+    -Force
+
+Import-Module WindowsDeviceLink -Force
+Test-WindowsDeviceLinkSupport
 ```
+
+### Windows PE
+
+The current unsigned preview has a validated WinPE-specific PowerShellGet publisher-check issue. In the tested AMD64 WinPE, normal `Install-Module` returned `InvalidModuleAuthenticodeSignature`, while this command succeeded:
+
+```powershell
+Install-Module WindowsDeviceLink `
+    -Repository PSGallery `
+    -AllowPrerelease `
+    -SkipPublisherCheck `
+    -Force
+```
+
+`-SkipPublisherCheck` is a current workaround for the unsigned preview and is **not** required for the validated Windows 11 installation. A `Save-Module` + direct `Import-Module` fallback is also documented.
+
+WinPE additionally requires a compatible user-supplied `Windows.Management.Service.dll`; the Microsoft DLL is intentionally not redistributed in the repository or Gallery package.
+
+**Read [`docs/INSTALLATION.md`](docs/INSTALLATION.md) before deploying in WinPE.** It covers PowerShellGet, PackageManagement, NuGet, TLS, `-AllowPrerelease`, `-SkipPublisherCheck`, multiple PowerShellGet versions, the runtime DLL, verification, and troubleshooting.
 
 ## What this module is for
 
@@ -49,7 +77,7 @@ Always start on a new system with:
 Test-WindowsDeviceLinkSupport
 ```
 
-## Important WinPE note
+## Important WinPE runtime note
 
 `Windows.Management.Service.dll` is **not included** in this repository, GitHub releases, or the PowerShell Gallery package. Windows 11 uses the system copy. WinPE users must provide a compatible Microsoft copy themselves.
 
@@ -61,7 +89,7 @@ WindowsDeviceLink\Runtime\Windows.Management.Service.dll
 
 or pass it explicitly with `-WindowsManagementServicePath`.
 
-See [`src/WindowsDeviceLink/Runtime/README.md`](src/WindowsDeviceLink/Runtime/README.md).
+See [`src/WindowsDeviceLink/Runtime/README.md`](src/WindowsDeviceLink/Runtime/README.md) and [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
 
 ## Generate DeviceLink information
 
@@ -195,6 +223,14 @@ Get-WindowsDeviceLink `
 
 See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/README.md`](runbooks/README.md).
 
+## Documentation
+
+- [`docs/INSTALLATION.md`](docs/INSTALLATION.md) - Windows 11 and WinPE installation, PowerShellGet/PackageManagement and troubleshooting.
+- [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - online authentication and registration methods.
+- [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
+- [`docs/REMOVE-ASSOCIATION.md`](docs/REMOVE-ASSOCIATION.md) - server-side Device Association removal.
+- [`TESTING.md`](TESTING.md) - validation matrix and live test observations.
+
 ## Public commands
 
 | Command | Purpose |
@@ -212,7 +248,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 
 The primary registration, removal and firmware lifecycle flows are validated on Windows 11 and AMD64 Windows PE. The firmware reset lifecycle includes immediate removal verification, reboot, proof that a different DeviceLink identity is generated, and successful re-preassociation of that new identity.
 
-See [`TESTING.md`](TESTING.md) for the validation matrix.
+The actual `0.4.3-preview1` PowerShell Gallery package has also been smoke-tested in Windows 11 OOBE and AMD64 WinPE. See [`TESTING.md`](TESTING.md).
 
 ## Scope
 
