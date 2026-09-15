@@ -17,6 +17,7 @@ Export-ModuleMember -Function @(
     'Connect-WindowsDeviceLink'
     'Export-WindowsDeviceLinkCsv'
     'Get-WindowsDeviceLink'
+    'Get-WindowsDeviceLinkAssociation'
     'Get-WindowsDeviceLinkFirmwareState'
     'Register-WindowsDeviceLink'
     'Remove-WindowsDeviceLinkAssociation'
