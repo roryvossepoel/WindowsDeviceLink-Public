@@ -43,10 +43,11 @@ The primary Windows Autopilot Device Preparation Device Association workflow has
 | Post-reset firmware verification | Pass | Pass |
 | New identity after reset/reboot | Pass | Pass (reset), rebooted to Windows |
 | Re-preassociation with new identity | Pass | Pass (identity created after WinPE reset) |
-| Published PSGallery package import (0.4.3-preview1) | Pass | Pass |
-| Published package support probe (0.4.3-preview1) | Pass | Pass with user-supplied DLL |
-| Published package firmware read (0.4.3-preview1) | Pass | Pass |
-| Published package reset `-WhatIf` (0.4.3-preview1) | Pass | Pass |
+| Published PSGallery package import (0.4.4-preview1) | Pass | Pass |
+| Published package support probe (0.4.4-preview1) | Pass | Pass with user-supplied DLL |
+| Published package firmware read (0.4.4-preview1) | Pass | Pass |
+| Published package local status (0.4.4-preview1) | Pass | Pass |
+| Published package online associated health (0.4.4-preview1) | Pass | Pass |
 
 ## 0.4.4 command-boundary, Device Association, health and initialization validation
 
@@ -100,7 +101,7 @@ The same physical associated Dell device was validated first in Windows 11 OOBE 
 
 Validated in WinPE:
 
-- `Test-WindowsDeviceLinkSupport` reported `Environment=WindowsPE`, `Architecture=AMD64`, `Supported=True`, `DllSource=Bundled` and `ActivationMode=DirectDll` for the development checkout used in this test;
+- `Test-WindowsDeviceLinkSupport` reported `Environment=WindowsPE`, `Architecture=AMD64`, `Supported=True`, `DllSource=Bundled` and `ActivationMode=DirectDll` when a compatible runtime DLL was supplied;
 - `Get-WindowsDeviceLinkFirmwareState` returned all four known firmware variables as present;
 - `Get-WindowsDeviceLinkStatus` worked fully locally in WinPE with `DeviceLinkPresent=True`, `FirmwareStateComplete=True`, `FirmwareVariablesPresent=4/4`, `CloudChecked=False`;
 - local health was classified as `LocalCompleteFirmwareState` with informational severity;
@@ -232,38 +233,29 @@ DELETE /deviceManagement/tenantAssociatedDevices/{associationId}
 
 Validated standalone deletion, removal by serial number, removal by association ID in Windows 11, and removal by serial number from AMD64 WinPE. The cmdlet targets Device Association records (`tenantAssociatedDevices`) and does **not** use the classic Autopilot V1 deletion API.
 
-## Published 0.4.3-preview1 Gallery smoke test
+## Published 0.4.4-preview1 Gallery smoke test
 
-The actual `0.4.3-preview1` package published to PSGallery was tested after publication rather than relying only on repository checkout/build output.
+The actual `0.4.4-preview1` package published to PSGallery was tested after publication rather than relying only on the repository checkout.
 
 ### Windows 11 OOBE
 
-Validated from the installed Gallery package:
-
-- `Install-Module WindowsDeviceLink -Repository PSGallery -AllowPrerelease -Force` succeeded;
-- module version/path confirmed the Gallery installation rather than a development checkout;
-- `Test-WindowsDeviceLinkSupport` passed;
-- `Get-WindowsDeviceLinkFirmwareState` passed on the associated test device;
-- all four known firmware variables were present in the associated state;
-- `Reset-WindowsDeviceLinkFirmwareState -WhatIf` correctly invoked `ShouldProcess` without modifying state.
+Validated on physical AMD64 Windows 11 OOBE hardware, including local/online status and health, Device Association lifecycle states, and initializer behavior. `Preassociated` and `Associated` devices were both confirmed idempotent with `Action=None` and `Changed=False`.
 
 ### AMD64 Windows PE
 
-Observed environment included PowerShellGet `2.2.5` as the active `Install-Module` provider, with older PowerShellGet/PackageManagement versions also present on disk.
+The installed Gallery package was then exercised on the same physical associated device in AMD64 WinPE.
 
 Validated findings:
 
-- normal `Install-Module ... -AllowPrerelease -Force` failed in the tested WinPE with `InvalidModuleAuthenticodeSignature`;
-- `Find-Module` and `Save-Module` succeeded;
-- the saved PSGallery package imported directly and reported version `0.4.3`;
-- the current preview package is not Authenticode signed;
-- `Install-Module ... -AllowPrerelease -SkipPublisherCheck -Force` succeeded;
-- without `Windows.Management.Service.dll`, `Test-WindowsDeviceLinkSupport` correctly reported WinPE/AMD64/direct-DLL mode but unsupported because the DLL was absent;
-- after a compatible user-supplied Microsoft DLL was placed in the module `Runtime` directory, the support probe succeeded;
-- `Get-WindowsDeviceLinkFirmwareState` returned the four known variables from the Gallery package;
-- `Reset-WindowsDeviceLinkFirmwareState -WhatIf` worked and did not modify state.
+- the installed module reported version `0.4.4` from the Windows PowerShell module path rather than the repository checkout;
+- without `Windows.Management.Service.dll`, `Test-WindowsDeviceLinkSupport` correctly reported WinPE/AMD64/direct-DLL mode as unsupported because the runtime DLL was absent;
+- after a compatible user-supplied Microsoft DLL was placed in the installed module's `Runtime` directory, support changed to `Supported=True` with `ActivationMode=DirectDll`;
+- `Get-WindowsDeviceLinkFirmwareState` returned all four known variables;
+- the 24-byte fractional `DeviceLinkCreationTimeUtc` value decoded and parsed successfully while the other firmware values remained undisclosed;
+- `Get-WindowsDeviceLinkStatus` returned `Environment=WindowsPE`, `DeviceLinkPresent=True`, `FirmwareStateComplete=True`, `FirmwareVariablesPresent=4/4` and the parsed firmware creation time;
+- `Get-WindowsDeviceLinkStatus -Online -Method DeviceCode | Test-WindowsDeviceLinkHealth` returned `State=Associated`, `CloudChecked=True`, `AssociationPresent=True`, `AssociationState=associated` and no association error.
 
-The current WinPE `-SkipPublisherCheck` requirement is documented as a workaround for the unsigned preview and will be retested after trusted code signing is introduced.
+The current WinPE `-SkipPublisherCheck` requirement remains documented as a workaround for the unsigned preview and will be retested after trusted code signing is introduced.
 
 See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for the supported installation routes and troubleshooting guidance.
 
@@ -277,20 +269,17 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 - Full Windows uses the registered Windows Runtime and system `Windows.Management.Service.dll`.
 - WinPE uses direct DLL activation.
-- The public PowerShell Gallery package does **not** redistribute `Windows.Management.Service.dll`; WinPE Gallery users must provide a compatible copy themselves. Development checkouts may use a locally supplied Runtime copy for validation, but that file is excluded from the published package.
+- The public PowerShell Gallery package does **not** redistribute `Windows.Management.Service.dll`; WinPE Gallery users must provide a compatible copy themselves.
 - Native CSV generation is used; WindowsDeviceLink does not reconstruct the CSV format.
 - Firmware access requires `SeSystemEnvironmentPrivilege`; the firmware cmdlets enable it in the current process.
 - PowerShellGet `Save-Module` does not exercise the same install/publisher-check path as `Install-Module`; both routes were tested separately in WinPE.
 
 ## Published preview
 
-`WindowsDeviceLink 0.4.3-preview1` is the currently published PowerShell Gallery release. `0.4.4-preview1` is under active validation in the public repository and is not yet published.
+`WindowsDeviceLink 0.4.4-preview1` is the currently published PowerShell Gallery release. The GitHub release/tag and published Gallery package have been validated on physical AMD64 Windows 11 OOBE and AMD64 WinPE hardware.
 
 ## Remaining validation / future work
 
-- Build and inspect the exact `0.4.4-preview1` Gallery artifact from current `main`.
-- Run a final Windows PowerShell 5.1 smoke test against that staged artifact rather than the source checkout.
-- After publication, install the actual `0.4.4-preview1` Gallery package in Windows 11 and AMD64 WinPE and repeat the minimal smoke tests.
 - Trusted code signing; SignPath Foundation application is in progress.
 - Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
 - Retest and optimize the beta Device Association serial-number server-side lookup; the current client-side fallback is functionally correct.
