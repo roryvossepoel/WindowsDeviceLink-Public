@@ -55,7 +55,8 @@ jobs:
 
           Write-Host "Resolved release: $tag"
 
-      - name: Ensure tag and release do not already exist
+      - name: Check existing tag and release
+        id: existing
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,12 +65,17 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           git fetch --tags --force
-          if (git tag --list $env:TAG) {
-              throw "Tag '$env:TAG' already exists. Releases are immutable; bump the manifest version instead."
+          $tagExists = -not [string]::IsNullOrWhiteSpace((git tag --list $env:TAG))
+          "tag_exists=$($tagExists.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          if ($tagExists) {
+              $tagCommit = (git rev-list -n 1 $env:TAG).Trim()
+              Write-Host "Tag '$env:TAG' already exists at commit $tagCommit. The workflow will recover by creating the missing release from this existing immutable tag."
+          }
+          else {
+              Write-Host "Tag '$env:TAG' does not exist yet and will be created for this release."
           }
 
-          # Query the GitHub API directly. A missing release is the expected state and
-          # should not be turned into a terminating NativeCommandError by Windows PowerShell.
           $releaseApi = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:TAG"
           $headers = @{
               Authorization = "Bearer $env:GH_TOKEN"
@@ -79,7 +85,7 @@ jobs:
 
           try {
               Invoke-RestMethod -Uri $releaseApi -Headers $headers -Method Get -ErrorAction Stop | Out-Null
-              throw "GitHub release '$env:TAG' already exists."
+              throw "GitHub release '$env:TAG' already exists. Releases are immutable; bump the manifest version instead."
           }
           catch {
               $statusCode = $null
@@ -92,25 +98,34 @@ jobs:
               }
           }
 
-          Write-Host "Tag and release '$env:TAG' are available."
+          Write-Host "No GitHub release exists for '$env:TAG'; release creation may continue."
 
-      - name: Create tag and GitHub release
+      - name: Create GitHub release
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.release_version }}
           IS_PRERELEASE: ${{ steps.release.outputs.is_prerelease }}
+          TAG_EXISTS: ${{ steps.existing.outputs.tag_exists }}
         run: |
           $ErrorActionPreference = 'Stop'
 
           $arguments = @(
               'release', 'create', $env:TAG,
               '--repo', $env:GITHUB_REPOSITORY,
-              '--target', $env:GITHUB_SHA,
               '--title', "WindowsDeviceLink $env:RELEASE_VERSION",
               '--generate-notes'
           )
+
+          if ($env:TAG_EXISTS -eq 'true') {
+              # Recovery path: a previous release attempt may have created the tag before
+              # GitHub failed to create the Release object. Never move or recreate that tag.
+              $arguments += '--verify-tag'
+          }
+          else {
+              $arguments += @('--target', $env:GITHUB_SHA)
+          }
 
           if ($env:IS_PRERELEASE -eq 'True') {
               $arguments += '--prerelease'
@@ -121,4 +136,4 @@ jobs:
               throw "GitHub release creation failed with exit code $LASTEXITCODE."
           }
 
-          Write-Host "Created immutable GitHub release $env:TAG at commit $env:GITHUB_SHA."
+          Write-Host "Created GitHub release $env:TAG."
