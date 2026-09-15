@@ -1,0 +1,105 @@
+name: Create GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: 'Expected release version, for example 0.4.3-preview1. Leave empty to use the manifest.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate and resolve version
+        id: release
+        shell: powershell
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifestPath = Join-Path $PWD 'src\WindowsDeviceLink\WindowsDeviceLink.psd1'
+          $manifest = Test-ModuleManifest -Path $manifestPath -ErrorAction Stop
+          $manifestData = Import-PowerShellDataFile -Path $manifestPath
+
+          $baseVersion = $manifest.Version.ToString()
+          $prerelease = [string]$manifestData.PrivateData.PSData.Prerelease
+          $releaseVersion = if ([string]::IsNullOrWhiteSpace($prerelease)) {
+              $baseVersion
+          } else {
+              "$baseVersion-$prerelease"
+          }
+          $tag = "v$releaseVersion"
+
+          if (-not [string]::IsNullOrWhiteSpace($env:EXPECTED_VERSION) -and $env:EXPECTED_VERSION -ne $releaseVersion) {
+              throw "Expected version '$($env:EXPECTED_VERSION)' does not match manifest version '$releaseVersion'."
+          }
+
+          "release_version=$releaseVersion" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "is_prerelease=$(-not [string]::IsNullOrWhiteSpace($prerelease))" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Resolved release: $tag"
+
+      - name: Ensure tag and release do not already exist
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          git fetch --tags --force
+          if (git tag --list $env:TAG) {
+              throw "Tag '$env:TAG' already exists. Releases are immutable; bump the manifest version instead."
+          }
+
+          gh release view $env:TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+              throw "GitHub release '$env:TAG' already exists."
+          }
+
+          Write-Host "Tag and release '$env:TAG' are available."
+
+      - name: Create tag and GitHub release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.release_version }}
+          IS_PRERELEASE: ${{ steps.release.outputs.is_prerelease }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $arguments = @(
+              'release', 'create', $env:TAG,
+              '--repo', $env:GITHUB_REPOSITORY,
+              '--target', $env:GITHUB_SHA,
+              '--title', "WindowsDeviceLink $env:RELEASE_VERSION",
+              '--generate-notes'
+          )
+
+          if ($env:IS_PRERELEASE -eq 'True') {
+              $arguments += '--prerelease'
+          }
+
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+              throw "GitHub release creation failed with exit code $LASTEXITCODE."
+          }
+
+          Write-Host "Created immutable GitHub release $env:TAG at commit $env:GITHUB_SHA."
