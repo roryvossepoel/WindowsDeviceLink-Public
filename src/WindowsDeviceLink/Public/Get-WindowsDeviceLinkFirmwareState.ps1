@@ -11,9 +11,10 @@ function Get-WindowsDeviceLinkFirmwareState {
     available. It enables SeSystemEnvironmentPrivilege in the current process and
     returns presence, size, and Win32 error information for each known variable.
 
-    DeviceLinkCreationTimeUtc has been validated as a 20-byte UTF-8 ISO-8601 UTC
-    timestamp (for example 2026-09-06T12:22:51Z). For this variable only, the safe
-    decoded timestamp is returned as DecodedValue and ParsedUtc.
+    DeviceLinkCreationTimeUtc has been validated as a UTF-8 ISO-8601 UTC timestamp.
+    Observed valid forms include whole seconds (for example 2026-09-06T12:22:51Z)
+    and fractional seconds (for example 2026-09-15T07:48:22.972Z). For this variable
+    only, the safe decoded timestamp is returned as DecodedValue and ParsedUtc.
 
     Raw DeviceLinkId and DeviceLinkJwtCompressed values are intentionally never
     returned. DeviceLinkJwtCompressed contains sensitive association data.
@@ -83,9 +84,13 @@ function Get-WindowsDeviceLinkFirmwareState {
         if ($size -gt 0 -and $name -eq 'DeviceLinkCreationTimeUtc') {
             $candidate = [Text.Encoding]::UTF8.GetString($buffer, 0, [int]$size)
             $parsed = [DateTimeOffset]::MinValue
+            $formats = @(
+                'yyyy-MM-ddTHH:mm:ssZ',
+                'yyyy-MM-ddTHH:mm:ss.FFFFFFFZ'
+            )
             if ([DateTimeOffset]::TryParseExact(
                 $candidate,
-                'yyyy-MM-ddTHH:mm:ssZ',
+                $formats,
                 [Globalization.CultureInfo]::InvariantCulture,
                 [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal,
                 [ref]$parsed
