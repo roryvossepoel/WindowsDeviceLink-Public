@@ -20,6 +20,7 @@ Export-ModuleMember -Function @(
     'Get-WindowsDeviceLinkAssociation'
     'Get-WindowsDeviceLinkFirmwareState'
     'Get-WindowsDeviceLinkStatus'
+    'Initialize-WindowsDeviceLink'
     'Register-WindowsDeviceLink'
     'Remove-WindowsDeviceLinkAssociation'
     'Reset-WindowsDeviceLinkFirmwareState'
