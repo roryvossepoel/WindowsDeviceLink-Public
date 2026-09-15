@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       expected_version:
-        description: 'Expected Gallery version, for example 0.4.4-preview1. Leave empty to use the manifest.'
-        required: false
+        description: 'Exact Gallery version to publish, for example 0.4.4-preview1. The matching v<version> Git tag must already exist.'
+        required: true
         type: string
 
 permissions:
@@ -20,8 +20,24 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout immutable release tag
         uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.expected_version }}
+          fetch-depth: 0
+
+      - name: Verify release tag
+        shell: powershell
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expectedTag = "v$env:EXPECTED_VERSION"
+          $exactTag = (git describe --tags --exact-match HEAD 2>$null).Trim()
+          if ($LASTEXITCODE -ne 0 -or $exactTag -ne $expectedTag) {
+              throw "PSGallery publication must run from immutable tag '$expectedTag'. Checked out HEAD is not that exact tag."
+          }
+          Write-Host "Publishing source is pinned to tag $exactTag at commit $env:GITHUB_SHA."
 
       - name: Build Gallery package
         shell: powershell
@@ -43,7 +59,7 @@ jobs:
           $prerelease = [string]$manifestData.PrivateData.PSData.Prerelease
           $galleryVersion = if ([string]::IsNullOrWhiteSpace($prerelease)) { $baseVersion } else { "$baseVersion-$prerelease" }
 
-          if (-not [string]::IsNullOrWhiteSpace($env:EXPECTED_VERSION) -and $env:EXPECTED_VERSION -ne $galleryVersion) {
+          if ($env:EXPECTED_VERSION -ne $galleryVersion) {
               throw "Expected version '$($env:EXPECTED_VERSION)' does not match manifest version '$galleryVersion'."
           }
 
@@ -137,7 +153,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) { throw 'PSGALLERY_API_KEY is not available.' }
 
-          Write-Host "Publishing WindowsDeviceLink $env:GALLERY_VERSION to PSGallery..."
+          Write-Host "Publishing WindowsDeviceLink $env:GALLERY_VERSION from immutable release tag to PSGallery..."
           Publish-Module `
               -Path (Join-Path $PWD 'out\WindowsDeviceLink') `
               -Repository PSGallery `
