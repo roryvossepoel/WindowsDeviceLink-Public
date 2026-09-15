@@ -6,7 +6,7 @@
 
 PowerShell module for **Windows Autopilot Device Preparation Device Association** on physical Windows devices.
 
-WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the official Windows `.devicelink.csv`, query/pre-associate/remove Intune Device Association records, inspect and reset local DeviceLink UEFI state, or send a DeviceLink payload to a webhook for centralized automation.
+WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the official Windows `.devicelink.csv`, query/pre-associate/remove Intune Device Association records, inspect and reset local DeviceLink UEFI state, provide combined local/cloud diagnostics and health classification, or safely initialize a missing tenant-side preassociation.
 
 > [!IMPORTANT]
 > This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the Device Association flows use Microsoft Graph beta endpoints. These can change without notice.
@@ -15,11 +15,11 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 
 The currently published PowerShell Gallery preview is `0.4.3-preview1`.
 
-The `main` branch is now developing `0.4.4-preview1`. This preview intentionally separates local DeviceLink identity, local firmware state, and tenant-side Device Association operations. It is not published to the Gallery until its validation is complete.
+The `main` branch is developing `0.4.4-preview1`. This preview intentionally separates local DeviceLink identity, local firmware state, and tenant-side Device Association operations and adds non-destructive diagnostics, health classification, and safe idempotent initialization. It is not published to the Gallery until validation is complete.
 
 ## Mental model
 
-Starting with `0.4.4-preview1`, the module exposes three different concepts explicitly:
+Starting with `0.4.4-preview1`, the module exposes the layers explicitly:
 
 ```text
 Local DeviceLink identity
@@ -33,9 +33,14 @@ Tenant-side Intune Device Association
     Get-WindowsDeviceLinkAssociation
     Register-WindowsDeviceLink
     Remove-WindowsDeviceLinkAssociation
+
+Diagnostics / orchestration
+    Get-WindowsDeviceLinkStatus
+    Test-WindowsDeviceLinkHealth
+    Initialize-WindowsDeviceLink
 ```
 
-`Get-WindowsDeviceLink -Online` has been removed from the development version. This is an intentional breaking preview change: `Get-WindowsDeviceLink` is now always local and a `Get-*` operation no longer creates cloud state.
+`Get-WindowsDeviceLink -Online` has been removed from the development version. This is an intentional breaking preview change: `Get-WindowsDeviceLink` is now always local and a `Get-*` identity operation no longer creates cloud state.
 
 ## Installation
 
@@ -95,6 +100,8 @@ $deviceLink | Format-List *
 
 `Get-WindowsDeviceLink` does not authenticate to Microsoft Graph and does not change tenant-side state.
 
+`PayloadCreationTimeUtc` is the timestamp of the generated DeviceLink payload. It changes between payload generations and is deliberately distinguished from the persistent firmware `DeviceLinkCreationTimeUtc` value.
+
 Treat DeviceLink payloads, serial numbers, SMBIOS UUIDs, Link IDs and firmware JWT data as sensitive operational data.
 
 ## Export the official DeviceLink CSV
@@ -115,7 +122,7 @@ $deviceLink | Register-WindowsDeviceLink `
     -TenantId '<tenant-id>'
 ```
 
-Registration is now deliberately a `Register-*` operation. The default DeviceCode client ID is Microsoft's well-known public Graph PowerShell client ID and is not a customer secret.
+Registration is deliberately a `Register-*` operation. The default DeviceCode client ID is Microsoft's well-known public Graph PowerShell client ID and is not a customer secret.
 
 See [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) for all supported authentication methods.
 
@@ -130,13 +137,69 @@ Get-WindowsDeviceLinkAssociation `
 
 You can also query the exact record with `-AssociationId`. The cmdlet returns tenant-side association state and related Intune metadata; it does not read or change local firmware state.
 
+> [!NOTE]
+> During live validation, server-side Graph filtering by serial number did not reliably return an existing `tenantAssociatedDevices` record. The current implementation falls back to paged client-side matching. This is functionally validated but may be less efficient in large tenants; see GitHub issue #1 for the planned retest/optimization.
+
+## Combined status and health
+
+Local diagnostics require no Graph authentication:
+
+```powershell
+Get-WindowsDeviceLinkStatus | Format-List *
+Test-WindowsDeviceLinkHealth | Format-List *
+```
+
+To correlate the same local device with Intune:
+
+```powershell
+Get-WindowsDeviceLinkStatus `
+    -Online `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>' |
+    Test-WindowsDeviceLinkHealth |
+    Format-List *
+```
+
+`Get-WindowsDeviceLinkStatus` keeps observed state explicit: local identity, firmware state, and optional cloud association. `Test-WindowsDeviceLinkHealth` classifies that status without modifying anything. A failed cloud lookup is distinct from a confirmed `NotAssociated` result.
+
+Validated examples include `LocalBaseIdentity`, `LocalOnly`, `Preassociated`, `Associated`, incomplete firmware states, unsupported/runtime failures, and unknown cloud state. Health classification is intended for diagnostics and automation; it never resets, removes, registers, or reboots.
+
+## Safe idempotent initialization
+
+`Initialize-WindowsDeviceLink` is an orchestration command for the common goal “ensure this valid local DeviceLink is preassociated.” It checks status and health first and creates a tenant-side preassociation only when the validated state is exactly `LocalOnly`:
+
+```powershell
+Initialize-WindowsDeviceLink `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+Dry run:
+
+```powershell
+Initialize-WindowsDeviceLink `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>' `
+    -WhatIf
+```
+
+The initializer is deliberately conservative:
+
+- `LocalOnly` -> register, then verify through the explicit read path;
+- `Preassociated` -> `Action=None`, no write;
+- `Associated` -> `Action=None`, no write;
+- unexpected/incomplete/unknown states -> blocked;
+- it never resets firmware, removes an association, or reboots.
+
+For DeviceCode authentication the initializer reuses one access token for lookup, registration and verification, so a normal run requires one device-code sign-in rather than one sign-in per step.
+
 ## Read local firmware state
 
 ```powershell
 Get-WindowsDeviceLinkFirmwareState
 ```
 
-The cmdlet checks the four validated DeviceLink UEFI variables and returns metadata only; it never returns raw firmware contents:
+The cmdlet checks the four validated DeviceLink UEFI variables:
 
 ```text
 DeviceLinkId
@@ -144,6 +207,8 @@ DeviceLinkJwtCompressed
 DeviceLinkJwtLastWrite
 DeviceLinkCreationTimeUtc
 ```
+
+Raw `DeviceLinkId` and JWT contents are never returned. `DeviceLinkCreationTimeUtc` has been validated as a safe 20-byte UTF-8 ISO-8601 UTC timestamp and is exposed in decoded/parsed form. `Get-WindowsDeviceLinkStatus` surfaces it separately as `FirmwareCreationTimeUtc`.
 
 ## Reset local firmware state
 
@@ -239,9 +304,12 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 | Command | Purpose |
 |---|---|
 | `Get-WindowsDeviceLink` | Obtain the local DeviceLink identity; optionally export it. |
-| `Get-WindowsDeviceLinkFirmwareState` | Read safe metadata for local DeviceLink UEFI state. |
+| `Get-WindowsDeviceLinkFirmwareState` | Read safe metadata and the validated safe firmware timestamp. |
 | `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
 | `Get-WindowsDeviceLinkAssociation` | Query a tenant-side Intune Device Association by serial number or association ID. |
+| `Get-WindowsDeviceLinkStatus` | Combine runtime, local identity, firmware, and optional tenant-side association diagnostics. |
+| `Test-WindowsDeviceLinkHealth` | Non-destructively classify a status object into machine-readable health/lifecycle states. |
+| `Initialize-WindowsDeviceLink` | Safely and idempotently create a missing preassociation only from a validated `LocalOnly` state. |
 | `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association from an existing local DeviceLink object, directly or through a webhook. |
 | `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Test-WindowsDeviceLinkSupport` | Validate runtime, architecture and DeviceLink activation. |
@@ -262,7 +330,9 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 
 The `0.4.3-preview1` Gallery package has been smoke-tested in Windows 11 OOBE and AMD64 WinPE, including registration, removal and the firmware reset/reboot/reassociation lifecycle.
 
-The `0.4.4-preview1` development refactor must be revalidated before Gallery publication, particularly explicit registration and the new Device Association lookup cmdlet.
+For `0.4.4-preview1`, Windows 11 live validation now covers the local/cloud command boundary, Device Association lookup, combined status, safe firmware timestamp decoding, health classification, `LocalOnly -> Preassociated` initialization, `-WhatIf`, and idempotent handling of an already `Preassociated` device. Hardware-independent health regression tests cover 17 classification cases plus invariants.
+
+Remaining pre-publication validation includes the `Associated` initializer idempotency case, AMD64 WinPE validation of the new status/health surface, and final release/package review.
 
 ## Scope
 
@@ -270,9 +340,9 @@ Published Gallery preview: `0.4.3-preview1`.
 
 Development version on `main`: `0.4.4-preview1`.
 
-In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, local firmware inspection/reset, multiple authentication methods, webhook transport and optional Azure Automation receiver.
+In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure Automation receiver.
 
-Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot V1 management, or production support guarantees.
+Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot V1 management, automatic destructive repair, or production support guarantees.
 
 ## Code signing policy
 
