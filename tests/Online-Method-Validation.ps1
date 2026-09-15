@@ -1,11 +1,9 @@
 <#
-WindowsDeviceLink online-method regression tests.
+WindowsDeviceLink cloud-operation parameter regression tests for 0.4.4-preview1.
 
-These tests intentionally exercise parameter validation before DeviceLink generation.
-They do not require Graph credentials, TPM access, or a live webhook.
-
-Optional live webhook validation can be enabled with -WebhookUri. That test does
-require DeviceLink support on the machine running the script.
+These tests exercise the explicit separation between local DeviceLink retrieval and
+cloud Device Association operations. They do not require Graph credentials or TPM
+access unless the optional live webhook test is enabled.
 #>
 
 [CmdletBinding()]
@@ -20,11 +18,8 @@ $ErrorActionPreference = 'Stop'
 
 function Resolve-ModulePath {
     if ($ModulePath) { return (Resolve-Path -LiteralPath $ModulePath).Path }
-
     $candidate = Join-Path $PSScriptRoot '..\src\WindowsDeviceLink\WindowsDeviceLink.psd1'
-    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-        throw "WindowsDeviceLink manifest not found: $candidate"
-    }
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw "WindowsDeviceLink manifest not found: $candidate" }
     (Resolve-Path -LiteralPath $candidate).Path
 }
 
@@ -34,7 +29,6 @@ function Assert-Throws {
         [Parameter(Mandatory)][scriptblock]$ScriptBlock,
         [Parameter(Mandatory)][string]$ExpectedMessage
     )
-
     try {
         & $ScriptBlock
         throw "FAIL: $Name - expected an exception but none was thrown."
@@ -50,51 +44,58 @@ function Assert-Throws {
 $resolvedModulePath = Resolve-ModulePath
 Import-Module $resolvedModulePath -Force
 
-Assert-Throws -Name 'Online requires Method' -ExpectedMessage '-Method is required with -Online' -ScriptBlock {
+$fakeDeviceLink = [pscustomobject]@{
+    SerialNumber = 'TEST-SERIAL'
+    DeviceLink   = 'TEST-PAYLOAD'
+}
+$fakeDeviceLink.PSObject.TypeNames.Insert(0, 'Windows.DeviceLink.Information')
+
+Assert-Throws -Name 'Get-WindowsDeviceLink no longer accepts Online' -ExpectedMessage "parameter name 'Online'" -ScriptBlock {
     Get-WindowsDeviceLink -Online
 }
 
-Assert-Throws -Name 'Webhook requires WebhookUri' -ExpectedMessage '-WebhookUri is required for -Method Webhook' -ScriptBlock {
-    Get-WindowsDeviceLink -Online -Method Webhook
+Assert-Throws -Name 'Register Webhook requires WebhookUri' -ExpectedMessage '-WebhookUri is required for -Method Webhook' -ScriptBlock {
+    $fakeDeviceLink | Register-WindowsDeviceLink -Method Webhook
 }
 
 $testSecret = ConvertTo-SecureString 'not-a-real-secret' -AsPlainText -Force
-Assert-Throws -Name 'Webhook rejects ClientSecret' -ExpectedMessage 'not valid with -Method Webhook' -ScriptBlock {
-    Get-WindowsDeviceLink `
-        -Online `
-        -Method Webhook `
-        -WebhookUri 'https://example.invalid/' `
-        -ClientSecret $testSecret
+Assert-Throws -Name 'Register Webhook rejects ClientSecret' -ExpectedMessage 'not valid with -Method Webhook' -ScriptBlock {
+    $fakeDeviceLink | Register-WindowsDeviceLink -Method Webhook -WebhookUri 'https://example.invalid/' -ClientSecret $testSecret
 }
 
-Assert-Throws -Name 'DeviceCode requires TenantId' -ExpectedMessage '-TenantId is required for -Method DeviceCode' -ScriptBlock {
-    Get-WindowsDeviceLink -Online -Method DeviceCode
+Assert-Throws -Name 'Register DeviceCode requires TenantId' -ExpectedMessage '-TenantId is required for -Method DeviceCode' -ScriptBlock {
+    $fakeDeviceLink | Register-WindowsDeviceLink -Method DeviceCode
 }
 
-Assert-Throws -Name 'ClientSecret requires all inputs' -ExpectedMessage '-TenantId, -ClientId, and -ClientSecret are required' -ScriptBlock {
-    Get-WindowsDeviceLink -Online -Method ClientSecret -TenantId '00000000-0000-0000-0000-000000000000'
+Assert-Throws -Name 'Association lookup requires selector' -ExpectedMessage 'Specify exactly one of -AssociationId or -SerialNumber' -ScriptBlock {
+    Get-WindowsDeviceLinkAssociation -Method DeviceCode -TenantId '00000000-0000-0000-0000-000000000000'
 }
 
-Assert-Throws -Name 'AccessToken requires token' -ExpectedMessage '-TenantId and -AccessToken are required' -ScriptBlock {
-    Get-WindowsDeviceLink -Online -Method AccessToken -TenantId '00000000-0000-0000-0000-000000000000'
+Assert-Throws -Name 'Association lookup rejects two selectors' -ExpectedMessage 'Specify exactly one of -AssociationId or -SerialNumber' -ScriptBlock {
+    Get-WindowsDeviceLinkAssociation -AssociationId 'test-id' -SerialNumber 'TEST-SERIAL' -Method DeviceCode -TenantId '00000000-0000-0000-0000-000000000000'
+}
+
+Assert-Throws -Name 'Association DeviceCode requires TenantId' -ExpectedMessage '-TenantId is required for -Method DeviceCode' -ScriptBlock {
+    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method DeviceCode
+}
+
+Assert-Throws -Name 'Association ClientSecret requires all inputs' -ExpectedMessage '-TenantId, -ClientId, and -ClientSecret are required' -ScriptBlock {
+    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method ClientSecret -TenantId '00000000-0000-0000-0000-000000000000'
 }
 
 Write-Host ''
-Write-Host 'Parameter validation regression set passed.'
+Write-Host 'Cloud-operation parameter validation regression set passed.'
 
 if ($PSBoundParameters.ContainsKey('WebhookUri')) {
     Write-Host ''
-    Write-Host 'Running optional live webhook test...'
+    Write-Host 'Running optional live webhook registration test...'
 
-    $parameters = @{
-        Online = $true
-        Method = 'Webhook'
-        WebhookUri = $WebhookUri
-    }
+    $deviceLink = Get-WindowsDeviceLink
+    $parameters = @{ Method = 'Webhook'; WebhookUri = $WebhookUri }
     if ($PSBoundParameters.ContainsKey('WebhookApiKey')) { $parameters.WebhookApiKey = $WebhookApiKey }
     if ($TenantId) { $parameters.TenantId = $TenantId }
 
-    $result = Get-WindowsDeviceLink @parameters
+    $result = $deviceLink | Register-WindowsDeviceLink @parameters
     if (-not $result.RequestId) { throw 'FAIL: live webhook test returned no RequestId.' }
     if (-not $result.SerialNumber) { throw 'FAIL: live webhook test returned no SerialNumber.' }
 
