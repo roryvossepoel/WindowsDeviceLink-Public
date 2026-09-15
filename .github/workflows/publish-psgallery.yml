@@ -50,17 +50,46 @@ jobs:
           if ('Clear-WindowsDeviceLinkFirmwareState' -in $manifest.ExportedFunctions.Keys) {
               throw 'Deprecated pre-release command name is still exported.'
           }
-          if ('Get-WindowsDeviceLinkAssociation' -notin $manifest.ExportedFunctions.Keys) {
-              throw 'Get-WindowsDeviceLinkAssociation must be exported.'
-          }
-          if ('Register-WindowsDeviceLink' -notin $manifest.ExportedFunctions.Keys) {
-              throw 'Register-WindowsDeviceLink must be exported.'
+
+          $requiredFunctions = @(
+              'Connect-WindowsDeviceLink',
+              'Export-WindowsDeviceLinkCsv',
+              'Get-WindowsDeviceLink',
+              'Get-WindowsDeviceLinkAssociation',
+              'Get-WindowsDeviceLinkFirmwareState',
+              'Get-WindowsDeviceLinkStatus',
+              'Initialize-WindowsDeviceLink',
+              'Register-WindowsDeviceLink',
+              'Remove-WindowsDeviceLinkAssociation',
+              'Reset-WindowsDeviceLinkFirmwareState',
+              'Test-WindowsDeviceLinkHealth',
+              'Test-WindowsDeviceLinkSupport'
+          )
+          foreach ($function in $requiredFunctions) {
+              if ($function -notin $manifest.ExportedFunctions.Keys) {
+                  throw "Required public function '$function' is not exported."
+              }
           }
 
           Import-Module $manifestPath -Force
           $localGet = Get-Command Get-WindowsDeviceLink -Module WindowsDeviceLink -ErrorAction Stop
           if ($localGet.Parameters.ContainsKey('Online')) {
               throw 'Get-WindowsDeviceLink still exposes deprecated -Online semantics.'
+          }
+
+          $status = Get-Command Get-WindowsDeviceLinkStatus -Module WindowsDeviceLink -ErrorAction Stop
+          if (-not $status.Parameters.ContainsKey('Online')) {
+              throw 'Get-WindowsDeviceLinkStatus must expose explicit -Online diagnostics.'
+          }
+
+          $initializer = Get-Command Initialize-WindowsDeviceLink -Module WindowsDeviceLink -ErrorAction Stop
+          if (-not $initializer.Parameters.ContainsKey('WhatIf')) {
+              throw 'Initialize-WindowsDeviceLink must support ShouldProcess / -WhatIf.'
+          }
+
+          $firmwareReset = Get-Command Reset-WindowsDeviceLinkFirmwareState -Module WindowsDeviceLink -ErrorAction Stop
+          if (-not $firmwareReset.Parameters.ContainsKey('WhatIf')) {
+              throw 'Reset-WindowsDeviceLinkFirmwareState must support ShouldProcess / -WhatIf.'
           }
 
           $forbiddenDll = Join-Path $packagePath 'Runtime\Windows.Management.Service.dll'
@@ -73,6 +102,10 @@ jobs:
               Write-Host 'DLL files present in package:'
               $unexpectedDlls | ForEach-Object { Write-Host " - $($_.FullName)" }
           }
+
+          # Hardware-independent regression tests must pass before publication.
+          & (Join-Path $PWD 'tests\Health-State-Validation.ps1') -ModulePath $manifestPath
+          if (-not $?) { throw 'Health-State-Validation.ps1 failed.' }
 
           "gallery_version=$galleryVersion" >> $env:GITHUB_OUTPUT
           Write-Host "Release package validation passed for WindowsDeviceLink $galleryVersion."
