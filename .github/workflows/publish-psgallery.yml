@@ -72,6 +72,11 @@ jobs:
           }
 
           Import-Module $manifestPath -Force
+          $loadedModule = Get-Module WindowsDeviceLink -ErrorAction Stop
+          if (-not $loadedModule.Path.StartsWith($packagePath, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "Validation imported WindowsDeviceLink from unexpected path '$($loadedModule.Path)' instead of staged package '$packagePath'."
+          }
+
           $localGet = Get-Command Get-WindowsDeviceLink -Module WindowsDeviceLink -ErrorAction Stop
           if ($localGet.Parameters.ContainsKey('Online')) {
               throw 'Get-WindowsDeviceLink still exposes deprecated -Online semantics.'
@@ -99,16 +104,29 @@ jobs:
 
           $unexpectedDlls = @(Get-ChildItem -LiteralPath $packagePath -Recurse -File -Filter '*.dll')
           if ($unexpectedDlls.Count -gt 0) {
-              Write-Host 'DLL files present in package:'
-              $unexpectedDlls | ForEach-Object { Write-Host " - $($_.FullName)" }
+              throw "Unexpected DLL files are present in the Gallery package: $($unexpectedDlls.FullName -join ', ')"
           }
 
-          # Hardware-independent regression tests must pass before publication.
+          # Hardware-independent regression suites run against the exact staged artifact.
           & (Join-Path $PWD 'tests\Health-State-Validation.ps1') -ModulePath $manifestPath
           if (-not $?) { throw 'Health-State-Validation.ps1 failed.' }
 
+          & (Join-Path $PWD 'tests\Online-Method-Validation.ps1') -ModulePath $manifestPath
+          if (-not $?) { throw 'Online-Method-Validation.ps1 failed.' }
+
+          Remove-Module WindowsDeviceLink -Force -ErrorAction SilentlyContinue
+          Import-Module $manifestPath -Force
+          $smokeModule = Get-Module WindowsDeviceLink -ErrorAction Stop
+          if ($smokeModule.Version.ToString() -ne $baseVersion) {
+              throw "Staged artifact smoke import returned version '$($smokeModule.Version)' instead of '$baseVersion'."
+          }
+          if (-not $smokeModule.Path.StartsWith($packagePath, [StringComparison]::OrdinalIgnoreCase)) {
+              throw 'Staged artifact smoke test imported the module from an unexpected path.'
+          }
+
           "gallery_version=$galleryVersion" >> $env:GITHUB_OUTPUT
           Write-Host "Release package validation passed for WindowsDeviceLink $galleryVersion."
+          Write-Host "Validated staged artifact: $manifestPath"
 
       - name: Publish to PowerShell Gallery
         shell: powershell
