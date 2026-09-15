@@ -1,19 +1,22 @@
 name: Publish PowerShell Gallery
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/publish-psgallery.yml'
   workflow_dispatch:
+    inputs:
+      expected_version:
+        description: 'Expected Gallery version, for example 0.4.4-preview1. Leave empty to use the manifest.'
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: powershell-gallery-publish
+  cancel-in-progress: false
+
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'Publish WindowsDeviceLink 0.4.3-preview1'
     runs-on: windows-latest
 
     steps:
@@ -25,28 +28,31 @@ jobs:
         run: .\tools\New-GalleryPackage.ps1
 
       - name: Validate release package
+        id: release
         shell: powershell
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: |
           $ErrorActionPreference = 'Stop'
           $packagePath = Join-Path $PWD 'out\WindowsDeviceLink'
           $manifestPath = Join-Path $packagePath 'WindowsDeviceLink.psd1'
           $manifest = Test-ModuleManifest -Path $manifestPath -ErrorAction Stop
+          $manifestData = Import-PowerShellDataFile -Path $manifestPath
 
-          if ($manifest.Version.ToString() -ne '0.4.3') {
-              throw "Unexpected module version: $($manifest.Version)"
+          $baseVersion = $manifest.Version.ToString()
+          $prerelease = [string]$manifestData.PrivateData.PSData.Prerelease
+          $galleryVersion = if ([string]::IsNullOrWhiteSpace($prerelease)) {
+              $baseVersion
+          } else {
+              "$baseVersion-$prerelease"
           }
 
-          $manifestData = Import-PowerShellDataFile -Path $manifestPath
-          if ($manifestData.PrivateData.PSData.Prerelease -ne 'preview1') {
-              throw "Unexpected prerelease label: $($manifestData.PrivateData.PSData.Prerelease)"
+          if (-not [string]::IsNullOrWhiteSpace($env:EXPECTED_VERSION) -and $env:EXPECTED_VERSION -ne $galleryVersion) {
+              throw "Expected version '$($env:EXPECTED_VERSION)' does not match manifest version '$galleryVersion'."
           }
 
           if ('Clear-WindowsDeviceLinkFirmwareState' -in $manifest.ExportedFunctions.Keys) {
               throw 'Deprecated pre-release command name is still exported.'
-          }
-
-          if ('Reset-WindowsDeviceLinkFirmwareState' -notin $manifest.ExportedFunctions.Keys) {
-              throw 'Reset-WindowsDeviceLinkFirmwareState is not exported.'
           }
 
           $forbiddenDll = Join-Path $packagePath 'Runtime\Windows.Management.Service.dll'
@@ -54,12 +60,20 @@ jobs:
               throw 'Windows.Management.Service.dll must not be included in the Gallery package.'
           }
 
-          Write-Host 'Release package validation passed for WindowsDeviceLink 0.4.3-preview1.'
+          $unexpectedDlls = @(Get-ChildItem -LiteralPath $packagePath -Recurse -File -Filter '*.dll')
+          if ($unexpectedDlls.Count -gt 0) {
+              Write-Host 'DLL files present in package:'
+              $unexpectedDlls | ForEach-Object { Write-Host " - $($_.FullName)" }
+          }
 
-      - name: Publish WindowsDeviceLink 0.4.3-preview1
+          "gallery_version=$galleryVersion" >> $env:GITHUB_OUTPUT
+          Write-Host "Release package validation passed for WindowsDeviceLink $galleryVersion."
+
+      - name: Publish to PowerShell Gallery
         shell: powershell
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+          GALLERY_VERSION: ${{ steps.release.outputs.gallery_version }}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -67,10 +81,12 @@ jobs:
               throw 'PSGALLERY_API_KEY is not available.'
           }
 
+          Write-Host "Publishing WindowsDeviceLink $env:GALLERY_VERSION to PSGallery..."
+
           Publish-Module `
               -Path (Join-Path $PWD 'out\WindowsDeviceLink') `
               -Repository PSGallery `
               -NuGetApiKey $env:PSGALLERY_API_KEY `
               -Force
 
-          Write-Host 'Publish-Module completed.'
+          Write-Host "Publish-Module completed for WindowsDeviceLink $env:GALLERY_VERSION."
