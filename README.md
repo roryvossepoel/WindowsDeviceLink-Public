@@ -6,14 +6,38 @@
 
 PowerShell module for **Windows Autopilot Device Preparation Device Association** on physical Windows devices.
 
-WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the official Windows `.devicelink.csv`, pre-associate directly through Microsoft Graph, remove Device Association records, inspect and reset local DeviceLink UEFI state, or send a richer DeviceLink payload to a webhook for centralized automation.
+WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the official Windows `.devicelink.csv`, query/pre-associate/remove Intune Device Association records, inspect and reset local DeviceLink UEFI state, or send a DeviceLink payload to a webhook for centralized automation.
 
 > [!IMPORTANT]
-> This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the online registration/removal flows use Microsoft Graph beta endpoints. These can change without notice.
+> This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the Device Association flows use Microsoft Graph beta endpoints. These can change without notice.
+
+## Current versions
+
+The currently published PowerShell Gallery preview is `0.4.3-preview1`.
+
+The `main` branch is now developing `0.4.4-preview1`. This preview intentionally separates local DeviceLink identity, local firmware state, and tenant-side Device Association operations. It is not published to the Gallery until its validation is complete.
+
+## Mental model
+
+Starting with `0.4.4-preview1`, the module exposes three different concepts explicitly:
+
+```text
+Local DeviceLink identity
+    Get-WindowsDeviceLink
+
+Local DeviceLink firmware state
+    Get-WindowsDeviceLinkFirmwareState
+    Reset-WindowsDeviceLinkFirmwareState
+
+Tenant-side Intune Device Association
+    Get-WindowsDeviceLinkAssociation
+    Register-WindowsDeviceLink
+    Remove-WindowsDeviceLinkAssociation
+```
+
+`Get-WindowsDeviceLink -Online` has been removed from the development version. This is an intentional breaking preview change: `Get-WindowsDeviceLink` is now always local and a `Get-*` operation no longer creates cloud state.
 
 ## Installation
-
-The currently published Gallery preview is `0.4.3-preview1`.
 
 ### Windows 11
 
@@ -31,7 +55,7 @@ Test-WindowsDeviceLinkSupport
 
 ### Windows PE
 
-The current unsigned preview has a validated WinPE-specific PowerShellGet publisher-check issue. In the tested AMD64 WinPE, normal `Install-Module` returned `InvalidModuleAuthenticodeSignature`, while this command succeeded:
+The current unsigned Gallery preview has a validated WinPE-specific PowerShellGet publisher-check issue. In the tested AMD64 WinPE this succeeds:
 
 ```powershell
 Install-Module WindowsDeviceLink `
@@ -41,24 +65,9 @@ Install-Module WindowsDeviceLink `
     -Force
 ```
 
-`-SkipPublisherCheck` is a current workaround for the unsigned preview and is **not** required for the validated Windows 11 installation. A `Save-Module` + direct `Import-Module` fallback is also documented.
+`-SkipPublisherCheck` is a temporary workaround for the unsigned preview. WinPE additionally requires a compatible user-supplied `Windows.Management.Service.dll`; the Microsoft DLL is intentionally not redistributed.
 
-WinPE additionally requires a compatible user-supplied `Windows.Management.Service.dll`; the Microsoft DLL is intentionally not redistributed in the repository or Gallery package.
-
-**Read [`docs/INSTALLATION.md`](docs/INSTALLATION.md) before deploying in WinPE.** It covers PowerShellGet, PackageManagement, NuGet, TLS, `-AllowPrerelease`, `-SkipPublisherCheck`, multiple PowerShellGet versions, the runtime DLL, verification, and troubleshooting.
-
-## What this module is for
-
-WindowsDeviceLink focuses on:
-
-1. obtaining the DeviceLink identity from a physical device;
-2. optionally exporting the official Windows-generated DeviceLink CSV;
-3. pre-associating the device with Intune directly or through a webhook/automation layer;
-4. removing server-side Device Association records;
-5. inspecting local DeviceLink firmware state;
-6. resetting the current local DeviceLink identity/association firmware state for reinstallation or tenant-move workflows.
-
-This is **not** classic Windows Autopilot V1 hardware-hash registration.
+Read [`docs/INSTALLATION.md`](docs/INSTALLATION.md) before deploying in WinPE. It covers PowerShellGet, PackageManagement, NuGet, TLS, prerelease installation, the runtime DLL, verification and troubleshooting.
 
 ## Requirements
 
@@ -68,8 +77,8 @@ This is **not** classic Windows Autopilot V1 hardware-hash registration.
 - 64-bit Windows PowerShell 5.1.
 - Windows 11 or compatible AMD64 Windows PE.
 - For WinPE: a compatible user-supplied `Windows.Management.Service.dll`.
-- For direct Graph pre-association/removal: Microsoft Graph permission `DeviceManagementServiceConfig.ReadWrite.All`.
-- For firmware read/reset: elevated PowerShell with `SeSystemEnvironmentPrivilege` available. The module enables this privilege in the current process.
+- For direct Graph Device Association operations: Microsoft Graph permission `DeviceManagementServiceConfig.ReadWrite.All`.
+- For firmware read/reset: elevated PowerShell with `SeSystemEnvironmentPrivilege` available.
 
 Always start on a new system with:
 
@@ -77,26 +86,14 @@ Always start on a new system with:
 Test-WindowsDeviceLinkSupport
 ```
 
-## Important WinPE runtime note
-
-`Windows.Management.Service.dll` is **not included** in this repository, GitHub releases, or the PowerShell Gallery package. Windows 11 uses the system copy. WinPE users must provide a compatible Microsoft copy themselves.
-
-Place it at:
-
-```text
-WindowsDeviceLink\Runtime\Windows.Management.Service.dll
-```
-
-or pass it explicitly with `-WindowsManagementServicePath`.
-
-See [`src/WindowsDeviceLink/Runtime/README.md`](src/WindowsDeviceLink/Runtime/README.md) and [`docs/INSTALLATION.md`](docs/INSTALLATION.md).
-
-## Generate DeviceLink information
+## Generate the local DeviceLink identity
 
 ```powershell
 $deviceLink = Get-WindowsDeviceLink
 $deviceLink | Format-List *
 ```
+
+`Get-WindowsDeviceLink` does not authenticate to Microsoft Graph and does not change tenant-side state.
 
 Treat DeviceLink payloads, serial numbers, SMBIOS UUIDs, Link IDs and firmware JWT data as sensitive operational data.
 
@@ -108,18 +105,30 @@ Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 
 Windows generates the CSV through `ExportDeviceLinkInfoCsvAsync`; WindowsDeviceLink does not reconstruct the format.
 
-## Pre-associate directly
-
-`-Online` requires an explicit authentication method.
+## Pre-associate explicitly
 
 ```powershell
-Get-WindowsDeviceLink `
-    -Online `
+$deviceLink = Get-WindowsDeviceLink
+
+$deviceLink | Register-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>'
 ```
 
-The default DeviceCode client ID is Microsoft's well-known public Graph PowerShell client ID. It is not a customer secret. See [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) for all supported methods and examples.
+Registration is now deliberately a `Register-*` operation. The default DeviceCode client ID is Microsoft's well-known public Graph PowerShell client ID and is not a customer secret.
+
+See [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) for all supported authentication methods.
+
+## Query the tenant-side Device Association
+
+```powershell
+Get-WindowsDeviceLinkAssociation `
+    -SerialNumber '<serial-number>' `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+You can also query the exact record with `-AssociationId`. The cmdlet returns tenant-side association state and related Intune metadata; it does not read or change local firmware state.
 
 ## Read local firmware state
 
@@ -138,8 +147,6 @@ DeviceLinkCreationTimeUtc
 
 ## Reset local firmware state
 
-`0.4.3-preview1` adds:
-
 ```powershell
 Reset-WindowsDeviceLinkFirmwareState
 ```
@@ -156,14 +163,11 @@ For a dry run:
 Reset-WindowsDeviceLinkFirmwareState -WhatIf
 ```
 
-The cmdlet removes all four known DeviceLink UEFI variables and immediately verifies that they are absent.
+Reset removes all four known DeviceLink UEFI variables and immediately verifies that they are absent. After reboot Windows can generate a new DeviceLink identity; this is new identity generation, not restoration of the removed identity.
 
-> [!IMPORTANT]
-> Reset does **not** mean that DeviceLink variables remain permanently absent. End-to-end testing confirmed that after reset and reboot Windows can generate a **new** `DeviceLinkId` and `DeviceLinkCreationTimeUtc`. SHA-256 fingerprints before and after reset differed, the creation time changed, and the new identity could be pre-associated again. This is new identity generation, not restoration of the removed identity.
+See [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) for the validated lifecycle.
 
-See [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) for the complete validated lifecycle.
-
-## Remove a server-side Device Association
+## Remove a tenant-side Device Association
 
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
@@ -182,7 +186,7 @@ This does not reset local firmware state. See [`docs/REMOVE-ASSOCIATION.md`](doc
 
 ## Tenant-move / reinstallation lifecycle
 
-Server-side removal and local reset are intentionally separate operations. A controlled workflow can be:
+Server-side removal and local reset are intentionally separate operations:
 
 ```text
 old Device Association
@@ -200,21 +204,28 @@ all four known UEFI variables immediately absent
 reboot
         |
         v
-Windows creates a new base DeviceLink identity
+Windows creates a new local DeviceLink identity
         |
         v
-Get-WindowsDeviceLink / new preassociation
+Get-WindowsDeviceLink
+        |
+        v
+Register-WindowsDeviceLink
+        |
+        v
+Get-WindowsDeviceLinkAssociation
 ```
 
-This complete identity-reset and re-preassociation sequence has been validated on physical AMD64 hardware.
+This identity-reset and re-preassociation sequence has been validated on physical AMD64 hardware.
 
-## Webhook
+## Webhook registration
 
 For centralized/unattended workflows:
 
 ```powershell
-Get-WindowsDeviceLink `
-    -Online `
+$deviceLink = Get-WindowsDeviceLink
+
+$deviceLink | Register-WindowsDeviceLink `
     -Method Webhook `
     -WebhookUri '<webhook-url>' `
     -WebhookApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
@@ -223,52 +234,55 @@ Get-WindowsDeviceLink `
 
 See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/README.md`](runbooks/README.md).
 
-## Documentation
-
-- [`docs/INSTALLATION.md`](docs/INSTALLATION.md) - Windows 11 and WinPE installation, PowerShellGet/PackageManagement and troubleshooting.
-- [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - online authentication and registration methods.
-- [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
-- [`docs/REMOVE-ASSOCIATION.md`](docs/REMOVE-ASSOCIATION.md) - server-side Device Association removal.
-- [`docs/CODE-SIGNING.md`](docs/CODE-SIGNING.md) - code signing policy, roles and release provenance.
-- [`PRIVACY.md`](PRIVACY.md) - project privacy policy and administrator-initiated network transfers.
-- [`TESTING.md`](TESTING.md) - validation matrix and live test observations.
-
 ## Public commands
 
 | Command | Purpose |
 |---|---|
-| `Get-WindowsDeviceLink` | Generate, export and/or pre-associate a DeviceLink. |
+| `Get-WindowsDeviceLink` | Obtain the local DeviceLink identity; optionally export it. |
 | `Get-WindowsDeviceLinkFirmwareState` | Read safe metadata for local DeviceLink UEFI state. |
-| `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity/association state. |
-| `Remove-WindowsDeviceLinkAssociation` | Remove a server-side Device Association record. |
+| `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
+| `Get-WindowsDeviceLinkAssociation` | Query a tenant-side Intune Device Association by serial number or association ID. |
+| `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association from an existing local DeviceLink object, directly or through a webhook. |
+| `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Test-WindowsDeviceLinkSupport` | Validate runtime, architecture and DeviceLink activation. |
 | `Export-WindowsDeviceLinkCsv` | Export an existing DeviceLink object using the Windows CSV API. |
-| `Connect-WindowsDeviceLink` | Advanced Graph SDK authentication helper. |
-| `Register-WindowsDeviceLink` | Advanced Graph SDK registration helper for an existing DeviceLink object. |
+| `Connect-WindowsDeviceLink` | Advanced Microsoft Graph SDK authentication helper. |
+
+## Documentation
+
+- [`docs/INSTALLATION.md`](docs/INSTALLATION.md) - Windows 11 and WinPE installation, PowerShellGet/PackageManagement and troubleshooting.
+- [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - cloud operations and authentication methods.
+- [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
+- [`docs/REMOVE-ASSOCIATION.md`](docs/REMOVE-ASSOCIATION.md) - tenant-side Device Association removal.
+- [`docs/CODE-SIGNING.md`](docs/CODE-SIGNING.md) - code signing policy, roles and release provenance.
+- [`PRIVACY.md`](PRIVACY.md) - project privacy policy and administrator-initiated network transfers.
+- [`TESTING.md`](TESTING.md) - validation matrix and live test observations.
 
 ## Validation
 
-The primary registration, removal and firmware lifecycle flows are validated on Windows 11 and AMD64 Windows PE. The firmware reset lifecycle includes immediate removal verification, reboot, proof that a different DeviceLink identity is generated, and successful re-preassociation of that new identity.
+The `0.4.3-preview1` Gallery package has been smoke-tested in Windows 11 OOBE and AMD64 WinPE, including registration, removal and the firmware reset/reboot/reassociation lifecycle.
 
-The actual `0.4.3-preview1` PowerShell Gallery package has also been smoke-tested in Windows 11 OOBE and AMD64 WinPE. See [`TESTING.md`](TESTING.md).
+The `0.4.4-preview1` development refactor must be revalidated before Gallery publication, particularly explicit registration and the new Device Association lookup cmdlet.
 
 ## Scope
 
-Currently published Gallery preview: `0.4.3-preview1`.
+Published Gallery preview: `0.4.3-preview1`.
 
-In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association preassociation/removal, local firmware inspection/reset, multiple authentication methods, webhook transport and the optional Azure Automation receiver.
+Development version on `main`: `0.4.4-preview1`.
+
+In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, local firmware inspection/reset, multiple authentication methods, webhook transport and optional Azure Automation receiver.
 
 Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot V1 management, or production support guarantees.
 
 ## Code signing policy
 
-WindowsDeviceLink is applying for code signing through the SignPath Foundation. Until the application is approved and the signing integration is complete, current preview releases may remain unsigned.
+WindowsDeviceLink has applied for code signing through the SignPath Foundation. Until the application is approved and the signing integration is complete, preview releases may remain unsigned.
 
 > **Free code signing provided by SignPath.io, certificate by SignPath Foundation.**
 
 Official signed artifacts will be built from the public source repository through the project's automated GitHub Actions release workflow and must be explicitly approved for signing. WindowsDeviceLink does not redistribute or sign Microsoft's `Windows.Management.Service.dll`.
 
-See [`docs/CODE-SIGNING.md`](docs/CODE-SIGNING.md) for the complete policy, team roles and provenance requirements, and [`PRIVACY.md`](PRIVACY.md) for the privacy policy.
+See [`docs/CODE-SIGNING.md`](docs/CODE-SIGNING.md) for the complete policy and [`PRIVACY.md`](PRIVACY.md) for the privacy policy.
 
 ## License
 
