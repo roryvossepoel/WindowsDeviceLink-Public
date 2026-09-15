@@ -11,11 +11,11 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 > [!IMPORTANT]
 > This is preview / proof-of-concept software. The WinPE implementation uses an undocumented Windows Runtime interface and the Device Association flows use Microsoft Graph beta endpoints. These can change without notice.
 
-## Current versions
+## Current version
 
-The currently published PowerShell Gallery preview is `0.4.3-preview1`.
+The currently published PowerShell Gallery preview is `0.4.4-preview1`.
 
-The `main` branch is developing `0.4.4-preview1`. This preview intentionally separates local DeviceLink identity, local firmware state, and tenant-side Device Association operations and adds non-destructive diagnostics, health classification, and safe idempotent initialization. It is not published to the Gallery until validation is complete.
+This preview separates local DeviceLink identity, local firmware state, and tenant-side Device Association operations and adds non-destructive combined diagnostics, health classification, and safe idempotent initialization. The published package has been smoke-tested on physical AMD64 Windows 11 OOBE and AMD64 Windows PE hardware.
 
 ## Mental model
 
@@ -40,7 +40,7 @@ Diagnostics / orchestration
     Initialize-WindowsDeviceLink
 ```
 
-`Get-WindowsDeviceLink -Online` has been removed from the development version. This is an intentional breaking preview change: `Get-WindowsDeviceLink` is now always local and a `Get-*` identity operation no longer creates cloud state.
+`Get-WindowsDeviceLink -Online` has been removed. This is an intentional breaking preview change: `Get-WindowsDeviceLink` is now always local and a `Get-*` identity operation no longer creates cloud state.
 
 ## Installation
 
@@ -208,7 +208,7 @@ DeviceLinkJwtLastWrite
 DeviceLinkCreationTimeUtc
 ```
 
-Raw `DeviceLinkId` and JWT contents are never returned. `DeviceLinkCreationTimeUtc` has been validated as a safe 20-byte UTF-8 ISO-8601 UTC timestamp and is exposed in decoded/parsed form. `Get-WindowsDeviceLinkStatus` surfaces it separately as `FirmwareCreationTimeUtc`.
+Raw `DeviceLinkId` and JWT contents are never returned. `DeviceLinkCreationTimeUtc` has been validated as a UTF-8 ISO-8601 UTC timestamp in both whole-second and fractional-second forms, including `2026-09-06T12:22:51Z` and `2026-09-15T07:48:22.972Z`. Only this safe timestamp is exposed in decoded/parsed form. `Get-WindowsDeviceLinkStatus` surfaces it separately as `FirmwareCreationTimeUtc`.
 
 ## Reset local firmware state
 
@@ -328,17 +328,15 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 
 ## Validation
 
-The `0.4.3-preview1` Gallery package has been smoke-tested in Windows 11 OOBE and AMD64 WinPE, including registration, removal and the firmware reset/reboot/reassociation lifecycle.
+`0.4.4-preview1` has been validated on physical AMD64 Windows 11 OOBE and AMD64 WinPE. Live validation covers the local/cloud command boundary, Device Association lookup, combined status, health classification, safe firmware timestamp decoding, `LocalOnly -> Preassociated` initialization, `-WhatIf`, and idempotent handling of both `Preassociated` and `Associated` devices.
 
-For `0.4.4-preview1`, Windows 11 live validation now covers the local/cloud command boundary, Device Association lookup, combined status, safe firmware timestamp decoding, health classification, `LocalOnly -> Preassociated` initialization, `-WhatIf`, and idempotent handling of an already `Preassociated` device. Hardware-independent health regression tests cover 17 classification cases plus invariants.
+The same physical associated device was validated across Windows 11 and WinPE. In WinPE, `Get-WindowsDeviceLinkStatus -Online` correctly correlated the local DeviceLink with the existing tenant association, health returned `Associated`, and `Initialize-WindowsDeviceLink` returned `Action=None` / `Changed=False`. The installed `0.4.4-preview1` package was then smoke-tested in WinPE with a user-supplied compatible runtime DLL, including support detection, 4/4 firmware state, fractional timestamp parsing, local status, and online associated health.
 
-Remaining pre-publication validation includes the `Associated` initializer idempotency case, AMD64 WinPE validation of the new status/health surface, and final release/package review.
+Hardware-independent health regression tests cover 17 classification cases plus invariants, and the cloud-operation parameter regression suite passes under Windows PowerShell 5.1. See [`TESTING.md`](TESTING.md) for the detailed matrix.
 
 ## Scope
 
-Published Gallery preview: `0.4.3-preview1`.
-
-Development version on `main`: `0.4.4-preview1`.
+Published Gallery preview: `0.4.4-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure Automation receiver.
 
