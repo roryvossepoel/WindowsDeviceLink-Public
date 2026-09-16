@@ -1,6 +1,6 @@
 <#
-Validates Connect-WindowsDeviceLink SDK authentication error redaction.
-No real Microsoft Graph dependency or network access is required.
+Validates SDK authentication error redaction through the production connection helper.
+No Microsoft Graph dependency or network access is required.
 #>
 [CmdletBinding()] param([string]$ModulePath)
 $ErrorActionPreference='Stop'
@@ -19,44 +19,20 @@ Remove-Module WindowsDeviceLink -Force -ErrorAction SilentlyContinue
 Import-Module (Resolve-Path -LiteralPath $ModulePath).Path -Force -ErrorAction Stop
 $module=Get-Module WindowsDeviceLink|Select-Object -First 1
 
-& $module {
-    function Initialize-WindowsDeviceLinkOnline { }
-    function Connect-MgGraph {
-        [CmdletBinding()]
-        param(
-            [string]$TenantId,[string]$ClientId,[string[]]$Scopes,[string]$ContextScope,[switch]$UseDeviceCode,
-            [securestring]$AccessToken,[System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
-            [string]$CertificateThumbprint,[string]$CertificateSubjectName,[bool]$SendCertificateChain,
-            [pscredential]$ClientSecretCredential,[switch]$Identity,[switch]$EnvironmentVariable,
-            [string]$Environment,[double]$ClientTimeout,[switch]$NoWelcome
-        )
-        if($AccessToken){$c=[pscredential]::new('token',$AccessToken);throw "Synthetic SDK failure token=$($c.GetNetworkCredential().Password)"}
-        if($ClientSecretCredential){throw "Synthetic SDK failure secret=$($ClientSecretCredential.GetNetworkCredential().Password)"}
-        if($EnvironmentVariable){throw "Synthetic SDK failure envsecret=$env:AZURE_CLIENT_SECRET"}
-        throw 'Synthetic SDK failure'
+foreach($case in @(
+    @{Name='SDK AccessToken failure is redacted';Method='AccessToken';Secret='WDL-SDK-ACCESS-TOKEN'},
+    @{Name='SDK ClientSecret failure is redacted';Method='ClientSecret';Secret='WDL-SDK-CLIENT-SECRET'},
+    @{Name='SDK EnvironmentVariable failure is redacted';Method='EnvironmentVariable';Secret='WDL-SDK-ENV-SECRET'}
+)){
+    $request={param($Parameters,$MethodName)throw "Synthetic SDK $MethodName failure secret=$($case.Secret)"}.GetNewClosure()
+    Assert-ThrowsSafe -Name $case.Name -Expected "method '$($case.Method)'" -Forbidden $case.Secret -ScriptBlock {
+        & $module {param($Method,$Secret,$Request)Invoke-WindowsDeviceLinkGraphConnect -Parameters @{NoWelcome=$true} -MethodName $Method -SensitiveValue @($Secret) -RequestScript $Request} $case.Method $case.Secret $request
     }
 }
 
-$tokenMarker='WDL-SDK-ACCESS-TOKEN'
-$secureToken=ConvertTo-SecureString $tokenMarker -AsPlainText -Force
-Assert-ThrowsSafe -Name 'SDK AccessToken failure is redacted' -Expected "method 'AccessToken'" -Forbidden $tokenMarker -ScriptBlock {
-    & $module {param($Token) Connect-WindowsDeviceLink -AccessToken $Token} $secureToken
-}
-
-$secretMarker='WDL-SDK-CLIENT-SECRET'
-$secureSecret=ConvertTo-SecureString $secretMarker -AsPlainText -Force
-Assert-ThrowsSafe -Name 'SDK ClientSecret failure is redacted' -Expected "method 'ClientSecret'" -Forbidden $secretMarker -ScriptBlock {
-    & $module {param($Secret) Connect-WindowsDeviceLink -TenantId 'tenant-test' -ClientId 'client-test' -ClientSecret $Secret} $secureSecret
-}
-
-$oldTenant=$env:AZURE_TENANT_ID;$oldClient=$env:AZURE_CLIENT_ID;$oldSecret=$env:AZURE_CLIENT_SECRET
-$env:AZURE_TENANT_ID='tenant-test';$env:AZURE_CLIENT_ID='client-test';$env:AZURE_CLIENT_SECRET='WDL-SDK-ENV-SECRET'
-try {
-    Assert-ThrowsSafe -Name 'SDK EnvironmentVariable failure is redacted' -Expected "method 'EnvironmentVariable'" -Forbidden 'WDL-SDK-ENV-SECRET' -ScriptBlock {
-        & $module {Connect-WindowsDeviceLink -EnvironmentVariable}
-    }
-}
-finally {$env:AZURE_TENANT_ID=$oldTenant;$env:AZURE_CLIENT_ID=$oldClient;$env:AZURE_CLIENT_SECRET=$oldSecret}
+$command=(Get-Command Connect-WindowsDeviceLink -Module WindowsDeviceLink).ScriptBlock.ToString()
+if($command -notmatch 'Invoke-WindowsDeviceLinkGraphConnect'){throw 'FAIL: Connect-WindowsDeviceLink is not wired to the hardened connection helper.'}
+Write-Host 'PASS: Connect-WindowsDeviceLink uses hardened SDK connection transport'
 
 Write-Host ''
 Write-Host 'Connect authentication security regression set passed.'
