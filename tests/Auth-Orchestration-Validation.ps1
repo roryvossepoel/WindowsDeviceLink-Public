@@ -13,18 +13,17 @@ Import-Module (Resolve-Path -LiteralPath $ModulePath).Path -Force -ErrorAction S
 $initialize=(Get-Command Initialize-WindowsDeviceLink -Module WindowsDeviceLink).ScriptBlock.ToString()
 $connect=(Get-Command Connect-WindowsDeviceLink -Module WindowsDeviceLink).ScriptBlock.ToString()
 
-# DeviceCode initialization obtains one token, converts it to a SecureString once,
-# then switches the remainder of the orchestration to AccessToken mode.
 $tokenAcquisitionCount=([regex]::Matches($initialize,'Get-WindowsDeviceLinkDeviceCodeToken')).Count
 Assert-True ($tokenAcquisitionCount -eq 1) "Initializer must contain exactly one DeviceCode token acquisition; found $tokenAcquisitionCount."
 Assert-True ($initialize -match "effectiveMethod\s*=\s*'AccessToken'") 'Initializer does not switch DeviceCode orchestration to AccessToken mode.'
 Assert-True ($initialize -match 'effectiveAccessToken') 'Initializer does not retain the acquired token for reuse.'
-Assert-True ($initialize -match 'onlineParams\.AccessToken\s*=\s*\$effectiveAccessToken') 'Initializer does not pass the reused token into online status checks.'
-Assert-True ($initialize -match 'registerParams\.AccessToken\s*=\s*\$effectiveAccessToken') 'Initializer does not pass the reused token into registration.'
+Assert-True ($initialize -match 'commonOnline\.AccessToken\s*=\s*\$effectiveAccessToken') 'Initializer does not place the acquired token in the shared online parameter set.'
+Assert-True ($initialize -match 'foreach\s*\(\$key\s+in\s+\$commonOnline\.Keys\)') 'Initializer does not copy the shared online parameter set into downstream operations.'
+Assert-True ($initialize -match 'statusParameters\[\$key\]\s*=\s*\$commonOnline\[\$key\]') 'Status lookups do not inherit the shared AccessToken parameters.'
+Assert-True ($initialize -match 'registerParameters\[\$key\]\s*=\s*\$commonOnline\[\$key\]') 'Registration does not inherit the shared AccessToken parameters.'
 Assert-True (([regex]::Matches($initialize,'Get-WindowsDeviceLinkStatus')).Count -ge 2) 'Initializer must perform both pre-action and verification status reads.'
-Write-Host 'PASS: DeviceCode initializer structural contract enforces single acquisition and AccessToken reuse'
+Write-Host 'PASS: DeviceCode initializer structural contract enforces single acquisition and shared AccessToken reuse'
 
-# Connect-WindowsDeviceLink builds only the supported safe SDK shapes.
 Assert-True ($connect -match 'CertificateThumbprint') 'CertificateThumbprint parameter path is missing.'
 Assert-True ($connect -match 'CertificateSubjectName') 'CertificateSubjectName parameter path is missing.'
 Assert-True ($connect -match 'ClientSecretCredential') 'ClientSecret is not wrapped as ClientSecretCredential for SDK authentication.'
