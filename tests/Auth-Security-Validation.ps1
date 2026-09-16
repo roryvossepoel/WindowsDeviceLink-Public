@@ -33,43 +33,44 @@ $clientSecretMarker='WDL-CLIENT-SECRET-MARKER'
 $secureClientSecret=ConvertTo-SecureString $clientSecretMarker -AsPlainText -Force
 & $module { $script:WdlAuthTestSecret='WDL-CLIENT-SECRET-MARKER'; function Invoke-RestMethod { throw "Synthetic OAuth failure containing $script:WdlAuthTestSecret" } }
 try {
-    Assert-Throws -Name 'Client-secret transport error is redacted' -ExpectedMessage 'Client-secret authentication failed' -ForbiddenText @($clientSecretMarker) -ScriptBlock {
-        & $module { param($Secret) Get-WindowsDeviceLinkClientSecretToken -TenantId 'tenant-test' -ClientId 'client-test' -ClientSecret $Secret } $secureClientSecret
-    }
+    Assert-Throws -Name 'Client-secret transport error is redacted' -ExpectedMessage 'Client-secret authentication failed' -ForbiddenText @($clientSecretMarker) -ScriptBlock { & $module { param($Secret) Get-WindowsDeviceLinkClientSecretToken -TenantId 'tenant-test' -ClientId 'client-test' -ClientSecret $Secret } $secureClientSecret }
 }
 finally { & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlAuthTestSecret -Scope Script -ErrorAction SilentlyContinue } }
 
-$apiKeyMarker='WDL-WEBHOOK-KEY-MARKER'
-$deviceLinkMarker='WDL-RAW-DEVICE-LINK-MARKER'
+# Device-code OAuth errors must not echo the long-lived device_code value.
+$deviceCodeMarker='WDL-DEVICE-CODE-SECRET'
+& $module {
+    $script:WdlDeviceCodeCall=0
+    $script:WdlDeviceCodeSecret='WDL-DEVICE-CODE-SECRET'
+    function Start-Sleep { param([int]$Seconds) }
+    function Invoke-RestMethod {
+        $script:WdlDeviceCodeCall++
+        if($script:WdlDeviceCodeCall -eq 1){ return [pscustomobject]@{device_code=$script:WdlDeviceCodeSecret;user_code='SAFE-USER-CODE';verification_uri='https://example.invalid/device';expires_in=60;interval=1} }
+        throw "Synthetic device-code token failure containing $script:WdlDeviceCodeSecret"
+    }
+}
+try {
+    Assert-Throws -Name 'Device-code transport error redacts device_code' -ExpectedMessage 'Device code authentication failed' -ForbiddenText @($deviceCodeMarker) -ScriptBlock { & $module { Get-WindowsDeviceLinkDeviceCodeToken -TenantId 'tenant-test' } }
+}
+finally { & $module { Remove-Item Function:\Invoke-RestMethod,Function:\Start-Sleep -Force -ErrorAction SilentlyContinue; Remove-Variable WdlDeviceCodeCall,WdlDeviceCodeSecret -Scope Script -ErrorAction SilentlyContinue } }
+
+$apiKeyMarker='WDL-WEBHOOK-KEY-MARKER';$deviceLinkMarker='WDL-RAW-DEVICE-LINK-MARKER'
 $fakeDeviceLink=[pscustomobject]@{SerialNumber='TEST-SERIAL';Manufacturer='Test';Model='Test';SmbiosUuid='00000000-0000-0000-0000-000000000001';LinkId='00000000-0000-0000-0000-000000000002';PayloadCreationTimeUtc='2026-09-16T00:00:00Z';DeviceLink=$deviceLinkMarker;Environment='Windows';DllSource='System';DllVersion='test';ActivationMode='RegisteredWinRT'}
 $fakeDeviceLink.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
 & $module { $script:WdlWebhookKey='WDL-WEBHOOK-KEY-MARKER'; $script:WdlWebhookPayload='WDL-RAW-DEVICE-LINK-MARKER'; function Invoke-RestMethod { throw "Synthetic webhook failure key=$script:WdlWebhookKey payload=$script:WdlWebhookPayload" } }
-try {
-    Assert-Throws -Name 'Webhook transport error redacts key and DeviceLink' -ExpectedMessage 'DeviceLink webhook could not be reached' -ForbiddenText @($apiKeyMarker,$deviceLinkMarker) -ScriptBlock {
-        & $module { param($Input,$Key) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key } $fakeDeviceLink $apiKeyMarker
-    }
-}
+try { Assert-Throws -Name 'Webhook transport error redacts key and DeviceLink' -ExpectedMessage 'DeviceLink webhook could not be reached' -ForbiddenText @($apiKeyMarker,$deviceLinkMarker) -ScriptBlock { & $module { param($Input,$Key) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key } $fakeDeviceLink $apiKeyMarker } }
 finally { & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlWebhookKey,WdlWebhookPayload -Scope Script -ErrorAction SilentlyContinue } }
 
-# Native Graph GET must not echo bearer tokens when a transport error contains them.
 $accessTokenMarker='WDL-ACCESS-TOKEN-MARKER'
 $request={ param($Uri,$SdkMode,$AccessToken) throw "HTTP 401 Authorization: Bearer $AccessToken" }
-Assert-Throws -Name 'Graph GET redacts bearer token' -ExpectedMessage 'HTTP 401' -ForbiddenText @($accessTokenMarker) -ScriptBlock {
-    & $module { param($Request,$Token) Invoke-WindowsDeviceLinkGraphGet -Uri 'https://graph.microsoft.com/beta/test' -AccessToken $Token -RequestScript $Request } $request $accessTokenMarker
-}
+Assert-Throws -Name 'Graph GET redacts bearer token' -ExpectedMessage 'HTTP 401' -ForbiddenText @($accessTokenMarker) -ScriptBlock { & $module { param($Request,$Token) Invoke-WindowsDeviceLinkGraphGet -Uri 'https://graph.microsoft.com/beta/test' -AccessToken $Token -RequestScript $Request } $request $accessTokenMarker }
 
-# Native registration must redact both bearer token and raw DeviceLink payload.
-$registrationToken='WDL-REGISTRATION-TOKEN'
-$registrationPayload='WDL-REGISTRATION-DEVICE-LINK'
-$registrationInput=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink=$registrationPayload}
-$registrationInput.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
+$registrationToken='WDL-REGISTRATION-TOKEN';$registrationPayload='WDL-REGISTRATION-DEVICE-LINK'
+$registrationInput=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink=$registrationPayload};$registrationInput.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
 $registrationRequest={ param($Uri,$Body,$AccessToken) throw "HTTP 403 token=$AccessToken body=$Body" }
-Assert-Throws -Name 'Graph registration redacts token and DeviceLink payload' -ExpectedMessage 'HTTP 403' -ForbiddenText @($registrationToken,$registrationPayload) -ScriptBlock {
-    & $module { param($Input,$Request,$Token) Invoke-WindowsDeviceLinkGraphRegistration -InputObject $Input -AccessToken $Token -TenantId 'tenant-test' -RequestScript $Request } $registrationInput $registrationRequest $registrationToken
-}
+Assert-Throws -Name 'Graph registration redacts token and DeviceLink payload' -ExpectedMessage 'HTTP 403' -ForbiddenText @($registrationToken,$registrationPayload) -ScriptBlock { & $module { param($Input,$Request,$Token) Invoke-WindowsDeviceLinkGraphRegistration -InputObject $Input -AccessToken $Token -TenantId 'tenant-test' -RequestScript $Request } $registrationInput $registrationRequest $registrationToken }
 
-$fakePublicDeviceLink=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink='TEST-PAYLOAD'}
-$fakePublicDeviceLink.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
+$fakePublicDeviceLink=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink='TEST-PAYLOAD'};$fakePublicDeviceLink.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
 Assert-Throws -Name 'Register AccessToken requires token' -ExpectedMessage '-TenantId and -AccessToken are required' -ScriptBlock { $fakePublicDeviceLink | Register-WindowsDeviceLink -Method AccessToken -TenantId 'tenant-test' }
 Assert-Throws -Name 'Lookup Certificate requires certificate object' -ExpectedMessage '-TenantId, -ClientId, and -Certificate are required' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method Certificate -TenantId 'tenant-test' -ClientId 'client-test' }
 Assert-Throws -Name 'Lookup CertificateThumbprint requires thumbprint' -ExpectedMessage '-TenantId, -ClientId, and -CertificateThumbprint are required' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method CertificateThumbprint -TenantId 'tenant-test' -ClientId 'client-test' }
