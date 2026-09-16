@@ -46,6 +46,30 @@ function ConvertTo-WindowsDeviceLinkAssociationResult {
     $devicePreparationPolicyId = [string]$Record.devicePreparationPolicyId
     if ([string]::IsNullOrWhiteSpace($devicePreparationPolicyId) -or $devicePreparationPolicyId -eq [guid]::Empty.ToString()) { $devicePreparationPolicyId = $null }
 
+    $normalizeDateTime = {
+        param([AllowNull()]$Value)
+        if ($null -eq $Value) { return $null }
+
+        $text = [string]$Value
+        if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+
+        $parsed = [datetimeoffset]::MinValue
+        $styles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces -bor
+                  [System.Globalization.DateTimeStyles]::AssumeUniversal -bor
+                  [System.Globalization.DateTimeStyles]::AdjustToUniversal
+        if ([datetimeoffset]::TryParse($text, [System.Globalization.CultureInfo]::InvariantCulture, $styles, [ref]$parsed) -and $parsed.Year -eq 1) {
+            return $null
+        }
+
+        $Value
+    }
+
+    $preassociationDateTime = & $normalizeDateTime $Record.preassociationDateTime
+    $associationDateTime = & $normalizeDateTime $Record.associationDateTime
+    $enrolledDateTime = & $normalizeDateTime $Record.enrolledDateTime
+    $lastContactedDateTime = & $normalizeDateTime $Record.lastContactedDateTime
+    $devicePreparationPolicyAssignedDateTime = & $normalizeDateTime $Record.devicePreparationPolicyAssignedDateTime
+
     $typeName = if ($ResultType -eq 'Registration') { 'Windows.DeviceLink.Registration' } else { 'Windows.DeviceLink.Association' }
 
     [pscustomobject]@{
@@ -59,13 +83,13 @@ function ConvertTo-WindowsDeviceLinkAssociationResult {
         Manufacturer = $Record.manufacturerName
         Model = $Record.modelName
         AssociationState = $associationState
-        PreassociationDateTime = $Record.preassociationDateTime
-        AssociationDateTime = $Record.associationDateTime
-        EnrolledDateTime = $Record.enrolledDateTime
-        LastContactedDateTime = $Record.lastContactedDateTime
+        PreassociationDateTime = $preassociationDateTime
+        AssociationDateTime = $associationDateTime
+        EnrolledDateTime = $enrolledDateTime
+        LastContactedDateTime = $lastContactedDateTime
         PreassociatedByUserPrincipalName = $Record.preassociatedByUserPrincipalName
         AssignedToUserPrincipalName = $Record.assignedToUserPrincipalName
         DevicePreparationPolicyId = $devicePreparationPolicyId
-        DevicePreparationPolicyAssignedDateTime = $Record.devicePreparationPolicyAssignedDateTime
+        DevicePreparationPolicyAssignedDateTime = $devicePreparationPolicyAssignedDateTime
     }
 }
