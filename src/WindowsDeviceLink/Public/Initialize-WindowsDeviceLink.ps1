@@ -69,14 +69,16 @@ function Initialize-WindowsDeviceLink {
 
         $beforeStatus = Get-WindowsDeviceLinkStatus @statusParameters
         $beforeHealth = $beforeStatus | Test-WindowsDeviceLinkHealth
-        $action = 'Blocked'; $changed = $false; $registration = $null
+        $action = Resolve-WindowsDeviceLinkInitializationAction -HealthState $beforeHealth.State
+        $changed = $false; $registration = $null
         $afterStatus = $beforeStatus; $afterHealth = $beforeHealth; $message = $beforeHealth.Summary
 
-        switch ($beforeHealth.State) {
-            'Preassociated' { $action = 'None'; $message = 'The DeviceLink is already preassociated. No change was made.' }
-            'Associated' { $action = 'None'; $message = 'The DeviceLink is already associated. No change was made.' }
-            'LocalOnly' {
-                $action = 'Register'
+        switch ($action) {
+            'None' {
+                if ($beforeHealth.State -eq 'Preassociated') { $message = 'The DeviceLink is already preassociated. No change was made.' }
+                else { $message = 'The DeviceLink is already associated. No change was made.' }
+            }
+            'Register' {
                 $deviceLinkParameters = @{ TimeoutSeconds = $TimeoutSeconds }
                 if ($PSBoundParameters.ContainsKey('WindowsManagementServicePath')) { $deviceLinkParameters.WindowsManagementServicePath = $WindowsManagementServicePath }
                 $deviceLink = Get-WindowsDeviceLink @deviceLinkParameters
@@ -97,7 +99,9 @@ function Initialize-WindowsDeviceLink {
                 }
                 else { $message = 'The DeviceLink is locally valid and not associated; registration would be performed.' }
             }
-            default { $message = "Initialization was blocked because the current health state is '$($beforeHealth.State)'. $($beforeHealth.RecommendedAction)" }
+            default {
+                $message = "Initialization was blocked because the current health state is '$($beforeHealth.State)'. $($beforeHealth.RecommendedAction)"
+            }
         }
 
         [pscustomobject]@{
