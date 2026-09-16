@@ -82,9 +82,13 @@ function Remove-WindowsDeviceLinkAssociation {
                 if($sdkMode){Invoke-MgGraphRequest -Method DELETE -Uri $deleteUri -ErrorAction Stop|Out-Null}
                 else{Invoke-RestMethod -Method DELETE -Uri $deleteUri -Headers @{Authorization="Bearer $nativeAccessToken"} -ErrorAction Stop|Out-Null}
             }catch{
-                $statusCode=$null;try{$statusCode=[int]$_.Exception.Response.StatusCode}catch{}
+                $statusCode=$null
+                try{if($_.Exception.Response -and $_.Exception.Response.StatusCode){$statusCode=[int]$_.Exception.Response.StatusCode}}catch{}
+                if($null -eq $statusCode -and $_.Exception.Message -match '(?<!\d)(400|401|403|404|409|429|500|502|503|504)(?!\d)'){$statusCode=[int]$Matches[1]}
                 if($statusCode -eq 404){throw "Device Association '$resolvedAssociationId' was not found or has already been removed."}
-                throw
+                $safeDetail=Protect-WindowsDeviceLinkSensitiveText -Text ([string]$_.Exception.Message) -SensitiveValue @($nativeAccessToken)
+                if($statusCode){throw "Device Association removal failed with HTTP $statusCode. Association ID: $resolvedAssociationId. $safeDetail"}
+                throw "Device Association removal failed before a valid Graph response was received. Association ID: $resolvedAssociationId. $safeDetail"
             }
             Write-Information -InformationAction Continue -MessageData "Device Association removed successfully. Association ID: $resolvedAssociationId"
             [pscustomobject]@{PSTypeName='Windows.DeviceLink.AssociationRemovalResult';AssociationId=$resolvedAssociationId;SerialNumber=$resolvedSerialNumber;TenantId=$TenantId;Removed=$true}
