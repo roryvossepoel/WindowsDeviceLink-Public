@@ -50,14 +50,17 @@ function Invoke-WindowsDeviceLinkGraphGet {
             $retryable = ($statusCode -in @(429,500,502,503,504)) -or $transportRetryable
             if (-not $retryable -or $attempt -ge $MaxAttempts) { throw $errorRecord }
 
-            $delaySeconds = [math]::Min([math]::Pow(2, $attempt - 1), $MaxRetryAfterSeconds)
+            $retryAfter = $null
             if ($statusCode -eq 429) {
-                try {
-                    $retryAfter = $errorRecord.Exception.Response.Headers['Retry-After']; $parsedRetryAfter = 0
-                    if ($retryAfter -and [int]::TryParse([string]$retryAfter,[ref]$parsedRetryAfter)) { $delaySeconds=[math]::Min($parsedRetryAfter,$MaxRetryAfterSeconds) }
-                }
-                catch {}
+                try { $retryAfter = [string]$errorRecord.Exception.Response.Headers['Retry-After'] }
+                catch { $retryAfter = $null }
             }
+
+            $delaySeconds = Get-WindowsDeviceLinkGraphRetryDelay `
+                -Attempt $attempt `
+                -StatusCode $statusCode `
+                -RetryAfter $retryAfter `
+                -MaxRetryAfterSeconds $MaxRetryAfterSeconds
 
             $reason = if ($null -ne $statusCode) { "HTTP $statusCode" } else { 'a transient transport failure' }
             Write-Information -InformationAction Continue -MessageData ("Microsoft Graph GET encountered {0}; retrying attempt {1}/{2} after {3} second(s)." -f $reason,($attempt+1),$MaxAttempts,$delaySeconds)
