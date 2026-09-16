@@ -77,7 +77,9 @@ Remove-Module WindowsDeviceLink -Force -ErrorAction SilentlyContinue
 Import-Module $resolvedModulePath -Force -ErrorAction Stop
 $loaded = Get-Module WindowsDeviceLink | Select-Object -First 1
 Assert-True ($null -ne $loaded) 'WindowsDeviceLink did not load.'
-Assert-True ($loaded.Path -eq $resolvedModulePath) "loaded module path '$($loaded.Path)' does not match staged path '$resolvedModulePath'."
+$expectedRootModulePath = (Join-Path $resolvedPackageRoot 'WindowsDeviceLink.psm1')
+Assert-True ($loaded.ModuleBase -eq $resolvedPackageRoot) "loaded module base '$($loaded.ModuleBase)' does not match staged package root '$resolvedPackageRoot'."
+Assert-True ($loaded.Path -eq $expectedRootModulePath) "loaded root module '$($loaded.Path)' does not match staged root module '$expectedRootModulePath'."
 Write-Host 'PASS: exact requested module artifact imported'
 
 $actualFunctions = @(Get-Command -Module WindowsDeviceLink -CommandType Function | Select-Object -ExpandProperty Name)
