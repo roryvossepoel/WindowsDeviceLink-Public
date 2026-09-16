@@ -36,5 +36,5 @@ $serialized=$result.Response|ConvertTo-Json -Depth 8 -Compress
 Assert-True (-not $serialized.Contains($key)) 'Webhook result leaked reflected API key.'
 Assert-True (-not $serialized.Contains($payload)) 'Webhook result leaked reflected DeviceLink payload.'
 Assert-True ($serialized -match '\[REDACTED\]') 'Webhook response did not contain redaction markers.'
-Assert-True ($result.RequestId) 'Webhook result lost RequestId while sanitizing response.'
+Assert-True (-not [string]::IsNullOrWhiteSpace([string]$result.RequestId)) 'Webhook result lost RequestId while sanitizing response.'
 Write-Host 'PASS: webhook reflected response is recursively sanitized'
