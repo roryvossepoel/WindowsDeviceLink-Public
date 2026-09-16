@@ -88,6 +88,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Auth-Orchestration-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate webhook response sanitization
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Webhook-Response-Security-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Final package safety check
         shell: powershell
         run: |
