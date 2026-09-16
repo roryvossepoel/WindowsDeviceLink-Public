@@ -1,0 +1,65 @@
+name: Module CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: module-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Windows PowerShell 5.1 regression
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build staged Gallery package
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $outputRoot = Join-Path $env:RUNNER_TEMP 'WindowsDeviceLink-Package'
+          .\tools\New-GalleryPackage.ps1 -OutputRoot $outputRoot
+          "WDL_PACKAGE_ROOT=$outputRoot\WindowsDeviceLink" >> $env:GITHUB_ENV
+          "WDL_MODULE_PATH=$outputRoot\WindowsDeviceLink\WindowsDeviceLink.psd1" >> $env:GITHUB_ENV
+
+      - name: Validate public module contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Public-Contract-Validation.ps1 `
+            -ModulePath $env:WDL_MODULE_PATH `
+            -PackageRoot $env:WDL_PACKAGE_ROOT
+
+      - name: Validate health states
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Health-State-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
+      - name: Validate cloud-operation parameter boundaries
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Online-Method-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
+      - name: Final package safety check
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $forbidden = Join-Path $env:WDL_PACKAGE_ROOT 'Runtime\Windows.Management.Service.dll'
+          if (Test-Path -LiteralPath $forbidden) {
+              throw 'Forbidden Microsoft runtime DLL is present in the staged Gallery package.'
+          }
+
+          $manifest = Test-ModuleManifest -Path $env:WDL_MODULE_PATH -ErrorAction Stop
+          Write-Host "Validated WindowsDeviceLink $($manifest.Version) staged package."
