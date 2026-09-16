@@ -79,16 +79,11 @@ function Remove-WindowsDeviceLinkAssociation {
             try{
                 # DELETE is intentionally not automatically retried. A timeout may occur after
                 # Graph has already committed the deletion, so blind retry is unsafe.
-                if($sdkMode){Invoke-MgGraphRequest -Method DELETE -Uri $deleteUri -ErrorAction Stop|Out-Null}
-                else{Invoke-RestMethod -Method DELETE -Uri $deleteUri -Headers @{Authorization="Bearer $nativeAccessToken"} -ErrorAction Stop|Out-Null}
+                if($sdkMode){Invoke-WindowsDeviceLinkGraphDelete -Uri $deleteUri -SdkMode}
+                else{Invoke-WindowsDeviceLinkGraphDelete -Uri $deleteUri -AccessToken $nativeAccessToken}
             }catch{
-                $statusCode=$null
-                try{if($_.Exception.Response -and $_.Exception.Response.StatusCode){$statusCode=[int]$_.Exception.Response.StatusCode}}catch{}
-                if($null -eq $statusCode -and $_.Exception.Message -match '(?<!\d)(400|401|403|404|409|429|500|502|503|504)(?!\d)'){$statusCode=[int]$Matches[1]}
-                if($statusCode -eq 404){throw "Device Association '$resolvedAssociationId' was not found or has already been removed."}
-                $safeDetail=Protect-WindowsDeviceLinkSensitiveText -Text ([string]$_.Exception.Message) -SensitiveValue @($nativeAccessToken)
-                if($statusCode){throw "Device Association removal failed with HTTP $statusCode. Association ID: $resolvedAssociationId. $safeDetail"}
-                throw "Device Association removal failed before a valid Graph response was received. Association ID: $resolvedAssociationId. $safeDetail"
+                if($_.Exception.Message -match 'HTTP 404'){throw "Device Association '$resolvedAssociationId' was not found or has already been removed."}
+                throw "Device Association removal failed. Association ID: $resolvedAssociationId. $($_.Exception.Message)"
             }
             Write-Information -InformationAction Continue -MessageData "Device Association removed successfully. Association ID: $resolvedAssociationId"
             [pscustomobject]@{PSTypeName='Windows.DeviceLink.AssociationRemovalResult';AssociationId=$resolvedAssociationId;SerialNumber=$resolvedSerialNumber;TenantId=$TenantId;Removed=$true}
