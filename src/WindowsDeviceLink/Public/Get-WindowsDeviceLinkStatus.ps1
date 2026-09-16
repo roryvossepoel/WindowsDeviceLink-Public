@@ -65,8 +65,6 @@ function Get-WindowsDeviceLinkStatus {
     try { $firmwareState = @(Get-WindowsDeviceLinkFirmwareState -ErrorAction Stop) }
     catch { $firmwareError = $_.Exception.Message }
 
-    # Scriptblock forms are intentional: property-expression syntax emits distracting
-    # ShouldProcess messages when a parent orchestration cmdlet is invoked with -WhatIf.
     $firmwarePresent = @($firmwareState | Where-Object { $_.Present })
     $firmwarePresentNames = @($firmwarePresent | ForEach-Object { $_.Name })
     $firmwareExpectedCount = 4
@@ -97,25 +95,9 @@ function Get-WindowsDeviceLinkStatus {
         }
     }
 
-    $associationPresent = $null
-    $associationState = $null
-    if ($cloudChecked) {
-        if ($associationError) {
-            # An authentication, transport, API, duplicate-result, or other lookup failure is
-            # indeterminate. Do not collapse it to confirmed absence: callers such as
-            # Initialize-WindowsDeviceLink must be able to distinguish this from LocalOnly.
-            $associationPresent = $null
-            $associationState = 'Unknown'
-        }
-        elseif ($association) {
-            $associationPresent = $true
-            $associationState = [string]$association.AssociationState
-        }
-        else {
-            $associationPresent = $false
-            $associationState = 'NotAssociated'
-        }
-    }
+    $cloudState = Resolve-WindowsDeviceLinkCloudState -CloudChecked $cloudChecked -Association $association -AssociationError $associationError
+    $associationPresent = $cloudState.AssociationPresent
+    $associationState = $cloudState.AssociationState
 
     [pscustomobject]@{
         PSTypeName='Windows.DeviceLink.Status'; Environment=$support.Environment; Architecture=$support.Architecture; Supported=[bool]$support.Supported
