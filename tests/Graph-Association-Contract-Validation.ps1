@@ -44,6 +44,20 @@ function Resolve-SerialRecords {
     } $Records $Serial ([bool]$RequireComplete)
 }
 
+function Invoke-SyntheticRegistration {
+    param([scriptblock]$Request)
+    & $module {
+        param($RequestScript)
+        $inputObject=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink='synthetic-device-link'}
+        $inputObject.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
+        Invoke-WindowsDeviceLinkGraphRegistration `
+            -InputObject $inputObject `
+            -AccessToken 'synthetic-token' `
+            -TenantId 'tenant-test' `
+            -RequestScript $RequestScript
+    } $Request
+}
+
 $validId='11111111-1111-1111-1111-111111111111'
 $zeroGuid=[guid]::Empty.ToString()
 
@@ -114,21 +128,18 @@ Assert-True ($matches.Count -eq 0) 'complete non-matching enumeration should con
 Write-Host 'PASS: complete serial coverage can confirm absence'
 
 # Native registration transport has deterministic 409 handling and validates its response.
-$inputObject=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink='synthetic-device-link'}
-$inputObject.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
-
 $conflictRequest={param($Uri,$Body,$AccessToken)throw 'HTTP 409 Conflict'}
 Assert-Throws -Name 'Registration 409 returns actionable conflict error' -ExpectedMessage 'pre-association already exists or conflicts' -ScriptBlock {
-    & $module {param($Input,$Request)Invoke-WindowsDeviceLinkGraphRegistration -InputObject $Input -AccessToken 'synthetic-token' -TenantId 'tenant-test' -RequestScript $Request} $inputObject $conflictRequest
+    Invoke-SyntheticRegistration -Request $conflictRequest
 }
 
 $emptyRequest={param($Uri,$Body,$AccessToken)$null}
 Assert-Throws -Name 'Empty registration response is indeterminate' -ExpectedMessage 'empty Device Association response' -ScriptBlock {
-    & $module {param($Input,$Request)Invoke-WindowsDeviceLinkGraphRegistration -InputObject $Input -AccessToken 'synthetic-token' -TenantId 'tenant-test' -RequestScript $Request} $inputObject $emptyRequest
+    Invoke-SyntheticRegistration -Request $emptyRequest
 }
 
-$successRequest={param($Uri,$Body,$AccessToken)[pscustomobject]@{id='33333333-3333-3333-3333-333333333333';serialNumber='TEST-SERIAL';associationState='preassociated';managedDeviceId=$zeroGuid}}.GetNewClosure()
-$registration=& $module {param($Input,$Request)Invoke-WindowsDeviceLinkGraphRegistration -InputObject $Input -AccessToken 'synthetic-token' -TenantId 'tenant-test' -RequestScript $Request} $inputObject $successRequest
+$successRequest={param($Uri,$Body,$AccessToken)[pscustomobject]@{id='33333333-3333-3333-3333-333333333333';serialNumber='TEST-SERIAL';associationState='preassociated';managedDeviceId='00000000-0000-0000-0000-000000000000'}}
+$registration=Invoke-SyntheticRegistration -Request $successRequest
 Assert-True ($registration.PSObject.TypeNames -contains 'Windows.DeviceLink.Registration') 'registration result type is incorrect.'
 Assert-True ($registration.AssociationState -eq 'preassociated') 'registration state was not preserved.'
 Assert-True ($null -eq $registration.ManagedDeviceId) 'registration zero managedDeviceId should normalize to null.'
