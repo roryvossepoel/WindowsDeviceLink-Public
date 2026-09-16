@@ -12,9 +12,7 @@ function Assert-Throws {
     catch {
         $message=[string]$_.Exception.Message
         if($ExpectedMessage -and $message -notlike "*$ExpectedMessage*"){throw "FAIL: $Name - expected '$ExpectedMessage', got '$message'."}
-        foreach($forbidden in @($ForbiddenText)){
-            if($forbidden -and $message.Contains($forbidden)){throw "FAIL: $Name - exception leaked forbidden text '$forbidden'."}
-        }
+        foreach($forbidden in @($ForbiddenText)){ if($forbidden -and $message.Contains($forbidden)){throw "FAIL: $Name - exception leaked forbidden text '$forbidden'."} }
         Write-Host "PASS: $Name"
     }
 }
@@ -26,86 +24,62 @@ Import-Module $resolvedModulePath -Force -ErrorAction Stop
 $module=Get-Module WindowsDeviceLink|Select-Object -First 1
 if(-not $module){throw 'FAIL: WindowsDeviceLink did not load.'}
 
-# Core redaction helper removes exact sensitive values and bearer credentials.
-$redacted=& $module {
-    Protect-WindowsDeviceLinkSensitiveText `
-        -Text 'secret=CLIENT-SECRET Authorization: Bearer ACCESS-TOKEN payload=DEVICE-JWT' `
-        -SensitiveValue @('CLIENT-SECRET','DEVICE-JWT')
-}
+$redacted=& $module { Protect-WindowsDeviceLinkSensitiveText -Text 'secret=CLIENT-SECRET Authorization: Bearer ACCESS-TOKEN payload=DEVICE-JWT' -SensitiveValue @('CLIENT-SECRET','DEVICE-JWT') }
 Assert-True ($redacted -notmatch 'CLIENT-SECRET|ACCESS-TOKEN|DEVICE-JWT') 'redaction helper leaked a sensitive marker.'
 Assert-True ($redacted -match '\[REDACTED\]') 'redaction helper did not emit a redaction marker.'
 Write-Host 'PASS: sensitive-text redaction helper'
 
-# Client-secret authentication must not echo the secret even when the underlying transport exception does.
 $clientSecretMarker='WDL-CLIENT-SECRET-MARKER'
 $secureClientSecret=ConvertTo-SecureString $clientSecretMarker -AsPlainText -Force
-& $module {
-    $script:WdlAuthTestSecret='WDL-CLIENT-SECRET-MARKER'
-    function Invoke-RestMethod { throw "Synthetic OAuth failure containing $script:WdlAuthTestSecret" }
-}
+& $module { $script:WdlAuthTestSecret='WDL-CLIENT-SECRET-MARKER'; function Invoke-RestMethod { throw "Synthetic OAuth failure containing $script:WdlAuthTestSecret" } }
 try {
     Assert-Throws -Name 'Client-secret transport error is redacted' -ExpectedMessage 'Client-secret authentication failed' -ForbiddenText @($clientSecretMarker) -ScriptBlock {
         & $module { param($Secret) Get-WindowsDeviceLinkClientSecretToken -TenantId 'tenant-test' -ClientId 'client-test' -ClientSecret $Secret } $secureClientSecret
     }
 }
-finally {
-    & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlAuthTestSecret -Scope Script -ErrorAction SilentlyContinue }
-}
+finally { & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlAuthTestSecret -Scope Script -ErrorAction SilentlyContinue } }
 
-# Webhook transport errors must not echo either the API key or the raw DeviceLink payload.
 $apiKeyMarker='WDL-WEBHOOK-KEY-MARKER'
 $deviceLinkMarker='WDL-RAW-DEVICE-LINK-MARKER'
-$fakeDeviceLink=[pscustomobject]@{
-    SerialNumber='TEST-SERIAL'; Manufacturer='Test'; Model='Test'; SmbiosUuid='00000000-0000-0000-0000-000000000001'
-    LinkId='00000000-0000-0000-0000-000000000002'; PayloadCreationTimeUtc='2026-09-16T00:00:00Z'; DeviceLink=$deviceLinkMarker
-    Environment='Windows'; DllSource='System'; DllVersion='test'; ActivationMode='RegisteredWinRT'
-}
+$fakeDeviceLink=[pscustomobject]@{SerialNumber='TEST-SERIAL';Manufacturer='Test';Model='Test';SmbiosUuid='00000000-0000-0000-0000-000000000001';LinkId='00000000-0000-0000-0000-000000000002';PayloadCreationTimeUtc='2026-09-16T00:00:00Z';DeviceLink=$deviceLinkMarker;Environment='Windows';DllSource='System';DllVersion='test';ActivationMode='RegisteredWinRT'}
 $fakeDeviceLink.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
-& $module {
-    $script:WdlWebhookKey='WDL-WEBHOOK-KEY-MARKER'
-    $script:WdlWebhookPayload='WDL-RAW-DEVICE-LINK-MARKER'
-    function Invoke-RestMethod { throw "Synthetic webhook failure key=$script:WdlWebhookKey payload=$script:WdlWebhookPayload" }
-}
+& $module { $script:WdlWebhookKey='WDL-WEBHOOK-KEY-MARKER'; $script:WdlWebhookPayload='WDL-RAW-DEVICE-LINK-MARKER'; function Invoke-RestMethod { throw "Synthetic webhook failure key=$script:WdlWebhookKey payload=$script:WdlWebhookPayload" } }
 try {
     Assert-Throws -Name 'Webhook transport error redacts key and DeviceLink' -ExpectedMessage 'DeviceLink webhook could not be reached' -ForbiddenText @($apiKeyMarker,$deviceLinkMarker) -ScriptBlock {
         & $module { param($Input,$Key) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key } $fakeDeviceLink $apiKeyMarker
     }
 }
-finally {
-    & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlWebhookKey,WdlWebhookPayload -Scope Script -ErrorAction SilentlyContinue }
+finally { & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlWebhookKey,WdlWebhookPayload -Scope Script -ErrorAction SilentlyContinue } }
+
+# Native Graph GET must not echo bearer tokens when a transport error contains them.
+$accessTokenMarker='WDL-ACCESS-TOKEN-MARKER'
+$request={ param($Uri,$SdkMode,$AccessToken) throw "HTTP 401 Authorization: Bearer $AccessToken" }
+Assert-Throws -Name 'Graph GET redacts bearer token' -ExpectedMessage 'HTTP 401' -ForbiddenText @($accessTokenMarker) -ScriptBlock {
+    & $module { param($Request,$Token) Invoke-WindowsDeviceLinkGraphGet -Uri 'https://graph.microsoft.com/beta/test' -AccessToken $Token -RequestScript $Request } $request $accessTokenMarker
 }
 
-# Required combinations fail before authentication/network work begins.
+# Native registration must redact both bearer token and raw DeviceLink payload.
+$registrationToken='WDL-REGISTRATION-TOKEN'
+$registrationPayload='WDL-REGISTRATION-DEVICE-LINK'
+$registrationInput=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink=$registrationPayload}
+$registrationInput.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
+$registrationRequest={ param($Uri,$Body,$AccessToken) throw "HTTP 403 token=$AccessToken body=$Body" }
+Assert-Throws -Name 'Graph registration redacts token and DeviceLink payload' -ExpectedMessage 'HTTP 403' -ForbiddenText @($registrationToken,$registrationPayload) -ScriptBlock {
+    & $module { param($Input,$Request,$Token) Invoke-WindowsDeviceLinkGraphRegistration -InputObject $Input -AccessToken $Token -TenantId 'tenant-test' -RequestScript $Request } $registrationInput $registrationRequest $registrationToken
+}
+
 $fakePublicDeviceLink=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink='TEST-PAYLOAD'}
 $fakePublicDeviceLink.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
-Assert-Throws -Name 'Register AccessToken requires token' -ExpectedMessage '-TenantId and -AccessToken are required' -ScriptBlock {
-    $fakePublicDeviceLink | Register-WindowsDeviceLink -Method AccessToken -TenantId 'tenant-test'
-}
-Assert-Throws -Name 'Lookup Certificate requires certificate object' -ExpectedMessage '-TenantId, -ClientId, and -Certificate are required' -ScriptBlock {
-    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method Certificate -TenantId 'tenant-test' -ClientId 'client-test'
-}
-Assert-Throws -Name 'Lookup CertificateThumbprint requires thumbprint' -ExpectedMessage '-TenantId, -ClientId, and -CertificateThumbprint are required' -ScriptBlock {
-    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method CertificateThumbprint -TenantId 'tenant-test' -ClientId 'client-test'
-}
-Assert-Throws -Name 'Lookup CertificateSubjectName requires subject' -ExpectedMessage '-TenantId, -ClientId, and -CertificateSubjectName are required' -ScriptBlock {
-    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method CertificateSubjectName -TenantId 'tenant-test' -ClientId 'client-test'
-}
-Assert-Throws -Name 'ManagedIdentity rejects TenantId' -ExpectedMessage 'not valid with -Method ManagedIdentity' -ScriptBlock {
-    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method ManagedIdentity -TenantId 'tenant-test'
-}
+Assert-Throws -Name 'Register AccessToken requires token' -ExpectedMessage '-TenantId and -AccessToken are required' -ScriptBlock { $fakePublicDeviceLink | Register-WindowsDeviceLink -Method AccessToken -TenantId 'tenant-test' }
+Assert-Throws -Name 'Lookup Certificate requires certificate object' -ExpectedMessage '-TenantId, -ClientId, and -Certificate are required' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method Certificate -TenantId 'tenant-test' -ClientId 'client-test' }
+Assert-Throws -Name 'Lookup CertificateThumbprint requires thumbprint' -ExpectedMessage '-TenantId, -ClientId, and -CertificateThumbprint are required' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method CertificateThumbprint -TenantId 'tenant-test' -ClientId 'client-test' }
+Assert-Throws -Name 'Lookup CertificateSubjectName requires subject' -ExpectedMessage '-TenantId, -ClientId, and -CertificateSubjectName are required' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method CertificateSubjectName -TenantId 'tenant-test' -ClientId 'client-test' }
+Assert-Throws -Name 'ManagedIdentity rejects TenantId' -ExpectedMessage 'not valid with -Method ManagedIdentity' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method ManagedIdentity -TenantId 'tenant-test' }
 
-# Environment-variable auth reports only missing variable names, never values.
-$envNames=@('AZURE_TENANT_ID','AZURE_CLIENT_ID','AZURE_CLIENT_SECRET')
-$saved=@{}
+$envNames=@('AZURE_TENANT_ID','AZURE_CLIENT_ID','AZURE_CLIENT_SECRET');$saved=@{}
 foreach($name in $envNames){$saved[$name]=[Environment]::GetEnvironmentVariable($name);[Environment]::SetEnvironmentVariable($name,$null)}
-try {
-    Assert-Throws -Name 'EnvironmentVariable reports missing names safely' -ExpectedMessage 'AZURE_TENANT_ID' -ScriptBlock {
-        Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method EnvironmentVariable
-    }
-}
-finally {
-    foreach($name in $envNames){[Environment]::SetEnvironmentVariable($name,$saved[$name])}
-}
+try { Assert-Throws -Name 'EnvironmentVariable reports missing names safely' -ExpectedMessage 'AZURE_TENANT_ID' -ScriptBlock { Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method EnvironmentVariable } }
+finally { foreach($name in $envNames){[Environment]::SetEnvironmentVariable($name,$saved[$name])} }
 
 Write-Host ''
 Write-Host 'Authentication and secret-handling regression set passed.'
