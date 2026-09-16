@@ -1,5 +1,5 @@
 <#
-Validates native association-removal error redaction.
+Validates native Graph DELETE error redaction through the production transport helper.
 No Graph request is sent.
 #>
 [CmdletBinding()] param([string]$ModulePath)
@@ -10,25 +10,19 @@ Import-Module (Resolve-Path -LiteralPath $ModulePath).Path -Force -ErrorAction S
 $module=Get-Module WindowsDeviceLink|Select-Object -First 1
 
 $marker='WDL-DELETE-ACCESS-TOKEN'
-$secure=ConvertTo-SecureString $marker -AsPlainText -Force
-& $module {
-    function Invoke-RestMethod {
-        param($Method,$Uri,$Headers,$ErrorAction)
-        throw "HTTP 403 Authorization: $($Headers.Authorization)"
-    }
-}
+$request={param($Uri,$SdkMode,$AccessToken)throw "HTTP 403 Authorization: Bearer $AccessToken"}
 try {
-    try {
-        & $module {param($Token) Remove-WindowsDeviceLinkAssociation -AssociationId '11111111-1111-1111-1111-111111111111' -Method AccessToken -TenantId 'tenant-test' -AccessToken $Token -Confirm:$false} $secure
-        throw 'FAIL: removal expected an exception.'
-    }
-    catch {
-        $message=[string]$_.Exception.Message
-        if($message -notlike '*HTTP 403*'){throw "FAIL: removal error lost HTTP context: $message"}
-        if($message.Contains($marker)){throw 'FAIL: removal error leaked bearer token.'}
-        Write-Host 'PASS: removal transport error redacts bearer token'
-    }
+    & $module {param($Request,$Token)Invoke-WindowsDeviceLinkGraphDelete -Uri 'https://graph.microsoft.com/beta/deviceManagement/tenantAssociatedDevices/test' -AccessToken $Token -RequestScript $Request} $request $marker
+    throw 'FAIL: DELETE helper expected an exception.'
 }
-finally {
-    & $module {Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue}
+catch {
+    $message=[string]$_.Exception.Message
+    if($message -notlike '*HTTP 403*'){throw "FAIL: DELETE error lost HTTP context: $message"}
+    if($message.Contains($marker)){throw 'FAIL: DELETE error leaked bearer token.'}
+    Write-Host 'PASS: Graph DELETE transport error redacts bearer token'
 }
+
+# Static wiring guard: the public removal command must use the hardened DELETE helper.
+$command=(Get-Command Remove-WindowsDeviceLinkAssociation -Module WindowsDeviceLink).ScriptBlock.ToString()
+if($command -notmatch 'Invoke-WindowsDeviceLinkGraphDelete'){throw 'FAIL: public removal command is not wired to the hardened DELETE helper.'}
+Write-Host 'PASS: public removal command uses hardened DELETE transport'
