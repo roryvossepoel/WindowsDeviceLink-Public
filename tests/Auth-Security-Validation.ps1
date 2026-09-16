@@ -31,35 +31,32 @@ Write-Host 'PASS: sensitive-text redaction helper'
 
 $clientSecretMarker='WDL-CLIENT-SECRET-MARKER'
 $secureClientSecret=ConvertTo-SecureString $clientSecretMarker -AsPlainText -Force
-& $module { $script:WdlAuthTestSecret='WDL-CLIENT-SECRET-MARKER'; function Invoke-RestMethod { throw "Synthetic OAuth failure containing $script:WdlAuthTestSecret" } }
-try {
-    Assert-Throws -Name 'Client-secret transport error is redacted' -ExpectedMessage 'Client-secret authentication failed' -ForbiddenText @($clientSecretMarker) -ScriptBlock { & $module { param($Secret) Get-WindowsDeviceLinkClientSecretToken -TenantId 'tenant-test' -ClientId 'client-test' -ClientSecret $Secret } $secureClientSecret }
+$clientSecretRequest={param($Uri,$Body)throw "Synthetic OAuth failure containing $($Body.client_secret)"}
+Assert-Throws -Name 'Client-secret transport error is redacted' -ExpectedMessage 'Client-secret authentication failed' -ForbiddenText @($clientSecretMarker) -ScriptBlock {
+    & $module {param($Secret,$Request) Get-WindowsDeviceLinkClientSecretToken -TenantId 'tenant-test' -ClientId 'client-test' -ClientSecret $Secret -RequestScript $Request} $secureClientSecret $clientSecretRequest
 }
-finally { & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlAuthTestSecret -Scope Script -ErrorAction SilentlyContinue } }
 
 # Device-code OAuth errors must not echo the long-lived device_code value.
 $deviceCodeMarker='WDL-DEVICE-CODE-SECRET'
-& $module {
-    $script:WdlDeviceCodeCall=0
-    $script:WdlDeviceCodeSecret='WDL-DEVICE-CODE-SECRET'
-    function Start-Sleep { param([int]$Seconds) }
-    function Invoke-RestMethod {
-        $script:WdlDeviceCodeCall++
-        if($script:WdlDeviceCodeCall -eq 1){ return [pscustomobject]@{device_code=$script:WdlDeviceCodeSecret;user_code='SAFE-USER-CODE';verification_uri='https://example.invalid/device';expires_in=60;interval=1} }
-        throw "Synthetic device-code token failure containing $script:WdlDeviceCodeSecret"
+$deviceCodeRequest={
+    param($Stage,$Uri,$Body)
+    if($Stage -eq 'DeviceCode'){
+        return [pscustomobject]@{device_code='WDL-DEVICE-CODE-SECRET';user_code='SAFE-USER-CODE';verification_uri='https://example.invalid/device';expires_in=60;interval=1}
     }
+    throw "Synthetic device-code token failure containing $($Body.device_code)"
 }
-try {
-    Assert-Throws -Name 'Device-code transport error redacts device_code' -ExpectedMessage 'Device code authentication failed' -ForbiddenText @($deviceCodeMarker) -ScriptBlock { & $module { Get-WindowsDeviceLinkDeviceCodeToken -TenantId 'tenant-test' } }
+$noSleep={param($Seconds)}
+Assert-Throws -Name 'Device-code transport error redacts device_code' -ExpectedMessage 'Device code authentication failed' -ForbiddenText @($deviceCodeMarker) -ScriptBlock {
+    & $module {param($Request,$Sleep) Get-WindowsDeviceLinkDeviceCodeToken -TenantId 'tenant-test' -RequestScript $Request -SleepScript $Sleep} $deviceCodeRequest $noSleep
 }
-finally { & $module { Remove-Item Function:\Invoke-RestMethod,Function:\Start-Sleep -Force -ErrorAction SilentlyContinue; Remove-Variable WdlDeviceCodeCall,WdlDeviceCodeSecret -Scope Script -ErrorAction SilentlyContinue } }
 
 $apiKeyMarker='WDL-WEBHOOK-KEY-MARKER';$deviceLinkMarker='WDL-RAW-DEVICE-LINK-MARKER'
 $fakeDeviceLink=[pscustomobject]@{SerialNumber='TEST-SERIAL';Manufacturer='Test';Model='Test';SmbiosUuid='00000000-0000-0000-0000-000000000001';LinkId='00000000-0000-0000-0000-000000000002';PayloadCreationTimeUtc='2026-09-16T00:00:00Z';DeviceLink=$deviceLinkMarker;Environment='Windows';DllSource='System';DllVersion='test';ActivationMode='RegisteredWinRT'}
 $fakeDeviceLink.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
-& $module { $script:WdlWebhookKey='WDL-WEBHOOK-KEY-MARKER'; $script:WdlWebhookPayload='WDL-RAW-DEVICE-LINK-MARKER'; function Invoke-RestMethod { throw "Synthetic webhook failure key=$script:WdlWebhookKey payload=$script:WdlWebhookPayload" } }
-try { Assert-Throws -Name 'Webhook transport error redacts key and DeviceLink' -ExpectedMessage 'DeviceLink webhook could not be reached' -ForbiddenText @($apiKeyMarker,$deviceLinkMarker) -ScriptBlock { & $module { param($Input,$Key) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key } $fakeDeviceLink $apiKeyMarker } }
-finally { & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlWebhookKey,WdlWebhookPayload -Scope Script -ErrorAction SilentlyContinue } }
+$webhookRequest={param($Uri,$Headers,$Body)throw "Synthetic webhook failure key=$($Headers['X-WindowsDeviceLink-Key']) payload=$Body"}
+Assert-Throws -Name 'Webhook transport error redacts key and DeviceLink' -ExpectedMessage 'DeviceLink webhook could not be reached' -ForbiddenText @($apiKeyMarker,$deviceLinkMarker) -ScriptBlock {
+    & $module {param($Input,$Key,$Request) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key -RequestScript $Request} $fakeDeviceLink $apiKeyMarker $webhookRequest
+}
 
 $accessTokenMarker='WDL-ACCESS-TOKEN-MARKER'
 $request={ param($Uri,$SdkMode,$AccessToken) throw "HTTP 401 Authorization: Bearer $AccessToken" }
