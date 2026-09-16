@@ -84,7 +84,7 @@ $firmwareReaderPath = Join-Path $moduleRoot 'Public\Get-WindowsDeviceLinkFirmwar
 $readerText = Get-Content -LiteralPath $firmwareReaderPath -Raw
 $decoderCalls = [regex]::Matches($readerText, 'ConvertFrom-WindowsDeviceLinkFirmwareTimestamp').Count
 Assert-True ($decoderCalls -eq 1) "firmware reader must contain exactly one timestamp-decoder call; found $decoderCalls."
-Assert-True ($readerText -match "\$name\s+-eq\s+'DeviceLinkCreationTimeUtc'") 'timestamp decoder is not guarded by the DeviceLinkCreationTimeUtc variable name.'
+Assert-True ($readerText -match '\$name\s+-eq\s+''DeviceLinkCreationTimeUtc''') 'timestamp decoder is not guarded by the DeviceLinkCreationTimeUtc variable name.'
 Write-Host 'PASS: public firmware reader decodes only DeviceLinkCreationTimeUtc'
 
 Write-Host ''
