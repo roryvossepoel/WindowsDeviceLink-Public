@@ -82,6 +82,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Auth-Security-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate authentication orchestration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Auth-Orchestration-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Final package safety check
         shell: powershell
         run: |
