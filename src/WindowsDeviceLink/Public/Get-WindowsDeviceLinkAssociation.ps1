@@ -268,7 +268,11 @@ function Get-WindowsDeviceLinkAssociation {
     catch {
         $statusCode = $null
         try { $statusCode = [int]$_.Exception.Response.StatusCode } catch {}
-        if ($statusCode -eq 404) {
+
+        # A 404 for an explicitly addressed association ID means that exact record does
+        # not exist. A 404 from a collection/serial lookup is an API/transport failure,
+        # not proof that the serial number has no association, and must remain an error.
+        if ($statusCode -eq 404 -and $AssociationId) {
             Write-Information -InformationAction Continue -MessageData 'No Device Association record was found.'
             return
         }
