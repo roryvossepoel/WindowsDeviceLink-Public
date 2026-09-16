@@ -77,6 +77,23 @@ Assert-True ($null -eq $result.ManagedDeviceId) 'zero managedDeviceId must norma
 Assert-True ($null -eq $result.DevicePreparationPolicyId) 'empty devicePreparationPolicyId must normalize to null.'
 Write-Host 'PASS: empty/zero optional GUID-like values normalize to null'
 
+# Graph/.NET minimum date sentinels mean the optional lifecycle date is not populated yet.
+$dateSentinel=[pscustomobject]@{
+    id=$validId;serialNumber='TEST-SERIAL';associationState='preassociated'
+    preassociationDateTime='2026-09-15T15:27:07.9458446Z'
+    associationDateTime='0001-01-01T00:00:00Z'
+    enrolledDateTime='0001-01-01T00:00:00Z'
+    lastContactedDateTime='0001-01-01T00:00:00Z'
+    devicePreparationPolicyAssignedDateTime='0001-01-01T00:00:00Z'
+}
+$result=Convert-AssociationRecord -Record $dateSentinel
+Assert-True ($result.PreassociationDateTime -eq '2026-09-15T15:27:07.9458446Z') 'real preassociation date must remain unchanged.'
+Assert-True ($null -eq $result.AssociationDateTime) 'minimum associationDateTime sentinel must normalize to null.'
+Assert-True ($null -eq $result.EnrolledDateTime) 'minimum enrolledDateTime sentinel must normalize to null.'
+Assert-True ($null -eq $result.LastContactedDateTime) 'minimum lastContactedDateTime sentinel must normalize to null.'
+Assert-True ($null -eq $result.DevicePreparationPolicyAssignedDateTime) 'minimum policy-assigned date sentinel must normalize to null.'
+Write-Host 'PASS: minimum lifecycle date sentinels normalize to null'
+
 # Required association identity/state must never silently degrade.
 Assert-Throws -Name 'Zero association ID is rejected' -ExpectedMessage 'association ID is missing or empty' -ScriptBlock {
     Convert-AssociationRecord -Record ([pscustomobject]@{id=$zeroGuid;serialNumber='TEST-SERIAL';associationState='preassociated'})
