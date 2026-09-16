@@ -5,7 +5,9 @@ function Get-WindowsDeviceLinkGraphCollection {
         [AllowNull()][string]$AccessToken,
         [switch]$SdkMode,
         [ValidateRange(1, 1000)][int]$MaxPages = 100,
-        [ValidateRange(1, 5)][int]$MaxAttempts = 3
+        [ValidateRange(1, 5)][int]$MaxAttempts = 3,
+        [scriptblock]$RequestScript,
+        [scriptblock]$SleepScript
     )
 
     $records = @()
@@ -34,6 +36,8 @@ function Get-WindowsDeviceLinkGraphCollection {
         $requestParameters = @{ Uri=$nextUri; MaxAttempts=$MaxAttempts }
         if ($SdkMode) { $requestParameters.SdkMode = $true }
         else { $requestParameters.AccessToken = $AccessToken }
+        if ($RequestScript) { $requestParameters.RequestScript = $RequestScript }
+        if ($SleepScript) { $requestParameters.SleepScript = $SleepScript }
         $page = Invoke-WindowsDeviceLinkGraphGet @requestParameters
 
         if ($null -eq $page) {
