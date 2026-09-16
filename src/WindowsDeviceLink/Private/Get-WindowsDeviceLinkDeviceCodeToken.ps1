@@ -3,13 +3,23 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
     param(
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$TenantId,
         [ValidateNotNullOrEmpty()][string]$ClientId = '14d82eec-204b-4c2f-b7e8-296a70dab67e',
-        [ValidateNotNullOrEmpty()][string]$Scope = 'https://graph.microsoft.com/DeviceManagementServiceConfig.ReadWrite.All offline_access openid profile'
+        [ValidateNotNullOrEmpty()][string]$Scope = 'https://graph.microsoft.com/DeviceManagementServiceConfig.ReadWrite.All offline_access openid profile',
+        [scriptblock]$RequestScript,
+        [scriptblock]$SleepScript
     )
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $authority = "https://login.microsoftonline.com/$TenantId/oauth2/v2.0"
+    $deviceCodeUri = "$authority/devicecode"
+    $tokenUri = "$authority/token"
 
-    $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri "$authority/devicecode" -ContentType 'application/x-www-form-urlencoded' -Body @{ client_id=$ClientId; scope=$Scope } -ErrorAction Stop
+    if ($RequestScript) {
+        $deviceCodeResponse = & $RequestScript 'DeviceCode' $deviceCodeUri @{ client_id=$ClientId; scope=$Scope }
+    }
+    else {
+        $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri $deviceCodeUri -ContentType 'application/x-www-form-urlencoded' -Body @{ client_id=$ClientId; scope=$Scope } -ErrorAction Stop
+    }
+
     $verificationUri = if ($deviceCodeResponse.verification_uri) { $deviceCodeResponse.verification_uri } else { $deviceCodeResponse.verification_url }
     Write-Information -InformationAction Continue -MessageData ("To sign in, open {0} and enter code {1}." -f $verificationUri, $deviceCodeResponse.user_code)
 
@@ -18,7 +28,7 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
     $lastStatusAt = [DateTime]::MinValue
 
     while ([DateTime]::UtcNow -lt $expiresAt) {
-        Start-Sleep -Seconds $interval
+        if ($SleepScript) { & $SleepScript $interval } else { Start-Sleep -Seconds $interval }
         $remaining = $expiresAt - [DateTime]::UtcNow
         if (($remaining.TotalSeconds -gt 0) -and (([DateTime]::UtcNow - $lastStatusAt).TotalSeconds -ge 30)) {
             Write-Information -InformationAction Continue -MessageData ('Waiting for authentication... {0:mm\:ss} remaining.' -f $remaining)
@@ -26,13 +36,22 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
         }
 
         try {
-            $tokenResponse = Invoke-RestMethod -Method POST -Uri "$authority/token" -ContentType 'application/x-www-form-urlencoded' -Body @{ grant_type='urn:ietf:params:oauth:grant-type:device_code'; client_id=$ClientId; device_code=$deviceCodeResponse.device_code } -ErrorAction Stop
+            $tokenBody = @{ grant_type='urn:ietf:params:oauth:grant-type:device_code'; client_id=$ClientId; device_code=$deviceCodeResponse.device_code }
+            if ($RequestScript) {
+                $tokenResponse = & $RequestScript 'Token' $tokenUri $tokenBody
+            }
+            else {
+                $tokenResponse = Invoke-RestMethod -Method POST -Uri $tokenUri -ContentType 'application/x-www-form-urlencoded' -Body $tokenBody -ErrorAction Stop
+            }
+            $tokenBody.device_code = $null
+
             if ($tokenResponse.access_token) {
                 Write-Information -InformationAction Continue -MessageData 'Device code authentication succeeded.'
                 return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$TenantId }
             }
         }
         catch {
+            if ($tokenBody) { $tokenBody.device_code = $null }
             $errorCode = $null; $errorDescription = $null
             $rawBody = if ($_.ErrorDetails -and $_.ErrorDetails.Message) { [string]$_.ErrorDetails.Message } else { $null }
             if ($rawBody) {
