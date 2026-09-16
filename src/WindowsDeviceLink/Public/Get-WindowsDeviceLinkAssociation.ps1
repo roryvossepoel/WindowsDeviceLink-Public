@@ -70,24 +70,39 @@ function Get-WindowsDeviceLinkAssociation {
         if($AssociationId){
             $uri="$baseUri/deviceManagement/tenantAssociatedDevices/$AssociationId"
             $record=Invoke-WindowsDeviceLinkGraphGet -Uri $uri @graphReadParameters
-            $records=if($null -eq $record){@()}else{@($record)}
+            if($null -eq $record){throw "Microsoft Graph returned an empty response for Device Association '$AssociationId'; lookup result is indeterminate."}
+            if([string]::IsNullOrWhiteSpace([string]$record.id) -or [string]$record.id -eq [guid]::Empty.ToString()){throw "Microsoft Graph returned a malformed Device Association record for '$AssociationId': association ID is missing or empty."}
+            if([string]$record.id -ne [string]$AssociationId){throw "Microsoft Graph returned a mismatched Device Association record. Requested ID '$AssociationId', received '$($record.id)'."}
+            $records=@($record)
         } else {
             $escapedSerial=$SerialNumber.Replace("'","''");$filter=[uri]::EscapeDataString("serialNumber eq '$escapedSerial'");$uri="$baseUri/deviceManagement/tenantAssociatedDevices?`$filter=$filter"
-            $records=@(Get-WindowsDeviceLinkGraphCollection -Uri $uri @graphReadParameters)
+            $filteredRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri $uri @graphReadParameters)
+            $records=@($filteredRecords|Where-Object{[string]$_.serialNumber -eq [string]$SerialNumber})
             if($records.Count -eq 0){
-                Write-Information -InformationAction Continue -MessageData 'Filtered serial-number lookup returned no match; retrying with client-side matching.'
+                Write-Information -InformationAction Continue -MessageData 'Filtered serial-number lookup returned no exact match; retrying with client-side matching.'
                 $allRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri "$baseUri/deviceManagement/tenantAssociatedDevices" @graphReadParameters)
                 $records=@($allRecords|Where-Object{[string]$_.serialNumber -eq [string]$SerialNumber})
+                if($records.Count -eq 0){
+                    $recordsWithoutSerial=@($allRecords|Where-Object{[string]::IsNullOrWhiteSpace([string]$_.serialNumber)})
+                    if($recordsWithoutSerial.Count -gt 0){throw "Microsoft Graph returned one or more Device Association records without serialNumber; absence of serial number '$SerialNumber' cannot be confirmed safely."}
+                }
             }
+            if($records.Count -gt 1){throw "Multiple Device Association records were returned for serial number '$SerialNumber'. Use -AssociationId to select an exact record."}
         }
         if($records.Count -eq 0){Write-Information -InformationAction Continue -MessageData 'No Device Association record was found.';return}
         foreach($record in $records){
+            if([string]::IsNullOrWhiteSpace([string]$record.id) -or [string]$record.id -eq [guid]::Empty.ToString()){throw 'Microsoft Graph returned a malformed Device Association record: association ID is missing or empty.'}
+            if([string]::IsNullOrWhiteSpace([string]$record.associationState)){throw "Microsoft Graph returned a malformed Device Association record '$($record.id)': associationState is missing or empty."}
+
+            $managedDeviceId=if([string]::IsNullOrWhiteSpace([string]$record.managedDeviceId) -or [string]$record.managedDeviceId -eq [guid]::Empty.ToString()){$null}else{[string]$record.managedDeviceId}
+            $devicePreparationPolicyId=if([string]::IsNullOrWhiteSpace([string]$record.devicePreparationPolicyId) -or [string]$record.devicePreparationPolicyId -eq [guid]::Empty.ToString()){$null}else{[string]$record.devicePreparationPolicyId}
+
             [pscustomobject]@{
-                PSTypeName='Windows.DeviceLink.Association';Id=$record.id;TenantId=$TenantId;ManagedDeviceId=$record.managedDeviceId;ManagedDeviceName=$record.managedDeviceName
-                SerialNumber=$record.serialNumber;SmbiosUuid=$record.smbiosUuid;Manufacturer=$record.manufacturerName;Model=$record.modelName;AssociationState=$record.associationState
+                PSTypeName='Windows.DeviceLink.Association';Id=[string]$record.id;TenantId=$TenantId;ManagedDeviceId=$managedDeviceId;ManagedDeviceName=$record.managedDeviceName
+                SerialNumber=$record.serialNumber;SmbiosUuid=$record.smbiosUuid;Manufacturer=$record.manufacturerName;Model=$record.modelName;AssociationState=[string]$record.associationState
                 PreassociationDateTime=$record.preassociationDateTime;AssociationDateTime=$record.associationDateTime;EnrolledDateTime=$record.enrolledDateTime;LastContactedDateTime=$record.lastContactedDateTime
                 PreassociatedByUserPrincipalName=$record.preassociatedByUserPrincipalName;AssignedToUserPrincipalName=$record.assignedToUserPrincipalName
-                DevicePreparationPolicyId=$record.devicePreparationPolicyId;DevicePreparationPolicyAssignedDateTime=$record.devicePreparationPolicyAssignedDateTime
+                DevicePreparationPolicyId=$devicePreparationPolicyId;DevicePreparationPolicyAssignedDateTime=$record.devicePreparationPolicyAssignedDateTime
             }
         }
     } catch {
