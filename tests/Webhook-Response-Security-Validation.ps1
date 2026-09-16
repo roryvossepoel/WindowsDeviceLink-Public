@@ -18,27 +18,20 @@ $input=[pscustomobject]@{
 }
 $input.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
 
-& $module {
-    $script:WdlEchoKey='WDL-WEBHOOK-KEY-REFLECTION'
-    $script:WdlEchoPayload='WDL-DEVICE-LINK-REFLECTION'
-    function Invoke-RestMethod {
-        [pscustomobject]@{
-            status='ok'
-            echoedKey=$script:WdlEchoKey
-            nested=[pscustomobject]@{deviceLink=$script:WdlEchoPayload;authorization="Bearer $script:WdlEchoKey"}
-            array=@('safe',$script:WdlEchoPayload)
-        }
+$request={
+    param($Uri,$Headers,$Body)
+    [pscustomobject]@{
+        status='ok'
+        echoedKey=$Headers['X-WindowsDeviceLink-Key']
+        nested=[pscustomobject]@{deviceLink='WDL-DEVICE-LINK-REFLECTION';authorization="Bearer $($Headers['X-WindowsDeviceLink-Key'])"}
+        array=@('safe','WDL-DEVICE-LINK-REFLECTION')
     }
 }
-try {
-    $result=& $module { param($Input,$Key) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key } $input $key
-    $serialized=$result.Response|ConvertTo-Json -Depth 8 -Compress
-    Assert-True (-not $serialized.Contains($key)) 'Webhook result leaked reflected API key.'
-    Assert-True (-not $serialized.Contains($payload)) 'Webhook result leaked reflected DeviceLink payload.'
-    Assert-True ($serialized -match '\[REDACTED\]') 'Webhook response did not contain redaction markers.'
-    Assert-True ($result.RequestId) 'Webhook result lost RequestId while sanitizing response.'
-    Write-Host 'PASS: webhook reflected response is recursively sanitized'
-}
-finally {
-    & $module { Remove-Item Function:\Invoke-RestMethod -Force -ErrorAction SilentlyContinue; Remove-Variable WdlEchoKey,WdlEchoPayload -Scope Script -ErrorAction SilentlyContinue }
-}
+
+$result=& $module { param($Input,$Key,$Request) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key -RequestScript $Request } $input $key $request
+$serialized=$result.Response|ConvertTo-Json -Depth 8 -Compress
+Assert-True (-not $serialized.Contains($key)) 'Webhook result leaked reflected API key.'
+Assert-True (-not $serialized.Contains($payload)) 'Webhook result leaked reflected DeviceLink payload.'
+Assert-True ($serialized -match '\[REDACTED\]') 'Webhook response did not contain redaction markers.'
+Assert-True ($result.RequestId) 'Webhook result lost RequestId while sanitizing response.'
+Write-Host 'PASS: webhook reflected response is recursively sanitized'
