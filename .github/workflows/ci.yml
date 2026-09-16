@@ -76,6 +76,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Online-Method-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate authentication and secret handling
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Auth-Security-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Final package safety check
         shell: powershell
         run: |
