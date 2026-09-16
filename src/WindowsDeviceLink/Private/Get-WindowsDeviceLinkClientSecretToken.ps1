@@ -35,7 +35,23 @@ function Get-WindowsDeviceLinkClientSecretToken {
             -ErrorAction Stop
     }
     catch {
-        throw "Client-secret authentication failed for tenant '$TenantId' and client '$ClientId'. $($_.Exception.Message)"
+        $statusCode = $null
+        try {
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+        }
+        catch {}
+
+        $detail = Protect-WindowsDeviceLinkSensitiveText `
+            -Text ([string]$_.Exception.Message) `
+            -SensitiveValue @($plainSecret)
+
+        $statusText = if ($statusCode) { " HTTP $statusCode." } else { '' }
+        if ([string]::IsNullOrWhiteSpace($detail)) {
+            throw "Client-secret authentication failed for tenant '$TenantId' and client '$ClientId'.$statusText"
+        }
+        throw "Client-secret authentication failed for tenant '$TenantId' and client '$ClientId'.$statusText $detail"
     }
     finally {
         $plainSecret = $null
