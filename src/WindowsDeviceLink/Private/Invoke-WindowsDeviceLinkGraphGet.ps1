@@ -5,13 +5,19 @@ function Invoke-WindowsDeviceLinkGraphGet {
         [AllowNull()][string]$AccessToken,
         [switch]$SdkMode,
         [ValidateRange(1, 5)][int]$MaxAttempts = 3,
-        [ValidateRange(0, 60)][int]$MaxRetryAfterSeconds = 30
+        [ValidateRange(0, 60)][int]$MaxRetryAfterSeconds = 30,
+        [scriptblock]$RequestScript,
+        [scriptblock]$SleepScript
     )
 
     $attempt = 0
     while ($true) {
         $attempt++
         try {
+            if ($RequestScript) {
+                return & $RequestScript $Uri ([bool]$SdkMode) $AccessToken
+            }
+
             if ($SdkMode) {
                 return Invoke-MgGraphRequest -Method GET -Uri $Uri -ErrorAction Stop
             }
@@ -56,7 +62,10 @@ function Invoke-WindowsDeviceLinkGraphGet {
             Write-Information -InformationAction Continue -MessageData (
                 "Microsoft Graph GET returned HTTP {0}; retrying attempt {1}/{2} after {3} second(s)." -f $statusCode, ($attempt + 1), $MaxAttempts, $delaySeconds
             )
-            if ($delaySeconds -gt 0) { Start-Sleep -Seconds $delaySeconds }
+            if ($delaySeconds -gt 0) {
+                if ($SleepScript) { & $SleepScript $delaySeconds }
+                else { Start-Sleep -Seconds $delaySeconds }
+            }
         }
     }
 }
