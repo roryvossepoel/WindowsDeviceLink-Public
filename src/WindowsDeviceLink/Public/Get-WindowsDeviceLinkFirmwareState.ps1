@@ -82,24 +82,11 @@ function Get-WindowsDeviceLinkFirmwareState {
         $decodedValue = $null
         $parsedUtc = $null
         if ($size -gt 0 -and $name -eq 'DeviceLinkCreationTimeUtc') {
-            $candidate = [Text.Encoding]::UTF8.GetString($buffer, 0, [int]$size)
-
-            # Keep the accepted firmware representation deliberately narrow: UTC ISO-8601
-            # with whole seconds or 1-7 fractional-second digits. Use TryParse rather than
-            # the string[] TryParseExact overload because the latter did not parse the
-            # observed fractional form reliably in Windows PowerShell 5.1 / WinPE.
-            if ($candidate -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$') {
-                $parsed = [DateTimeOffset]::MinValue
-                if ([DateTimeOffset]::TryParse(
-                    $candidate,
-                    [Globalization.CultureInfo]::InvariantCulture,
-                    [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal,
-                    [ref]$parsed
-                )) {
-                    $decodedValue = $candidate
-                    $parsedUtc = $parsed.UtcDateTime
-                }
-            }
+            $timestampBytes = New-Object byte[] ([int]$size)
+            [Array]::Copy($buffer, 0, $timestampBytes, 0, [int]$size)
+            $timestamp = ConvertFrom-WindowsDeviceLinkFirmwareTimestamp -Bytes $timestampBytes
+            $decodedValue = $timestamp.DecodedValue
+            $parsedUtc = $timestamp.ParsedUtc
         }
 
         [pscustomobject]@{
