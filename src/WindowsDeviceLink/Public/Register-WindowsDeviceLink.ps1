@@ -219,26 +219,11 @@ function Register-WindowsDeviceLink {
                 throw
             }
 
-            $result = [pscustomobject]@{
-                PSTypeName              = 'Windows.DeviceLink.Registration'
-                Id                      = $response.id
-                TenantId                = $context.TenantId
-                ManagedDeviceId         = $response.managedDeviceId
-                ManagedDeviceName       = $response.managedDeviceName
-                SerialNumber            = $response.serialNumber
-                SmbiosUuid              = $response.smbiosUuid
-                Manufacturer            = $response.manufacturerName
-                Model                   = $response.modelName
-                AssociationState        = $response.associationState
-                PreassociationDateTime  = $response.preassociationDateTime
-                AssociationDateTime     = $response.associationDateTime
-                EnrolledDateTime        = $response.enrolledDateTime
-                LastContactedDateTime   = $response.lastContactedDateTime
-                PreassociatedByUserPrincipalName = $response.preassociatedByUserPrincipalName
-                AssignedToUserPrincipalName = $response.assignedToUserPrincipalName
-                DevicePreparationPolicyId = $response.devicePreparationPolicyId
-                DevicePreparationPolicyAssignedDateTime = $response.devicePreparationPolicyAssignedDateTime
-            }
+            $result = ConvertTo-WindowsDeviceLinkAssociationResult `
+                -Record $response `
+                -TenantId $context.TenantId `
+                -ResultType Registration `
+                -ExpectedSerialNumber ([string]$InputObject.SerialNumber)
 
             Write-Information -InformationAction Continue -MessageData ("DeviceLink registration succeeded. Serial number: {0}; Association state: {1}; Association ID: {2}" -f $result.SerialNumber, $result.AssociationState, $result.Id)
             $result
