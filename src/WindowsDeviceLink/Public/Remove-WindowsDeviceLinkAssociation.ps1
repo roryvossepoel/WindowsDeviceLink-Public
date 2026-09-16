@@ -62,15 +62,16 @@ function Remove-WindowsDeviceLinkAssociation {
         $graphReadParameters=@{};if($sdkMode){$graphReadParameters.SdkMode=$true}else{$graphReadParameters.AccessToken=$nativeAccessToken}
         if(-not $resolvedAssociationId){
             $escapedSerial=$SerialNumber.Replace("'","''");$filter=[uri]::EscapeDataString("serialNumber eq '$escapedSerial'");$lookupUri="$baseUri/deviceManagement/tenantAssociatedDevices?`$filter=$filter"
-            $matches=@(Get-WindowsDeviceLinkGraphCollection -Uri $lookupUri @graphReadParameters)
+            $filteredRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri $lookupUri @graphReadParameters)
+            $matches=@(Resolve-WindowsDeviceLinkSerialAssociationRecords -Records $filteredRecords -SerialNumber $SerialNumber)
             if($matches.Count -eq 0){
-                Write-Information -InformationAction Continue -MessageData 'Filtered serial-number lookup returned no match; retrying with client-side matching.'
+                Write-Information -InformationAction Continue -MessageData 'Filtered serial-number lookup returned no exact match; retrying with client-side matching.'
                 $allRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri "$baseUri/deviceManagement/tenantAssociatedDevices" @graphReadParameters)
-                $matches=@($allRecords|Where-Object{[string]$_.serialNumber -eq [string]$SerialNumber})
+                $matches=@(Resolve-WindowsDeviceLinkSerialAssociationRecords -Records $allRecords -SerialNumber $SerialNumber -RequireCompleteSerialCoverage)
             }
             if($matches.Count -eq 0){throw "No Device Association record was found for serial number '$SerialNumber'."}
-            if($matches.Count -gt 1){throw "Multiple Device Association records were found for serial number '$SerialNumber'. Use -AssociationId to select the exact record."}
             $resolvedAssociationId=[string]$matches[0].id;$resolvedSerialNumber=[string]$matches[0].serialNumber
+            if([string]::IsNullOrWhiteSpace($resolvedAssociationId) -or $resolvedAssociationId -eq [guid]::Empty.ToString()){throw "Microsoft Graph returned a malformed Device Association record for serial number '$SerialNumber': association ID is missing or empty."}
         }
 
         $deleteUri="$baseUri/deviceManagement/tenantAssociatedDevices/$resolvedAssociationId";$target=if($resolvedSerialNumber){"$resolvedSerialNumber ($resolvedAssociationId)"}else{$resolvedAssociationId}

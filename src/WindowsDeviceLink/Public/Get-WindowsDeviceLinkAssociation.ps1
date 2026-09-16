@@ -67,29 +67,28 @@ function Get-WindowsDeviceLinkAssociation {
 
     try {
         $graphReadParameters=@{};if($sdkMode){$graphReadParameters.SdkMode=$true}else{$graphReadParameters.AccessToken=$nativeAccessToken}
+
         if($AssociationId){
             $uri="$baseUri/deviceManagement/tenantAssociatedDevices/$AssociationId"
             $record=Invoke-WindowsDeviceLinkGraphGet -Uri $uri @graphReadParameters
-            $records=if($null -eq $record){@()}else{@($record)}
-        } else {
-            $escapedSerial=$SerialNumber.Replace("'","''");$filter=[uri]::EscapeDataString("serialNumber eq '$escapedSerial'");$uri="$baseUri/deviceManagement/tenantAssociatedDevices?`$filter=$filter"
-            $records=@(Get-WindowsDeviceLinkGraphCollection -Uri $uri @graphReadParameters)
-            if($records.Count -eq 0){
-                Write-Information -InformationAction Continue -MessageData 'Filtered serial-number lookup returned no match; retrying with client-side matching.'
-                $allRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri "$baseUri/deviceManagement/tenantAssociatedDevices" @graphReadParameters)
-                $records=@($allRecords|Where-Object{[string]$_.serialNumber -eq [string]$SerialNumber})
-            }
+            return ConvertTo-WindowsDeviceLinkAssociationResult -Record $record -TenantId $TenantId -ExpectedAssociationId $AssociationId
         }
+
+        $escapedSerial=$SerialNumber.Replace("'","''")
+        $filter=[uri]::EscapeDataString("serialNumber eq '$escapedSerial'")
+        $uri="$baseUri/deviceManagement/tenantAssociatedDevices?`$filter=$filter"
+        $filteredRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri $uri @graphReadParameters)
+        $records=@(Resolve-WindowsDeviceLinkSerialAssociationRecords -Records $filteredRecords -SerialNumber $SerialNumber)
+
+        if($records.Count -eq 0){
+            Write-Information -InformationAction Continue -MessageData 'Filtered serial-number lookup returned no exact match; retrying with client-side matching.'
+            $allRecords=@(Get-WindowsDeviceLinkGraphCollection -Uri "$baseUri/deviceManagement/tenantAssociatedDevices" @graphReadParameters)
+            $records=@(Resolve-WindowsDeviceLinkSerialAssociationRecords -Records $allRecords -SerialNumber $SerialNumber -RequireCompleteSerialCoverage)
+        }
+
         if($records.Count -eq 0){Write-Information -InformationAction Continue -MessageData 'No Device Association record was found.';return}
-        foreach($record in $records){
-            [pscustomobject]@{
-                PSTypeName='Windows.DeviceLink.Association';Id=$record.id;TenantId=$TenantId;ManagedDeviceId=$record.managedDeviceId;ManagedDeviceName=$record.managedDeviceName
-                SerialNumber=$record.serialNumber;SmbiosUuid=$record.smbiosUuid;Manufacturer=$record.manufacturerName;Model=$record.modelName;AssociationState=$record.associationState
-                PreassociationDateTime=$record.preassociationDateTime;AssociationDateTime=$record.associationDateTime;EnrolledDateTime=$record.enrolledDateTime;LastContactedDateTime=$record.lastContactedDateTime
-                PreassociatedByUserPrincipalName=$record.preassociatedByUserPrincipalName;AssignedToUserPrincipalName=$record.assignedToUserPrincipalName
-                DevicePreparationPolicyId=$record.devicePreparationPolicyId;DevicePreparationPolicyAssignedDateTime=$record.devicePreparationPolicyAssignedDateTime
-            }
-        }
+
+        ConvertTo-WindowsDeviceLinkAssociationResult -Record $records[0] -TenantId $TenantId -ExpectedSerialNumber $SerialNumber
     } catch {
         $statusCode=$null;try{$statusCode=[int]$_.Exception.Response.StatusCode}catch{}
         if($null -eq $statusCode -and $_.Exception.Message -match '(?<!\d)404(?!\d)'){$statusCode=404}
