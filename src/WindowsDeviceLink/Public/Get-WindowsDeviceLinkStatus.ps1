@@ -8,8 +8,9 @@ function Get-WindowsDeviceLinkStatus {
     By default the cmdlet performs no Microsoft Graph authentication or tenant lookup.
 
     Use -Online with an explicit authentication method to add the tenant-side Intune Device Association state.
-    An online lookup that finds no association is reported as AssociationPresent = False and AssociationState = NotAssociated;
-    this is a normal status result, not an error.
+    An online lookup that successfully finds no association is reported as AssociationPresent = False and AssociationState = NotAssociated;
+    this is a normal status result, not an error. A failed or indeterminate lookup is reported as AssociationPresent = $null,
+    AssociationState = Unknown, with AssociationError populated; it must not be interpreted as confirmed absence.
 
     PayloadCreationTimeUtc is the timestamp contained in the newly generated DeviceLink payload. Live validation showed
     that this value changes between payload generations while LinkId remains stable; it must not be interpreted as the
@@ -99,8 +100,21 @@ function Get-WindowsDeviceLinkStatus {
     $associationPresent = $null
     $associationState = $null
     if ($cloudChecked) {
-        $associationPresent = $null -ne $association
-        $associationState = if ($association) { [string]$association.AssociationState } elseif (-not $associationError) { 'NotAssociated' } else { 'Unknown' }
+        if ($associationError) {
+            # An authentication, transport, API, duplicate-result, or other lookup failure is
+            # indeterminate. Do not collapse it to confirmed absence: callers such as
+            # Initialize-WindowsDeviceLink must be able to distinguish this from LocalOnly.
+            $associationPresent = $null
+            $associationState = 'Unknown'
+        }
+        elseif ($association) {
+            $associationPresent = $true
+            $associationState = [string]$association.AssociationState
+        }
+        else {
+            $associationPresent = $false
+            $associationState = 'NotAssociated'
+        }
     }
 
     [pscustomobject]@{
