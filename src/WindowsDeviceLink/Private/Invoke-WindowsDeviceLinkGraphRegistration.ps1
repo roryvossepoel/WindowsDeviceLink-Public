@@ -11,20 +11,27 @@ function Invoke-WindowsDeviceLinkGraphRegistration {
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string]$TenantId
+        [string]$TenantId,
+
+        [scriptblock]$RequestScript
     )
 
     $uri = 'https://graph.microsoft.com/beta/deviceManagement/tenantAssociatedDevices/importTenantAssociatedDevice'
     $body = @{ deviceLink = $InputObject.DeviceLink } | ConvertTo-Json -Compress
 
     try {
-        $response = Invoke-RestMethod `
-            -Method POST `
-            -Uri $uri `
-            -Headers @{ Authorization = "Bearer $AccessToken" } `
-            -ContentType 'application/json' `
-            -Body $body `
-            -ErrorAction Stop
+        if ($RequestScript) {
+            $response = & $RequestScript $uri $body $AccessToken
+        }
+        else {
+            $response = Invoke-RestMethod `
+                -Method POST `
+                -Uri $uri `
+                -Headers @{ Authorization = "Bearer $AccessToken" } `
+                -ContentType 'application/json' `
+                -Body $body `
+                -ErrorAction Stop
+        }
     }
     catch {
         $statusCode = $null
@@ -41,26 +48,11 @@ function Invoke-WindowsDeviceLinkGraphRegistration {
         throw
     }
 
-    $result = [pscustomobject]@{
-        PSTypeName              = 'Windows.DeviceLink.Registration'
-        Id                      = $response.id
-        TenantId                = $TenantId
-        ManagedDeviceId         = $response.managedDeviceId
-        ManagedDeviceName       = $response.managedDeviceName
-        SerialNumber            = $response.serialNumber
-        SmbiosUuid              = $response.smbiosUuid
-        Manufacturer            = $response.manufacturerName
-        Model                   = $response.modelName
-        AssociationState        = $response.associationState
-        PreassociationDateTime  = $response.preassociationDateTime
-        AssociationDateTime     = $response.associationDateTime
-        EnrolledDateTime        = $response.enrolledDateTime
-        LastContactedDateTime   = $response.lastContactedDateTime
-        PreassociatedByUserPrincipalName = $response.preassociatedByUserPrincipalName
-        AssignedToUserPrincipalName = $response.assignedToUserPrincipalName
-        DevicePreparationPolicyId = $response.devicePreparationPolicyId
-        DevicePreparationPolicyAssignedDateTime = $response.devicePreparationPolicyAssignedDateTime
-    }
+    $result = ConvertTo-WindowsDeviceLinkAssociationResult `
+        -Record $response `
+        -TenantId $TenantId `
+        -ResultType Registration `
+        -ExpectedSerialNumber ([string]$InputObject.SerialNumber)
 
     $successMessage = "DeviceLink registration succeeded. Serial number: {0}; Association state: {1}; Association ID: {2}" -f $result.SerialNumber, $result.AssociationState, $result.Id
     Write-Information -InformationAction Continue -MessageData $successMessage
