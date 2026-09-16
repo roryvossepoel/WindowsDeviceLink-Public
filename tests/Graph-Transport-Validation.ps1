@@ -11,6 +11,20 @@ $resolvedModulePath=(Resolve-Path -LiteralPath $ModulePath).Path
 Remove-Module WindowsDeviceLink -Force -ErrorAction SilentlyContinue;Import-Module $resolvedModulePath -Force -ErrorAction Stop
 $module=Get-Module WindowsDeviceLink|Select-Object -First 1;if(-not $module){throw 'FAIL: WindowsDeviceLink did not load.'}
 
+# Retry-After handling is deterministic, bounded, and supports both HTTP forms.
+$now=[datetimeoffset]'2026-09-16T11:00:00Z'
+$numericDelay=& $module {Get-WindowsDeviceLinkGraphRetryDelay -Attempt 1 -StatusCode 429 -RetryAfter '17' -MaxRetryAfterSeconds 30 -NowUtc ([datetimeoffset]'2026-09-16T11:00:00Z')}
+Assert-True ($numericDelay -eq 17) "numeric Retry-After expected 17 seconds, got $numericDelay."
+$boundedDelay=& $module {Get-WindowsDeviceLinkGraphRetryDelay -Attempt 1 -StatusCode 429 -RetryAfter '90' -MaxRetryAfterSeconds 30 -NowUtc ([datetimeoffset]'2026-09-16T11:00:00Z')}
+Assert-True ($boundedDelay -eq 30) "bounded Retry-After expected 30 seconds, got $boundedDelay."
+$dateDelay=& $module {Get-WindowsDeviceLinkGraphRetryDelay -Attempt 1 -StatusCode 429 -RetryAfter 'Wed, 16 Sep 2026 11:00:12 GMT' -MaxRetryAfterSeconds 30 -NowUtc ([datetimeoffset]'2026-09-16T11:00:00Z')}
+Assert-True ($dateDelay -eq 12) "HTTP-date Retry-After expected 12 seconds, got $dateDelay."
+$fallbackDelay=& $module {Get-WindowsDeviceLinkGraphRetryDelay -Attempt 2 -StatusCode 429 -RetryAfter 'not-a-valid-retry-after' -MaxRetryAfterSeconds 30 -NowUtc ([datetimeoffset]'2026-09-16T11:00:00Z')}
+Assert-True ($fallbackDelay -eq 2) "invalid Retry-After should fall back to exponential delay 2, got $fallbackDelay."
+$nonThrottleDelay=& $module {Get-WindowsDeviceLinkGraphRetryDelay -Attempt 2 -StatusCode 503 -RetryAfter '20' -MaxRetryAfterSeconds 30 -NowUtc ([datetimeoffset]'2026-09-16T11:00:00Z')}
+Assert-True ($nonThrottleDelay -eq 2) "non-429 response should use exponential delay 2, got $nonThrottleDelay."
+Write-Host 'PASS: Retry-After parsing and bounds'
+
 # GET retries are limited to idempotent reads. Exercise retryable HTTP and transport failures.
 foreach($case in @(
     @{Name='HTTP 429';Message='HTTP 429 Too Many Requests';Failures=1;ExpectedAttempts=2},
