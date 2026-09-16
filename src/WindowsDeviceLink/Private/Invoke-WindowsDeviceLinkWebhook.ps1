@@ -4,7 +4,8 @@ function Invoke-WindowsDeviceLinkWebhook {
         [Parameter(Mandatory)][PSTypeName('Windows.DeviceLink.Information')][psobject]$InputObject,
         [Parameter(Mandatory)][ValidateNotNull()][uri]$WebhookUri,
         [ValidateNotNullOrEmpty()][string]$WebhookApiKey,
-        [ValidateNotNullOrEmpty()][string]$TenantId
+        [ValidateNotNullOrEmpty()][string]$TenantId,
+        [scriptblock]$RequestScript
     )
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -40,14 +41,21 @@ function Invoke-WindowsDeviceLinkWebhook {
 
     $headers = @{'X-WindowsDeviceLink-Schema'='1';'X-WindowsDeviceLink-RequestId'=$requestId}
     if ($PSBoundParameters.ContainsKey('WebhookApiKey')) { $headers['X-WindowsDeviceLink-Key'] = $WebhookApiKey }
+    $body = $payload | ConvertTo-Json -Depth 8 -Compress
 
     try {
         Write-Information -InformationAction Continue -MessageData "Sending DeviceLink payload to webhook. Request ID: $requestId"
-        $response = Invoke-RestMethod -Method POST -Uri $WebhookUri -Headers $headers -ContentType 'application/json' -Body ($payload | ConvertTo-Json -Depth 8 -Compress) -ErrorAction Stop
+        if ($RequestScript) {
+            $response = & $RequestScript $WebhookUri $headers $body
+        }
+        else {
+            $response = Invoke-RestMethod -Method POST -Uri $WebhookUri -Headers $headers -ContentType 'application/json' -Body $body -ErrorAction Stop
+        }
     }
     catch {
         $statusCode = $null
         try { if ($_.Exception.Response -and $_.Exception.Response.StatusCode) { $statusCode = [int]$_.Exception.Response.StatusCode } } catch {}
+        if ($null -eq $statusCode -and $_.Exception.Message -match '(?<!\d)(400|401|403|404|408|429|500|502|503|504)(?!\d)') { $statusCode = [int]$Matches[1] }
         $detail = Protect-WindowsDeviceLinkSensitiveText -Text ([string]$_.Exception.Message) -SensitiveValue @($WebhookApiKey,[string]$InputObject.DeviceLink)
 
         switch ($statusCode) {
@@ -62,7 +70,10 @@ function Invoke-WindowsDeviceLinkWebhook {
         if ($statusCode) { throw "DeviceLink webhook request failed with HTTP $statusCode. Request ID: $requestId. $detail" }
         throw "DeviceLink webhook could not be reached or the request failed before an HTTP response was received. Request ID: $requestId. $detail"
     }
-    finally { $headers.Remove('X-WindowsDeviceLink-Key') | Out-Null }
+    finally {
+        $headers.Remove('X-WindowsDeviceLink-Key') | Out-Null
+        $body = $null
+    }
 
     $safeResponse = Protect-WindowsDeviceLinkObject -InputObject $response -SensitiveValue @($WebhookApiKey,[string]$InputObject.DeviceLink)
 
