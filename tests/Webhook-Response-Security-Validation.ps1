@@ -12,12 +12,6 @@ $module=Get-Module WindowsDeviceLink|Select-Object -First 1
 
 $key='WDL-WEBHOOK-KEY-REFLECTION'
 $payload='WDL-DEVICE-LINK-REFLECTION'
-$input=[pscustomobject]@{
-    SerialNumber='TEST-SERIAL';Manufacturer='Test';Model='Test';SmbiosUuid='uuid';LinkId='link';PayloadCreationTimeUtc='2026-09-16T00:00:00Z'
-    DeviceLink=$payload;Environment='Windows';DllSource='System';DllVersion='test';ActivationMode='RegisteredWinRT'
-}
-$input.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
-
 $request={
     param($Uri,$Headers,$Body)
     [pscustomobject]@{
@@ -28,7 +22,16 @@ $request={
     }
 }
 
-$result=& $module { param($Input,$Key,$Request) Invoke-WindowsDeviceLinkWebhook -InputObject $Input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key -RequestScript $Request } $input $key $request
+$result=& $module {
+    param($Key,$Payload,$Request)
+    $input=[pscustomobject]@{
+        SerialNumber='TEST-SERIAL';Manufacturer='Test';Model='Test';SmbiosUuid='uuid';LinkId='link';PayloadCreationTimeUtc='2026-09-16T00:00:00Z'
+        DeviceLink=$Payload;Environment='Windows';DllSource='System';DllVersion='test';ActivationMode='RegisteredWinRT'
+    }
+    $input.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
+    Invoke-WindowsDeviceLinkWebhook -InputObject $input -WebhookUri 'https://example.invalid/' -WebhookApiKey $Key -RequestScript $Request
+} $key $payload $request
+
 $serialized=$result.Response|ConvertTo-Json -Depth 8 -Compress
 Assert-True (-not $serialized.Contains($key)) 'Webhook result leaked reflected API key.'
 Assert-True (-not $serialized.Contains($payload)) 'Webhook result leaked reflected DeviceLink payload.'
