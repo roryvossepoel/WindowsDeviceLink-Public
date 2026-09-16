@@ -64,6 +64,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Graph-Transport-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate Graph Device Association API contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Graph-Association-Contract-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate cloud-operation parameter boundaries
         shell: powershell
         run: |
