@@ -77,7 +77,10 @@ function Invoke-WindowsDeviceLinkWebhook {
         }
         catch {}
 
-        $detail = $_.Exception.Message
+        $detail = Protect-WindowsDeviceLinkSensitiveText `
+            -Text ([string]$_.Exception.Message) `
+            -SensitiveValue @($WebhookApiKey, [string]$InputObject.DeviceLink)
+
         switch ($statusCode) {
             400 { throw "DeviceLink webhook rejected the request with HTTP 400 (Bad Request). Request ID: $requestId. $detail" }
             401 { throw "DeviceLink webhook authentication failed with HTTP 401 (Unauthorized). Request ID: $requestId. $detail" }
