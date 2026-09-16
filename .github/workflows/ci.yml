@@ -88,6 +88,18 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Auth-Orchestration-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate SDK authentication error redaction
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Connect-Auth-Security-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
+      - name: Validate removal authentication error redaction
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Removal-Auth-Security-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate webhook response sanitization
         shell: powershell
         run: |
