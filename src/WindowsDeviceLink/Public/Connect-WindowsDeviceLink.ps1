@@ -116,5 +116,34 @@ function Connect-WindowsDeviceLink {
         default { throw "Unsupported authentication parameter set: $($PSCmdlet.ParameterSetName)" }
     }
 
-    Connect-MgGraph @parameters
+    $sensitiveValues = @()
+    $temporaryCredential = $null
+    try {
+        if ($PSCmdlet.ParameterSetName -eq 'AccessToken' -and $AccessToken) {
+            $temporaryCredential = New-Object System.Management.Automation.PSCredential('token', $AccessToken)
+            $sensitiveValues += $temporaryCredential.GetNetworkCredential().Password
+            $temporaryCredential = $null
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'ClientSecret' -and $ClientSecret) {
+            $temporaryCredential = New-Object System.Management.Automation.PSCredential('secret', $ClientSecret)
+            $sensitiveValues += $temporaryCredential.GetNetworkCredential().Password
+            $temporaryCredential = $null
+        }
+        elseif ($PSCmdlet.ParameterSetName -eq 'EnvironmentVariable' -and $env:AZURE_CLIENT_SECRET) {
+            $sensitiveValues += [string]$env:AZURE_CLIENT_SECRET
+        }
+
+        Connect-MgGraph @parameters
+    }
+    catch {
+        $detail = Protect-WindowsDeviceLinkSensitiveText -Text ([string]$_.Exception.Message) -SensitiveValue $sensitiveValues
+        if ([string]::IsNullOrWhiteSpace($detail)) {
+            throw "Microsoft Graph authentication failed using method '$($PSCmdlet.ParameterSetName)'."
+        }
+        throw "Microsoft Graph authentication failed using method '$($PSCmdlet.ParameterSetName)'. $detail"
+    }
+    finally {
+        $temporaryCredential = $null
+        $sensitiveValues = $null
+    }
 }
