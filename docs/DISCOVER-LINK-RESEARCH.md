@@ -19,6 +19,18 @@ The wrapper currently calls only:
 
 These are sufficient for generating/exporting the TPM-backed DeviceLink identity package but do not complete tenant association.
 
+## Live runtime inventory
+
+Live read-only inventory on the controlled Surface Laptop 3 / Windows 11 build `10.0.26100.8875` reported three IInspectable interfaces on `ModernDeployment.Autopilot.Core.DeviceLinkUtilities`:
+
+- `6410BEE7-60A9-5627-9EB2-FEDA7518A4EB` - the interface already used by WindowsDeviceLink for identity export/generation;
+- `00000038-0000-0000-C000-000000000046` - standard `IWeakReferenceSource`;
+- `8A3B7C2E-5D1F-4E9A-B6C8-2F0E1D3A4B5C` - additional interface reported directly by `IInspectable.GetIids()` and not injected by the research tool.
+
+The third IID is now the primary candidate for additional DeviceLink functionality and requires type/signature correlation before any method is invoked.
+
+The runtime is registered under `WindowsManagementService` with `ActivationType=1` and `TrustLevel=0`.
+
 ## Observed successful lifecycle
 
 The current research model is:
@@ -39,9 +51,45 @@ The current research model is:
 
 This is distinct from Intune enrollment and Microsoft Entra join.
 
+## Live binary evidence
+
+Read-only string inventory of `C:\Windows\System32\Windows.Management.Service.dll` version `10.0.26100.8875` exposed direct DeviceLink implementation evidence including:
+
+- `AcquireApplyAckDeviceLink`
+- `ApplyDeviceLink`
+- `AcknowledgeDeviceLink`
+- `RetrieveDeviceLinkFromUrl`
+- `GetSignedDeviceAssociationInfo`
+- `GetDiscoveryResults`
+- `AcquireEnrollmentDiscoveryEndpoint`
+- `PerformAttestation`
+- `GenerateMaaAttestationClaims`
+- `DeviceLinkPreassociateDiscoveryUri`
+- `DeviceLinkJwtDownloadUri`
+- `AcknowledgeDeviceLinkUri`
+- `DeviceLinkManager`
+- `DeviceLinkUtilities`
+- `https://aps.windowsautopilot.microsoft.com/ztd/devicelink/preassociationDiscovery`
+
+The same binary exposes WinRT generic type strings for `Windows.Foundation.IAsyncOperationWithProgress<ModernDeployment.Autopilot.Core.ConfigureDeviceLinkResult, ...>` and its completed handler. This strongly suggests a higher-level asynchronous DeviceLink configuration/orchestration operation exists in addition to the internal discovery/apply/ack functions.
+
+This does not yet establish the public ABI, method name, interface IID, vtable slot, or call safety. Those must be recovered before invocation.
+
+## DevicePreparation CSP / MDM Bridge observation
+
+Live metadata enumeration of `root\cimv2\mdm\dmmap` found three DevicePreparation-related classes:
+
+- `MDM_DevicePreparation_MDMProvider01`
+- `MDM_DevicePreparation_BootstrapperAgent01`
+- `MDM_DevicePreparation`
+
+On the tested build these classes exposed properties only; no callable CIM methods were returned by `CimClassMethods` for `RefreshTenantAssociationInfo` or another tenant-association Exec surface.
+
+Therefore the documented DevicePreparation CSP remains useful as a lifecycle/status model, but the local MDM Bridge does not currently provide an obvious direct callable association-completion method on this device. The WinRT/native route remains the primary implementation research path unless another bridge class is discovered.
+
 ## Known service/routing observations
 
-Community research has observed the global preassociation discovery endpoint:
+The binary and community research both identify the global preassociation discovery endpoint:
 
 `https://aps.windowsautopilot.microsoft.com/ztd/devicelink/preassociationDiscovery`
 
@@ -130,14 +178,14 @@ Any experimental call must:
 
 ## Next research task
 
-Identify the exact DeviceLink WinRT/native interfaces used for the Discover and Link operations on the current Windows 11 build and determine:
+Correlate the extra runtime IID `8A3B7C2E-5D1F-4E9A-B6C8-2F0E1D3A4B5C` with binary/WinRT type metadata and recover the exact higher-level DeviceLink configuration contract, including:
 
-- interface IID(s)
-- vtable slots/method signatures
-- input/output types
-- async result/error contract
-- whether Discover and Link are independent calls or a higher-level orchestration wrapper
-- whether the methods are callable from full Windows outside OOBE
-- whether the same surface can activate through direct DLL loading in WinPE
+- interface/type name;
+- vtable slot(s) and ABI signature;
+- `ConfigureDeviceLinkResult` values;
+- progress type/values;
+- async error contract;
+- whether the high-level operation performs Discover + attestation + apply + acknowledge as one orchestration;
+- whether lower-level Discover/Link calls remain independently exposed.
 
-Do not add these calls to the public module surface until these details are reproducibly validated.
+Only after that mapping is reproducible should a controlled private experimental call be considered.
