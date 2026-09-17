@@ -1,5 +1,5 @@
 <#
-Validates that the read-only Discover/Link research probes parse in Windows PowerShell 5.1.
+Validates that the Discover/Link research probes parse in Windows PowerShell 5.1.
 The tools are intentionally not executed in CI because the hosted runner is not a controlled
 DeviceLink research target.
 #>
@@ -16,7 +16,8 @@ $files=@(
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkManagerVtableInventory.ps1'),
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkManagerVtableTargetInventory.ps1'),
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkWinRtMetadataInventory.ps1'),
-    (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkRoMetadataContract.ps1')
+    (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkRoMetadataContract.ps1'),
+    (Join-Path $PSScriptRoot '..\tools\Invoke-DeviceLinkDiscoveryResearch.ps1')
 )
 
 foreach($file in $files){
@@ -33,9 +34,6 @@ foreach($file in $files){
         throw "FAIL: research tool '$file' contains parser errors: $detail"
     }
 
-    # PowerShell variables are case-insensitive and the -match operator writes to the
-    # automatic $Matches hashtable. A normal accumulator named $matches is therefore
-    # unsafe and caused the first live probe failures on Windows PowerShell 5.1.
     $source=[IO.File]::ReadAllText($resolved)
     if($source -match '(?i)\$matches\b'){
         throw "FAIL: research tool '$file' uses `$matches, which collides with PowerShell's automatic `$Matches variable."
