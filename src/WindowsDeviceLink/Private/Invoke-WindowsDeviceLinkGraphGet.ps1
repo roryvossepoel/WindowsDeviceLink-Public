@@ -27,7 +27,7 @@ function Invoke-WindowsDeviceLinkGraphGet {
             }
             catch { $statusCode = $null }
 
-            if ($null -eq $statusCode -and $errorRecord.Exception.Message -match '(?<!\d)(429|500|502|503|504)(?!\d)') { $statusCode = [int]$Matches[1] }
+            if ($null -eq $statusCode -and $errorRecord.Exception.Message -match '(?<!\d)(401|403|404|409|429|500|502|503|504)(?!\d)') { $statusCode = [int]$Matches[1] }
 
             $transportRetryable = $false
             try {
@@ -48,7 +48,11 @@ function Invoke-WindowsDeviceLinkGraphGet {
             }
 
             $retryable = ($statusCode -in @(429,500,502,503,504)) -or $transportRetryable
-            if (-not $retryable -or $attempt -ge $MaxAttempts) { throw $errorRecord }
+            if (-not $retryable -or $attempt -ge $MaxAttempts) {
+                $safeDetail = Protect-WindowsDeviceLinkSensitiveText -Text ([string]$errorRecord.Exception.Message) -SensitiveValue @($AccessToken)
+                if ($statusCode) { throw "Microsoft Graph GET failed with HTTP $statusCode. $safeDetail" }
+                throw "Microsoft Graph GET failed. $safeDetail"
+            }
 
             $retryAfter = $null
             if ($statusCode -eq 429) {
@@ -56,12 +60,7 @@ function Invoke-WindowsDeviceLinkGraphGet {
                 catch { $retryAfter = $null }
             }
 
-            $delaySeconds = Get-WindowsDeviceLinkGraphRetryDelay `
-                -Attempt $attempt `
-                -StatusCode $statusCode `
-                -RetryAfter $retryAfter `
-                -MaxRetryAfterSeconds $MaxRetryAfterSeconds
-
+            $delaySeconds = Get-WindowsDeviceLinkGraphRetryDelay -Attempt $attempt -StatusCode $statusCode -RetryAfter $retryAfter -MaxRetryAfterSeconds $MaxRetryAfterSeconds
             $reason = if ($null -ne $statusCode) { "HTTP $statusCode" } else { 'a transient transport failure' }
             Write-Information -InformationAction Continue -MessageData ("Microsoft Graph GET encountered {0}; retrying attempt {1}/{2} after {3} second(s)." -f $reason,($attempt+1),$MaxAttempts,$delaySeconds)
             if ($delaySeconds -gt 0) { if ($SleepScript) { & $SleepScript $delaySeconds } else { Start-Sleep -Seconds $delaySeconds } }
