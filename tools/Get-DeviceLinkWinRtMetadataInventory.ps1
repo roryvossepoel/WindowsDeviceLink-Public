@@ -1,20 +1,20 @@
 <#
 .SYNOPSIS
-Searches local Windows metadata files for DeviceLinkManager contract evidence.
+Searches a targeted set of local Windows metadata/binaries for DeviceLinkManager contract evidence.
 
 .DESCRIPTION
-Performs a read-only scan of likely Windows Runtime metadata locations for UTF-16/ASCII
-occurrences of DeviceLinkManager-related type names, result/progress type names, and the
-known DeviceLinkManager interface IID. It does not activate DeviceLink methods or modify
-any local/cloud state.
+Performs a read-only targeted scan for DeviceLinkManager-related type names, result/progress
+type names, and the known DeviceLinkManager interface IID. The default scan intentionally avoids
+recursing through all of System32: it inspects Windows.Management.Service.dll plus the small
+System32\WinMetadata tree and a few explicitly named management/enrollment binaries when present.
+
+Each file is read once and searched for all needles in-memory. No DeviceLink methods are activated
+or invoked and no local/cloud state is modified.
 #>
 [CmdletBinding()]
 param(
-    [string[]]$Roots = @(
-        (Join-Path $env:SystemRoot 'System32\WinMetadata'),
-        (Join-Path $env:SystemRoot 'System32')
-    ),
-    [ValidateRange(1,20)][int]$MaxResultsPerNeedle = 20
+    [string[]]$AdditionalFiles = @(),
+    [ValidateRange(1,50)][int]$MaxResultsPerNeedle = 20
 )
 
 $ErrorActionPreference='Stop'
@@ -29,8 +29,6 @@ $needles = @(
     'AcquireApplyAckDeviceLink',
     '1F79101B-A792-5008-A82A-A4B232229026'
 )
-
-$extensions = @('.winmd','.dll','.exe')
 
 function Test-ByteSequence {
     param([byte[]]$Buffer,[byte[]]$Needle)
@@ -47,37 +45,55 @@ function Test-ByteSequence {
     return $false
 }
 
+$candidatePaths = @(
+    (Join-Path $env:SystemRoot 'System32\Windows.Management.Service.dll'),
+    (Join-Path $env:SystemRoot 'System32\mdmregistration.dll'),
+    (Join-Path $env:SystemRoot 'System32\omadmclient.exe'),
+    (Join-Path $env:SystemRoot 'System32\deviceenroller.exe')
+) + @($AdditionalFiles)
+
+$winMetadataRoot = Join-Path $env:SystemRoot 'System32\WinMetadata'
 $files = @(
-    foreach($root in $Roots){
-        if(-not (Test-Path -LiteralPath $root)){ continue }
-        Get-ChildItem -LiteralPath $root -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $extensions -contains $_.Extension.ToLowerInvariant() }
+    foreach($path in $candidatePaths){
+        if(Test-Path -LiteralPath $path -PathType Leaf){ Get-Item -LiteralPath $path }
+    }
+    if(Test-Path -LiteralPath $winMetadataRoot){
+        Get-ChildItem -LiteralPath $winMetadataRoot -File -Recurse -Filter '*.winmd' -ErrorAction SilentlyContinue
     }
 ) | Sort-Object FullName -Unique
+
+$needlePatterns = @(
+    foreach($needle in $needles){
+        $guidBytes=$null
+        if($needle -match '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'){
+            $guidBytes=([guid]$needle).ToByteArray()
+        }
+        [pscustomobject]@{
+            Needle=$needle
+            Ascii=[Text.Encoding]::ASCII.GetBytes($needle)
+            Unicode=[Text.Encoding]::Unicode.GetBytes($needle)
+            GuidBytes=$guidBytes
+        }
+    }
+)
 
 $results = @(
     foreach($file in $files){
         $bytes=$null
         try { $bytes=[IO.File]::ReadAllBytes($file.FullName) } catch { continue }
 
-        foreach($needle in $needles){
-            $ascii=[Text.Encoding]::ASCII.GetBytes($needle)
-            $unicode=[Text.Encoding]::Unicode.GetBytes($needle)
-            $guidBytes=$null
-            if($needle -match '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'){
-                $guidBytes=([guid]$needle).ToByteArray()
-            }
-
-            $kinds=@()
-            if(Test-ByteSequence -Buffer $bytes -Needle $unicode){ $kinds += 'UnicodeText' }
-            if(Test-ByteSequence -Buffer $bytes -Needle $ascii){ $kinds += 'AsciiText' }
-            if($guidBytes -and (Test-ByteSequence -Buffer $bytes -Needle $guidBytes)){ $kinds += 'GuidBytes' }
+        foreach($pattern in $needlePatterns){
+            $kinds=@(
+                if(Test-ByteSequence -Buffer $bytes -Needle $pattern.Unicode){ 'UnicodeText' }
+                if(Test-ByteSequence -Buffer $bytes -Needle $pattern.Ascii){ 'AsciiText' }
+                if($pattern.GuidBytes -and (Test-ByteSequence -Buffer $bytes -Needle $pattern.GuidBytes)){ 'GuidBytes' }
+            )
 
             if($kinds.Count -gt 0){
                 [pscustomobject]@{
                     File=$file.FullName
                     Extension=$file.Extension
-                    Needle=$needle
+                    Needle=$pattern.Needle
                     MatchKinds=@($kinds)
                     Length=$file.Length
                     Version=if($file.Extension -in @('.dll','.exe')){$file.VersionInfo.FileVersion}else{$null}
@@ -89,19 +105,20 @@ $results = @(
 
 $grouped=@(
     foreach($needle in $needles){
-        $matchesForNeedle=@($results | Where-Object Needle -eq $needle | Select-Object -First $MaxResultsPerNeedle)
+        $items=@($results | Where-Object Needle -eq $needle | Select-Object -First $MaxResultsPerNeedle)
         [pscustomobject]@{
             Needle=$needle
-            MatchCount=@($matchesForNeedle).Count
-            Matches=$matchesForNeedle
+            MatchCount=@($items).Count
+            Matches=$items
         }
     }
 )
 
 [pscustomobject]@{
     PSTypeName='Windows.DeviceLink.Research.WinRtMetadataInventory'
-    Roots=@($Roots)
+    Mode='Targeted'
     FileCount=@($files).Count
+    Files=@($files | ForEach-Object FullName)
     NeedleCount=@($needles).Count
     Results=$grouped
     ReadOnly=$true
