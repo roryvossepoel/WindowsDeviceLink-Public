@@ -6,9 +6,10 @@ Resolves read-only jump/thunk chains for DeviceLinkManager vtable slots.
 Activates ModernDeployment.Autopilot.Core.DeviceLinkManager, queries its known interface,
 and inspects (without invoking) the function pointers in vtable slots 6 through 11.
 For each slot the tool reads a small instruction prefix and follows only a narrow set of
-well-known x64 unconditional jump/thunk encodings (E9, EB, FF 25, 48 FF 25, and
-48 B8 <imm64> FF E0). It returns every hop, module/RVA information, and the final
-resolved address.
+well-known x64 unconditional jump/thunk encodings (E9, EB, FF 25, 48 FF 25,
+48 B8 <imm64> FF E0, and the WinRT/COM dispatch stub pattern
+B8 <slot> 00 00 00 E9 <rel32>). It returns every hop, module/RVA information,
+the dispatch index when observed, and the final resolved address.
 
 No DeviceLink method is invoked. No firmware, registry, TPM, cloud, network, or device
 association state is modified.
@@ -39,6 +40,8 @@ namespace WindowsDeviceLinkResearch
         public string HexBytes { get; set; }
         public string Kind { get; set; }
         public long Target { get; set; }
+        public int DispatchIndex { get; set; }
+        public bool HasDispatchIndex { get; set; }
         public string ModuleName { get; set; }
         public long Rva { get; set; }
     }
@@ -133,8 +136,18 @@ namespace WindowsDeviceLinkResearch
 
                 long target=0;
                 string kind="Final";
+                int dispatchIndex=0;
+                bool hasDispatchIndex=false;
 
-                if(bytes[0]==0xE9) // jmp rel32
+                if(bytes[0]==0xB8 && bytes[5]==0xE9) // mov eax,imm32 ; jmp rel32
+                {
+                    dispatchIndex=BitConverter.ToInt32(bytes,1);
+                    hasDispatchIndex=true;
+                    int disp=BitConverter.ToInt32(bytes,6);
+                    target=current+10+disp;
+                    kind="MovEaxDispatchJmpRel32";
+                }
+                else if(bytes[0]==0xE9) // jmp rel32
                 {
                     int disp=BitConverter.ToInt32(bytes,1);
                     target=current+5+disp;
@@ -174,6 +187,8 @@ namespace WindowsDeviceLinkResearch
                     HexBytes=BitConverter.ToString(bytes).Replace("-"," "),
                     Kind=kind,
                     Target=target,
+                    DispatchIndex=dispatchIndex,
+                    HasDispatchIndex=hasDispatchIndex,
                     ModuleName=moduleName,
                     Rva=rva
                 });
@@ -237,6 +252,7 @@ $result=[WindowsDeviceLinkResearch.VtableTargetInventory]::Inspect($FirstSlot,$S
                     ModuleName=$_.ModuleName
                     Rva=if($_.Rva -gt 0){'0x{0:X}' -f [uint64]$_.Rva}else{$null}
                     Kind=$_.Kind
+                    DispatchIndex=if($_.HasDispatchIndex){$_.DispatchIndex}else{$null}
                     Target=if($_.Target -ne 0){'0x{0:X}' -f [uint64]$_.Target}else{$null}
                     HexBytes=$_.HexBytes
                 }
