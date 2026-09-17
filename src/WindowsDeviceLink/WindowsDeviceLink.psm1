@@ -19,6 +19,7 @@ Get-ChildItem -Path $publicPath -Filter '*.ps1' -File |
     ForEach-Object { . $_.FullName }
 
 Export-ModuleMember -Function @(
+    'Complete-WindowsDeviceLinkAssociation'
     'Connect-WindowsDeviceLink'
     'Export-WindowsDeviceLinkCsv'
     'Get-WindowsDeviceLink'
@@ -31,6 +32,7 @@ Export-ModuleMember -Function @(
     'Remove-WindowsDeviceLinkAssociation'
     'Reset-WindowsDeviceLinkFirmwareState'
     'Test-WindowsDeviceLinkAssociationJwt'
+    'Test-WindowsDeviceLinkDiscovery'
     'Test-WindowsDeviceLinkHealth'
     'Test-WindowsDeviceLinkPreflight'
     'Test-WindowsDeviceLinkSupport'
