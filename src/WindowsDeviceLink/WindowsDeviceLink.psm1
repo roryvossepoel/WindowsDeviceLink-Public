@@ -7,6 +7,11 @@ if (-not ('WinPEDeviceLink.Native.DeviceLinkClient' -as [type])) {
     Add-Type -Path $nativeSource -ErrorAction Stop
 }
 
+$managerNativeSource = Join-Path $privatePath 'DeviceLinkManagerNative.cs'
+if (-not ('WinPEDeviceLink.Native.DeviceLinkManagerClient' -as [type])) {
+    Add-Type -Path $managerNativeSource -ErrorAction Stop
+}
+
 Get-ChildItem -Path $privatePath -Filter '*.ps1' -File |
     ForEach-Object { . $_.FullName }
 
@@ -14,6 +19,7 @@ Get-ChildItem -Path $publicPath -Filter '*.ps1' -File |
     ForEach-Object { . $_.FullName }
 
 Export-ModuleMember -Function @(
+    'Complete-WindowsDeviceLinkAssociation'
     'Connect-WindowsDeviceLink'
     'Export-WindowsDeviceLinkCsv'
     'Get-WindowsDeviceLink'
@@ -26,6 +32,7 @@ Export-ModuleMember -Function @(
     'Remove-WindowsDeviceLinkAssociation'
     'Reset-WindowsDeviceLinkFirmwareState'
     'Test-WindowsDeviceLinkAssociationJwt'
+    'Test-WindowsDeviceLinkDiscovery'
     'Test-WindowsDeviceLinkHealth'
     'Test-WindowsDeviceLinkPreflight'
     'Test-WindowsDeviceLinkSupport'

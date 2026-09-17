@@ -49,6 +49,7 @@ if (-not $PackageRoot) {
 $resolvedPackageRoot = (Resolve-Path -LiteralPath $PackageRoot).Path
 
 $expectedFunctions = @(
+    'Complete-WindowsDeviceLinkAssociation'
     'Connect-WindowsDeviceLink'
     'Export-WindowsDeviceLinkCsv'
     'Get-WindowsDeviceLink'
@@ -61,6 +62,7 @@ $expectedFunctions = @(
     'Remove-WindowsDeviceLinkAssociation'
     'Reset-WindowsDeviceLinkFirmwareState'
     'Test-WindowsDeviceLinkAssociationJwt'
+    'Test-WindowsDeviceLinkDiscovery'
     'Test-WindowsDeviceLinkHealth'
     'Test-WindowsDeviceLinkPreflight'
     'Test-WindowsDeviceLinkSupport'
@@ -93,14 +95,15 @@ $getLocal = Get-Command Get-WindowsDeviceLink
 Assert-True (-not $getLocal.Parameters.ContainsKey('Online')) 'Get-WindowsDeviceLink unexpectedly exposes -Online.'
 Write-Host 'PASS: local DeviceLink retrieval has no -Online parameter'
 
-foreach ($name in @('Get-WindowsDeviceLinkRepairPlan','Test-WindowsDeviceLinkPreflight','Test-WindowsDeviceLinkAssociationJwt')) {
+foreach ($name in @('Get-WindowsDeviceLinkRepairPlan','Test-WindowsDeviceLinkPreflight','Test-WindowsDeviceLinkAssociationJwt','Test-WindowsDeviceLinkDiscovery')) {
     $command = Get-Command $name
     Assert-True (-not $command.Parameters.ContainsKey('WhatIf')) "$name must remain read-only and must not expose -WhatIf."
     Assert-True (-not $command.Parameters.ContainsKey('Confirm')) "$name must remain read-only and must not expose -Confirm."
 }
-Write-Host 'PASS: planner, preflight, and JWT validation remain read-only'
+Write-Host 'PASS: planner, preflight, JWT validation, and discovery remain read-only'
 
 $writeCommands = @(
+    'Complete-WindowsDeviceLinkAssociation'
     'Initialize-WindowsDeviceLink'
     'Register-WindowsDeviceLink'
     'Remove-WindowsDeviceLinkAssociation'
