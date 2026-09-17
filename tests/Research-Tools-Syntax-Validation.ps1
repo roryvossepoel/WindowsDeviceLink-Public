@@ -14,10 +14,11 @@ $files=@(
 )
 
 foreach($file in $files){
+    $resolved=(Resolve-Path -LiteralPath $file).Path
     $tokens=$null
     $errors=$null
     [void][System.Management.Automation.Language.Parser]::ParseFile(
-        (Resolve-Path -LiteralPath $file).Path,
+        $resolved,
         [ref]$tokens,
         [ref]$errors
     )
@@ -25,7 +26,16 @@ foreach($file in $files){
         $detail=($errors|ForEach-Object{"$($_.Extent.Text): $($_.Message)"}) -join '; '
         throw "FAIL: research tool '$file' contains parser errors: $detail"
     }
-    Write-Host "PASS: parsed $([IO.Path]::GetFileName($file))"
+
+    # PowerShell variables are case-insensitive and the -match operator writes to the
+    # automatic $Matches hashtable. A normal accumulator named $matches is therefore
+    # unsafe and caused the first live probe failures on Windows PowerShell 5.1.
+    $source=[IO.File]::ReadAllText($resolved)
+    if($source -match '(?i)\$matches\b'){
+        throw "FAIL: research tool '$file' uses `$matches, which collides with PowerShell's automatic `$Matches variable."
+    }
+
+    Write-Host "PASS: parsed $([IO.Path]::GetFileName($file)) without automatic-Matches collisions"
 }
 
 Write-Host ''
