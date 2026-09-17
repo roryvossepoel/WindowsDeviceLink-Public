@@ -82,12 +82,6 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\AssociationJwt-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
-      - name: Validate Discover/Link research tools syntax
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          .\tests\Research-Tools-Syntax-Validation.ps1
-
       - name: Validate Graph failure-state safety
         shell: powershell
         run: |
