@@ -40,6 +40,12 @@ jobs:
             -ModulePath $env:WDL_MODULE_PATH `
             -PackageRoot $env:WDL_PACKAGE_ROOT
 
+      - name: Validate DeviceLinkManager native wrapper
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Native-Manager-Contract-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate firmware safety and timestamp parsing
         shell: powershell
         run: |
