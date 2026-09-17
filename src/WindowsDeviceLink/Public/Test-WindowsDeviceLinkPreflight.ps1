@@ -62,7 +62,11 @@ function Test-WindowsDeviceLinkPreflight {
         Add-Check -Name 'LocalIdentity' -State 'Ready' -Summary 'A local DeviceLink identity can be obtained.' -ObservedValue ([string]$identity.LinkId)
     } catch { Add-Check -Name 'LocalIdentity' -State 'Blocked' -Summary 'A local DeviceLink identity could not be obtained.' -ObservedValue $null }
 
-    $resolved = Resolve-WindowsDeviceLinkPreflightState -Checks @($checks)
+    # Windows PowerShell 5.1 can throw "Argument types do not match" when @(...)
+    # is used directly against a generic List[object]. Materialize through the pipeline
+    # so the helper and returned object receive a normal PowerShell Object[].
+    $checkArray = @($checks | ForEach-Object { $_ })
+    $resolved = Resolve-WindowsDeviceLinkPreflightState -Checks $checkArray
 
     [pscustomobject]@{
         PSTypeName='Windows.DeviceLink.Preflight'
@@ -74,6 +78,6 @@ function Test-WindowsDeviceLinkPreflight {
         Architecture=$support.Architecture
         ActivationMode=$support.ActivationMode
         DllVersion=$support.DllVersion
-        Checks=@($checks)
+        Checks=$checkArray
     }
 }
