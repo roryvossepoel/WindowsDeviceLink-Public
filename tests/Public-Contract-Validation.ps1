@@ -54,6 +54,7 @@ $expectedFunctions = @(
     'Get-WindowsDeviceLink'
     'Get-WindowsDeviceLinkAssociation'
     'Get-WindowsDeviceLinkFirmwareState'
+    'Get-WindowsDeviceLinkRepairPlan'
     'Get-WindowsDeviceLinkStatus'
     'Initialize-WindowsDeviceLink'
     'Register-WindowsDeviceLink'
@@ -89,6 +90,11 @@ Write-Host 'PASS: runtime public command set'
 $getLocal = Get-Command Get-WindowsDeviceLink
 Assert-True (-not $getLocal.Parameters.ContainsKey('Online')) 'Get-WindowsDeviceLink unexpectedly exposes -Online.'
 Write-Host 'PASS: local DeviceLink retrieval has no -Online parameter'
+
+$repairPlan = Get-Command Get-WindowsDeviceLinkRepairPlan
+Assert-True (-not $repairPlan.Parameters.ContainsKey('WhatIf')) 'Get-WindowsDeviceLinkRepairPlan must remain read-only and must not expose -WhatIf.'
+Assert-True (-not $repairPlan.Parameters.ContainsKey('Confirm')) 'Get-WindowsDeviceLinkRepairPlan must remain read-only and must not expose -Confirm.'
+Write-Host 'PASS: repair planner remains read-only'
 
 $writeCommands = @(
     'Initialize-WindowsDeviceLink'
