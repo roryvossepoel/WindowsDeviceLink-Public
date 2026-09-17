@@ -23,15 +23,16 @@ param(
 
 $ErrorActionPreference='Stop'
 
-$typeName='WindowsDeviceLinkResearch.VtableTargetInventory'
+# Versioned type name is intentional. PowerShell cannot unload/replace Add-Type classes in
+# the current process, so a new namespace/type prevents stale research code after git pull.
+$typeName='WindowsDeviceLinkResearchV2.VtableTargetInventory'
 if(-not ($typeName -as [type])){
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace WindowsDeviceLinkResearch
+namespace WindowsDeviceLinkResearchV2
 {
     public sealed class JumpHop
     {
@@ -139,7 +140,7 @@ namespace WindowsDeviceLinkResearch
                 int dispatchIndex=0;
                 bool hasDispatchIndex=false;
 
-                if(bytes[0]==0xB8 && bytes[5]==0xE9) // mov eax,imm32 ; jmp rel32
+                if(bytes[0]==0xB8 && bytes[5]==0xE9)
                 {
                     dispatchIndex=BitConverter.ToInt32(bytes,1);
                     hasDispatchIndex=true;
@@ -147,33 +148,33 @@ namespace WindowsDeviceLinkResearch
                     target=current+10+disp;
                     kind="MovEaxDispatchJmpRel32";
                 }
-                else if(bytes[0]==0xE9) // jmp rel32
+                else if(bytes[0]==0xE9)
                 {
                     int disp=BitConverter.ToInt32(bytes,1);
                     target=current+5+disp;
                     kind="JmpRel32";
                 }
-                else if(bytes[0]==0xEB) // jmp rel8
+                else if(bytes[0]==0xEB)
                 {
                     sbyte disp=unchecked((sbyte)bytes[1]);
                     target=current+2+disp;
                     kind="JmpRel8";
                 }
-                else if(bytes[0]==0xFF && bytes[1]==0x25) // jmp qword ptr [rip+disp32]
+                else if(bytes[0]==0xFF && bytes[1]==0x25)
                 {
                     int disp=BitConverter.ToInt32(bytes,2);
                     long pointerAddress=current+6+disp;
                     target=Marshal.ReadIntPtr(new IntPtr(pointerAddress)).ToInt64();
                     kind="JmpRipIndirect";
                 }
-                else if(bytes[0]==0x48 && bytes[1]==0xFF && bytes[2]==0x25) // rex.w jmp [rip+disp32]
+                else if(bytes[0]==0x48 && bytes[1]==0xFF && bytes[2]==0x25)
                 {
                     int disp=BitConverter.ToInt32(bytes,3);
                     long pointerAddress=current+7+disp;
                     target=Marshal.ReadIntPtr(new IntPtr(pointerAddress)).ToInt64();
                     kind="JmpRipIndirectRex";
                 }
-                else if(bytes[0]==0x48 && bytes[1]==0xB8 && bytes[10]==0xFF && bytes[11]==0xE0) // mov rax,imm64; jmp rax
+                else if(bytes[0]==0x48 && bytes[1]==0xB8 && bytes[10]==0xFF && bytes[11]==0xE0)
                 {
                     target=BitConverter.ToInt64(bytes,2);
                     kind="MovRaxJmpRax";
@@ -230,7 +231,7 @@ namespace WindowsDeviceLinkResearch
 '@
 }
 
-$result=[WindowsDeviceLinkResearch.VtableTargetInventory]::Inspect($FirstSlot,$SlotCount,$MaxDepth)
+$result=[WindowsDeviceLinkResearchV2.VtableTargetInventory]::Inspect($FirstSlot,$SlotCount,$MaxDepth)
 
 [pscustomobject]@{
     PSTypeName='Windows.DeviceLink.Research.VtableTargetInventory'
