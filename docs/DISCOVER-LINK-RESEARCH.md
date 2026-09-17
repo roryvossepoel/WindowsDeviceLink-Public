@@ -27,9 +27,16 @@ Live read-only inventory on the controlled Surface Laptop 3 / Windows 11 build `
 - `00000038-0000-0000-C000-000000000046` - standard `IWeakReferenceSource`;
 - `8A3B7C2E-5D1F-4E9A-B6C8-2F0E1D3A4B5C` - additional interface reported directly by `IInspectable.GetIids()` and not injected by the research tool.
 
-The third IID is now the primary candidate for additional DeviceLink functionality and requires type/signature correlation before any method is invoked.
+Binary IID-context inspection did **not** correlate the third IID with DeviceLink orchestration. Its nearby strings were dominated by `ApplyProperties`, `ConfigureProperties` and `Windows.Management.Service.Autopilot.AutopilotSurfaceHubHelper.*`, so it is no longer treated as the primary Discover/Link candidate.
 
 The runtime is registered under `WindowsManagementService` with `ActivationType=1` and `TrustLevel=0`.
+
+A second live read-only inventory of `ModernDeployment.Autopilot.Core.DeviceLinkManager` succeeded and reported exactly two interfaces:
+
+- `1F79101B-A792-5008-A82A-A4B232229026` - the sole functional interface currently associated with the `DeviceLinkManager` runtime class;
+- `00000038-0000-0000-C000-000000000046` - standard `IWeakReferenceSource`.
+
+`DeviceLinkManager` activation returned HRESULT `0x00000000`, `TrustLevel=0`, and runtime class name `ModernDeployment.Autopilot.Core.DeviceLinkManager`. This interface is now the primary candidate for the higher-level DeviceLink orchestration surface.
 
 ## Observed successful lifecycle
 
@@ -178,7 +185,7 @@ Any experimental call must:
 
 ## Next research task
 
-Correlate the extra runtime IID `8A3B7C2E-5D1F-4E9A-B6C8-2F0E1D3A4B5C` with binary/WinRT type metadata and recover the exact higher-level DeviceLink configuration contract, including:
+Correlate `DeviceLinkManager` interface IID `1F79101B-A792-5008-A82A-A4B232229026` with binary/WinRT type metadata and recover the exact higher-level DeviceLink configuration contract, including:
 
 - interface/type name;
 - vtable slot(s) and ABI signature;
