@@ -46,6 +46,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Native-Manager-Contract-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate initializer completion opt-in contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Initialize-Completion-Contract-Validation.ps1
+
       - name: Validate firmware safety and timestamp parsing
         shell: powershell
         run: |
