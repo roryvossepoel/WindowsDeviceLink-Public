@@ -17,7 +17,7 @@ $namespace='root\cimv2\mdm\dmmap'
 $patterns=@('DevicePreparation','DeviceAssociation','TenantAssociation','DeviceLink')
 
 $classes=@(Get-CimClass -Namespace $namespace -ErrorAction Stop)
-$matches=New-Object System.Collections.Generic.List[object]
+$matches=@()
 
 foreach($class in $classes){
     $qualifierText = @($class.CimClassQualifiers | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
@@ -43,19 +43,19 @@ foreach($class in $classes){
         }
     })
 
-    $matches.Add([pscustomobject]@{
+    $matches += [pscustomobject]@{
         CimClassName=[string]$class.CimClassName
-        MatchedPattern=$matched
+        MatchedPattern=[string]$matched
         Qualifiers=$qualifierText
-        Properties=$properties
-        Methods=$methods
-    }) | Out-Null
+        Properties=@($properties)
+        Methods=@($methods)
+    }
 }
 
 [pscustomobject]@{
     PSTypeName='Windows.DeviceLink.Research.CspInventory'
     Namespace=$namespace
-    MatchCount=$matches.Count
+    MatchCount=@($matches).Count
     Classes=@($matches)
     ReadOnly=$true
 }
