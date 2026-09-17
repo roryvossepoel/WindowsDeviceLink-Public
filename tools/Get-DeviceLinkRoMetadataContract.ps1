@@ -114,15 +114,12 @@ namespace WindowsDeviceLinkResearch
                 string metadataPath=HStringToString(metadataFile);
                 IntPtr table=Marshal.ReadIntPtr(importer);
 
-                // IUnknown = slots 0-2. IMetaDataImport::GetTypeDefProps is method 10 => slot 12.
                 var getTypeDefProps=GetDelegate<GetTypeDefPropsDelegate>(table,12);
                 var typeName=new StringBuilder(1024);
                 uint typeNameLength,typeFlags,extendsToken;
                 ThrowIfFailed(getTypeDefProps(importer,typeDef,typeName,(uint)typeName.Capacity,out typeNameLength,out typeFlags,out extendsToken),"IMetaDataImport.GetTypeDefProps");
 
-                // IMetaDataImport::EnumMethods is method 16 => vtable slot 18.
                 var enumMethods=GetDelegate<EnumMethodsDelegate>(table,18);
-                // IMetaDataImport::GetMethodProps is method 31 => vtable slot 33.
                 var getMethodProps=GetDelegate<GetMethodPropsDelegate>(table,33);
                 var closeEnum=GetDelegate<CloseEnumDelegate>(table,3);
 
@@ -213,11 +210,12 @@ namespace WindowsDeviceLinkResearch
 }
 
 $result=[WindowsDeviceLinkResearch.RoMetadataContractV1]::Inspect($RuntimeClassName)
+$hrUnsigned=[BitConverter]::ToUInt32([BitConverter]::GetBytes([int32]$result.HResult),0)
 
 [pscustomobject]@{
     PSTypeName='Windows.DeviceLink.Research.RoMetadataContract'
     RuntimeClassName=$result.RuntimeClassName
-    HResult=('0x{0:X8}' -f ([uint32]$result.HResult))
+    HResult=('0x{0:X8}' -f $hrUnsigned)
     MetadataFile=$result.MetadataFile
     TypeDefToken=('0x{0:X8}' -f $result.TypeDefToken)
     TypeDefName=$result.TypeDefName
