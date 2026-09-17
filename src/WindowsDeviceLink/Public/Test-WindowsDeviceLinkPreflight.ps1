@@ -62,16 +62,14 @@ function Test-WindowsDeviceLinkPreflight {
         Add-Check -Name 'LocalIdentity' -State 'Ready' -Summary 'A local DeviceLink identity can be obtained.' -ObservedValue ([string]$identity.LinkId)
     } catch { Add-Check -Name 'LocalIdentity' -State 'Blocked' -Summary 'A local DeviceLink identity could not be obtained.' -ObservedValue $null }
 
-    $blocked=@($checks|Where-Object State -eq 'Blocked')
-    $warnings=@($checks|Where-Object State -eq 'Warning')
-    $overall=if($blocked.Count){'Blocked'}elseif($warnings.Count){'Warning'}else{'Ready'}
+    $resolved = Resolve-WindowsDeviceLinkPreflightState -Checks @($checks)
 
     [pscustomobject]@{
         PSTypeName='Windows.DeviceLink.Preflight'
-        State=$overall
-        Ready=($overall -eq 'Ready')
-        BlockingCount=$blocked.Count
-        WarningCount=$warnings.Count
+        State=$resolved.State
+        Ready=$resolved.Ready
+        BlockingCount=$resolved.BlockingCount
+        WarningCount=$resolved.WarningCount
         Environment=$support.Environment
         Architecture=$support.Architecture
         ActivationMode=$support.ActivationMode
