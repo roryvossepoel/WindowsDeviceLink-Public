@@ -44,7 +44,7 @@ if(-not $ConfirmStateChange){
     throw 'Refusing to invoke ConfigureDeviceLinkAsync without -ConfirmStateChange.'
 }
 
-$typeName='WindowsDeviceLinkResearch.DeviceLinkConfigureV1'
+$typeName='WindowsDeviceLinkResearch.DeviceLinkConfigureV2'
 if(-not ($typeName -as [type])){
 Add-Type -TypeDefinition @'
 using System;
@@ -52,7 +52,7 @@ using System.Runtime.InteropServices;
 
 namespace WindowsDeviceLinkResearch
 {
-    public sealed class DeviceLinkConfigureResult
+    public sealed class DeviceLinkConfigureResultV2
     {
         public int ConfigureResultBefore { get; set; }
         public int ConfigureResultAfter { get; set; }
@@ -67,7 +67,7 @@ namespace WindowsDeviceLinkResearch
     }
 
     [ComImport, Guid("1F79101B-A792-5008-A82A-A4B232229026"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    interface IDeviceLinkManager
+    interface IDeviceLinkManagerV2
     {
         [PreserveSig] int GetIids(out int c, out IntPtr p);
         [PreserveSig] int GetRuntimeClassName(out IntPtr n);
@@ -79,7 +79,7 @@ namespace WindowsDeviceLinkResearch
     }
 
     [ComImport, Guid("B93C372F-472F-4BEA-B90B-9FAA9BDC178F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    interface IDiscoveryUrlRequestInfo
+    interface IDiscoveryUrlRequestInfoV2
     {
         [PreserveSig] int GetIids(out int c, out IntPtr p);
         [PreserveSig] int GetRuntimeClassName(out IntPtr n);
@@ -90,7 +90,7 @@ namespace WindowsDeviceLinkResearch
     }
 
     [ComImport, Guid("00000036-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    interface IAsyncInfo
+    interface IAsyncInfoV2
     {
         [PreserveSig] int GetIids(out int c, out IntPtr p);
         [PreserveSig] int GetRuntimeClassName(out IntPtr n);
@@ -102,7 +102,7 @@ namespace WindowsDeviceLinkResearch
         [PreserveSig] int Close();
     }
 
-    public static class DeviceLinkConfigureV1
+    public static class DeviceLinkConfigureV2
     {
         private const string RuntimeClassName = "ModernDeployment.Autopilot.Core.DeviceLinkManager";
 
@@ -124,7 +124,7 @@ namespace WindowsDeviceLinkResearch
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate int GetResultsIntDelegate(IntPtr self, out int result);
 
-        public static DeviceLinkConfigureResult Configure(string deviceLinkBase64, int timeoutSeconds)
+        public static DeviceLinkConfigureResultV2 Configure(string deviceLinkBase64, int timeoutSeconds)
         {
             IntPtr className=IntPtr.Zero, instance=IntPtr.Zero, blob=IntPtr.Zero;
             IntPtr discoveryOp=IntPtr.Zero, infoPtr=IntPtr.Zero;
@@ -136,7 +136,7 @@ namespace WindowsDeviceLinkResearch
                 uninit=init>=0;
                 ThrowIfFailed(WindowsCreateString(RuntimeClassName,RuntimeClassName.Length,out className),"WindowsCreateString(class)");
                 ThrowIfFailed(RoActivateInstance(className,out instance),"RoActivateInstance(DeviceLinkManager)");
-                var mgr=(IDeviceLinkManager)Marshal.GetObjectForIUnknown(instance);
+                var mgr=(IDeviceLinkManagerV2)Marshal.GetObjectForIUnknown(instance);
 
                 int before;
                 ThrowIfFailed(mgr.GetConfigureDeviceLinkResult(out before),"GetConfigureDeviceLinkResult(before)");
@@ -146,7 +146,8 @@ namespace WindowsDeviceLinkResearch
                 ThrowIfFailed(mgr.RequestDiscoveryUrlAsync(blob,out discoveryOp),"RequestDiscoveryUrlAsync");
                 WindowsDeleteString(blob); blob=IntPtr.Zero;
 
-                int discoveryStatus=WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(discoveryOp),timeoutSeconds,"RequestDiscoveryUrlAsync",false);
+                int discoveryStatus;
+                WaitForTerminal((IAsyncInfoV2)Marshal.GetObjectForIUnknown(discoveryOp),timeoutSeconds,"RequestDiscoveryUrlAsync",false,out discoveryStatus);
 
                 IntPtr discoveryVtable=Marshal.ReadIntPtr(discoveryOp);
                 IntPtr discoveryFn=Marshal.ReadIntPtr(discoveryVtable,8*IntPtr.Size);
@@ -154,7 +155,7 @@ namespace WindowsDeviceLinkResearch
                 ThrowIfFailed(getDiscoveryResults(discoveryOp,out infoPtr),"RequestDiscoveryUrlAsync.GetResults");
                 if(infoPtr==IntPtr.Zero) throw new InvalidOperationException("RequestDiscoveryUrlAsync returned a null result object.");
 
-                var info=(IDiscoveryUrlRequestInfo)Marshal.GetObjectForIUnknown(infoPtr);
+                var info=(IDiscoveryUrlRequestInfoV2)Marshal.GetObjectForIUnknown(infoPtr);
                 int discoveryResult;
                 ThrowIfFailed(info.get_DiscoveryUrl(out hUrl),"DiscoveryUrlRequestInfo.DiscoveryUrl");
                 ThrowIfFailed(info.get_TenantId(out hTenant),"DiscoveryUrlRequestInfo.TenantId");
@@ -167,11 +168,10 @@ namespace WindowsDeviceLinkResearch
                 if(String.IsNullOrWhiteSpace(url) || String.IsNullOrWhiteSpace(tenant))
                     throw new InvalidOperationException("Refusing ConfigureDeviceLinkAsync because discovery URL or tenant ID is empty.");
 
-                // Single state-changing call. No retries.
                 ThrowIfFailed(mgr.ConfigureDeviceLinkAsync(hUrl,hTenant,IntPtr.Zero,out configureOp),"ConfigureDeviceLinkAsync");
                 if(configureOp==IntPtr.Zero) throw new InvalidOperationException("ConfigureDeviceLinkAsync returned a null async operation.");
 
-                var configureInfo=(IAsyncInfo)Marshal.GetObjectForIUnknown(configureOp);
+                var configureInfo=(IAsyncInfoV2)Marshal.GetObjectForIUnknown(configureOp);
                 int configureStatus;
                 int configureError=WaitForTerminal(configureInfo,timeoutSeconds,"ConfigureDeviceLinkAsync",true,out configureStatus);
 
@@ -188,7 +188,7 @@ namespace WindowsDeviceLinkResearch
                 int after;
                 ThrowIfFailed(mgr.GetConfigureDeviceLinkResult(out after),"GetConfigureDeviceLinkResult(after)");
 
-                return new DeviceLinkConfigureResult
+                return new DeviceLinkConfigureResultV2
                 {
                     ConfigureResultBefore=before,
                     ConfigureResultAfter=after,
@@ -216,16 +216,7 @@ namespace WindowsDeviceLinkResearch
             }
         }
 
-        private static int WaitForTerminal(IAsyncInfo ai,int timeoutSeconds,string operation,bool returnErrorOnly)
-        {
-            int status;
-            int ignored;
-            int error=WaitForTerminal(ai,timeoutSeconds,operation,returnErrorOnly,out status);
-            if(returnErrorOnly) return error;
-            return status;
-        }
-
-        private static int WaitForTerminal(IAsyncInfo ai,int timeoutSeconds,string operation,bool returnErrorOnly,out int status)
+        private static int WaitForTerminal(IAsyncInfoV2 ai,int timeoutSeconds,string operation,bool returnErrorOnly,out int status)
         {
             var deadline=DateTime.UtcNow.AddSeconds(timeoutSeconds);
             do
@@ -267,9 +258,8 @@ namespace WindowsDeviceLinkResearch
 '@
 }
 
-$result=[WindowsDeviceLinkResearch.DeviceLinkConfigureV1]::Configure($DeviceLinkBase64,$TimeoutSeconds)
+$result=[WindowsDeviceLinkResearch.DeviceLinkConfigureV2]::Configure($DeviceLinkBase64,$TimeoutSeconds)
 
-# Preserve signed HRESULT and also show canonical hex form without PowerShell's signed->UInt32 cast issue.
 $configureErrorHex='0x{0:X8}' -f ([BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$result.ConfigureAsyncError),0))
 
 [pscustomobject]@{
