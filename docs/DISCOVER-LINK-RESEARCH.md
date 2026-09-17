@@ -38,6 +38,8 @@ A second live read-only inventory of `ModernDeployment.Autopilot.Core.DeviceLink
 
 `DeviceLinkManager` activation returned HRESULT `0x00000000`, `TrustLevel=0`, and runtime class name `ModernDeployment.Autopilot.Core.DeviceLinkManager`. This interface is now the primary candidate for the higher-level DeviceLink orchestration surface.
 
+Live vtable inventory showed six DeviceLinkManager-specific slots, 6 through 11. Each slot is a COM/WinRT proxy dispatch stub in `combase.dll` of the form `mov eax,<slot>; jmp <shared dispatcher>`, and all six converge on the same dispatcher. Therefore the vtable itself proves a six-method contract, but does not reveal the underlying method names or implementation RVAs.
+
 ## Observed successful lifecycle
 
 The current research model is:
@@ -78,9 +80,17 @@ Read-only string inventory of `C:\Windows\System32\Windows.Management.Service.dl
 - `DeviceLinkUtilities`
 - `https://aps.windowsautopilot.microsoft.com/ztd/devicelink/preassociationDiscovery`
 
-The same binary exposes WinRT generic type strings for `Windows.Foundation.IAsyncOperationWithProgress<ModernDeployment.Autopilot.Core.ConfigureDeviceLinkResult, ...>` and its completed handler. This strongly suggests a higher-level asynchronous DeviceLink configuration/orchestration operation exists in addition to the internal discovery/apply/ack functions.
+Targeted metadata/string-context inventory produced the first concrete high-level async contract evidence. The embedded metadata exposes:
 
-This does not yet establish the public ABI, method name, interface IID, vtable slot, or call safety. Those must be recovered before invocation.
+`Windows.Foundation.IAsyncOperationWithProgress<ModernDeployment.Autopilot.Core.ConfigureDeviceLinkResult, ModernDeployment.Autopilot.Core.DeviceLinkConfigurationStatus>`
+
+and the corresponding completed-handler type.
+
+This establishes the progress type name as `DeviceLinkConfigurationStatus` and strongly supports a high-level `ConfigureDeviceLink` operation returning `ConfigureDeviceLinkResult` while reporting DeviceLink configuration status/progress.
+
+The same compact metadata/string cluster contains `ConfigureDeviceLink`, `AcquireApplyAckDeviceLink`, `ApplyDeviceLink`, `AcknowledgeDeviceLink`, `AcquireEnrollmentDiscoveryEndpoint`, `RetrieveDeviceLinkFromUrl`, `MaaAttestImpl`, `GetIdkKeyInfoAsync`, `GetKeyIdSummaryAsync`, and the `DeviceLinkManager` type name. This is strong evidence that the high-level operation orchestrates the internal discovery/attestation/apply/ack pipeline, but it still does not establish the exact method slot or parameter list.
+
+Targeted metadata scanning across likely Windows metadata locations found all DeviceLinkManager/ConfigureDeviceLink contract names only in `Windows.Management.Service.dll`; no separate `.winmd` carrying this private/internal contract was found.
 
 ## DevicePreparation CSP / MDM Bridge observation
 
@@ -185,14 +195,20 @@ Any experimental call must:
 
 ## Next research task
 
-Correlate `DeviceLinkManager` interface IID `1F79101B-A792-5008-A82A-A4B232229026` with binary/WinRT type metadata and recover the exact higher-level DeviceLink configuration contract, including:
+Recover the embedded enum/value contracts for:
 
-- interface/type name;
-- vtable slot(s) and ABI signature;
-- `ConfigureDeviceLinkResult` values;
-- progress type/values;
+- `ConfigureDeviceLinkResult`
+- `DeviceLinkConfigurationStatus`
+
+Then correlate the six `DeviceLinkManager` proxy-dispatch slots with method names/signatures, prioritizing any slot whose return type matches `IAsyncOperationWithProgress<ConfigureDeviceLinkResult, DeviceLinkConfigurationStatus>`.
+
+The remaining contract questions are:
+
+- exact `ConfigureDeviceLink` parameter list;
+- exact vtable slot;
+- enum/result values and terminal-state semantics;
+- progress values/stages;
 - async error contract;
-- whether the high-level operation performs Discover + attestation + apply + acknowledge as one orchestration;
 - whether lower-level Discover/Link calls remain independently exposed.
 
 Only after that mapping is reproducible should a controlled private experimental call be considered.
