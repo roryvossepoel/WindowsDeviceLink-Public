@@ -120,18 +120,35 @@ Initialize-WindowsDeviceLink `
 
 The initializer verifies the state before and after each transition and remains idempotent on an already-associated device.
 
-## What happens if a device is both Autopilot-registered and Device Associated?
+## What happens if a device is already registered in classic Windows Autopilot?
 
-Microsoft supports Windows Autopilot and Windows Autopilot device preparation side by side in the same tenant.
+A classic Windows Autopilot registration does **not** prevent the same physical device from being pre-associated for Windows Autopilot device preparation.
 
-For a device that is already registered with classic Windows Autopilot:
+Current Microsoft guidance makes the OOBE precedence depend on **Device Association state**:
 
-- if the device is **not associated**, the classic Autopilot profile takes precedence;
-- if the device **is associated**, Device Association takes precedence and the Windows Autopilot device preparation deployment runs.
+| Classic Autopilot registration | Device Association | What runs during OOBE? |
+|---|---|---|
+| No | No | Normal Windows Autopilot device preparation eligibility/policy flow; there is no classic Autopilot registration to take precedence. |
+| Yes | No | **Classic Windows Autopilot**. The Autopilot registration/profile takes precedence. |
+| Yes | Yes | **Windows Autopilot device preparation**. Device Association takes precedence. |
+| No | Yes | **Windows Autopilot device preparation**. The associated device uses the device preparation flow. |
 
-If the goal is to use device preparation on a classically registered device **without** Device Association, Microsoft guidance is to deregister the classic Autopilot device first.
+In other words:
 
-This distinction is important: **classic Autopilot registration** and **Device Association** are independent tenant-side objects.
+```text
+Classic Autopilot registered + not associated
+    -> classic Autopilot
+
+Classic Autopilot registered + associated
+    -> Windows Autopilot device preparation
+```
+
+Microsoft's Device Association lifecycle documentation explicitly states that an already Autopilot-registered device can still be pre-associated and that Device Association then takes precedence during OOBE.
+
+If the goal is to run Windows Autopilot device preparation on a classically registered device **without** creating a Device Association, deregister the device from classic Windows Autopilot first.
+
+> [!IMPORTANT]
+> **Classic Autopilot registration and Device Association are separate tenant-side objects.** Removing one does not remove the other. WindowsDeviceLink manages Device Association, not classic Autopilot registration.
 
 ## Terminology used in this project
 
@@ -157,6 +174,7 @@ Because these requirements are actively evolving, do not hard-code OS build assu
 Authoritative Microsoft documentation:
 
 - [Compare Windows Autopilot device preparation and Windows Autopilot](https://learn.microsoft.com/autopilot/device-preparation/compare)
+- [Device association lifecycle management](https://learn.microsoft.com/autopilot/device-preparation/device-association/lifecycle-management)
 - [Overview of Windows Autopilot device preparation](https://learn.microsoft.com/autopilot/device-preparation/overview)
 - [Windows Autopilot device preparation requirements](https://learn.microsoft.com/autopilot/device-preparation/requirements)
 - [Requirements for Windows Autopilot device association](https://learn.microsoft.com/autopilot/device-preparation/device-association/requirements)
