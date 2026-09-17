@@ -17,13 +17,13 @@ $namespace='root\cimv2\mdm\dmmap'
 $patterns=@('DevicePreparation','DeviceAssociation','TenantAssociation','DeviceLink')
 
 $classes=@(Get-CimClass -Namespace $namespace -ErrorAction Stop)
-$matches=@()
+$foundClasses=@()
 
 foreach($class in $classes){
     $qualifierText = @($class.CimClassQualifiers | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
     $haystack = "$($class.CimClassName) $qualifierText"
-    $matched = $patterns | Where-Object { $haystack -match [regex]::Escape($_) } | Select-Object -First 1
-    if(-not $matched){ continue }
+    $matchedPattern = $patterns | Where-Object { $haystack -match [regex]::Escape($_) } | Select-Object -First 1
+    if(-not $matchedPattern){ continue }
 
     $properties=@($class.CimClassProperties | ForEach-Object {
         [pscustomobject]@{
@@ -43,9 +43,9 @@ foreach($class in $classes){
         }
     })
 
-    $matches += [pscustomobject]@{
+    $foundClasses += [pscustomobject]@{
         CimClassName=[string]$class.CimClassName
-        MatchedPattern=[string]$matched
+        MatchedPattern=[string]$matchedPattern
         Qualifiers=$qualifierText
         Properties=@($properties)
         Methods=@($methods)
@@ -55,7 +55,7 @@ foreach($class in $classes){
 [pscustomobject]@{
     PSTypeName='Windows.DeviceLink.Research.CspInventory'
     Namespace=$namespace
-    MatchCount=@($matches).Count
-    Classes=@($matches)
+    MatchCount=@($foundClasses).Count
+    Classes=@($foundClasses)
     ReadOnly=$true
 }
