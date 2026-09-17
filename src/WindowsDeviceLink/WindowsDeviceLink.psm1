@@ -7,6 +7,11 @@ if (-not ('WinPEDeviceLink.Native.DeviceLinkClient' -as [type])) {
     Add-Type -Path $nativeSource -ErrorAction Stop
 }
 
+$managerNativeSource = Join-Path $privatePath 'DeviceLinkManagerNative.cs'
+if (-not ('WinPEDeviceLink.Native.DeviceLinkManagerClient' -as [type])) {
+    Add-Type -Path $managerNativeSource -ErrorAction Stop
+}
+
 Get-ChildItem -Path $privatePath -Filter '*.ps1' -File |
     ForEach-Object { . $_.FullName }
 
