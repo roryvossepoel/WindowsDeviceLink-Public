@@ -104,12 +104,12 @@ $patterns = @(
     'enrollment'
 )
 
-$matches = @()
+$foundItems = @()
 foreach ($encoding in @('Ascii','Unicode')) {
     foreach ($text in @(Get-PrintableStrings -Bytes $bytes -Encoding $encoding)) {
         $matchedPattern = $patterns | Where-Object { $text -match [regex]::Escape($_) } | Select-Object -First 1
         if (-not $matchedPattern) { continue }
-        $matches += [pscustomobject]@{
+        $foundItems += [pscustomobject]@{
             Encoding = $encoding
             Pattern  = $matchedPattern
             Text     = [string]$text
@@ -117,7 +117,7 @@ foreach ($encoding in @('Ascii','Unicode')) {
     }
 }
 
-$matches = @($matches | Sort-Object Encoding,Text -Unique)
+$foundItems = @($foundItems | Sort-Object Encoding,Text -Unique)
 
 [pscustomobject]@{
     PSTypeName       = 'Windows.DeviceLink.Research.RuntimeRegistration'
@@ -125,6 +125,6 @@ $matches = @($matches | Sort-Object Encoding,Text -Unique)
     DllPath          = $resolvedDll
     DllVersion       = (Get-Item -LiteralPath $resolvedDll).VersionInfo.FileVersion
     Registrations    = @($registrations)
-    StringMatches    = @($matches)
+    StringMatches    = @($foundItems)
     ReadOnly         = $true
 }
