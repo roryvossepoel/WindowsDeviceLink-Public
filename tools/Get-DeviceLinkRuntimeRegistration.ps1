@@ -19,7 +19,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $className = 'ModernDeployment.Autopilot.Core.DeviceLinkUtilities'
 
-$registrations = New-Object System.Collections.Generic.List[object]
+$registrations = @()
 $registryCandidates = @(
     "HKLM:\SOFTWARE\Microsoft\WindowsRuntime\ActivatableClassId\$className",
     "HKLM:\SOFTWARE\Classes\ActivatableClasses\ActivatableClassId\$className",
@@ -35,17 +35,18 @@ foreach ($path in $registryCandidates) {
             if ($property.Name -like 'PS*') { continue }
             $safeProperties[$property.Name] = $property.Value
         }
-        $registrations.Add([pscustomobject]@{
+        $registrations += [pscustomobject]@{
             Path       = $path
             Properties = [pscustomobject]$safeProperties
-        }) | Out-Null
+            Error      = $null
+        }
     }
     catch {
-        $registrations.Add([pscustomobject]@{
+        $registrations += [pscustomobject]@{
             Path       = $path
             Properties = $null
             Error      = $_.Exception.Message
-        }) | Out-Null
+        }
     }
 }
 
@@ -59,7 +60,7 @@ function Get-PrintableStrings {
         [int]$MinimumLength = 5
     )
 
-    $results = New-Object System.Collections.Generic.List[string]
+    $results = @()
     if ($Encoding -eq 'Ascii') {
         $builder = New-Object Text.StringBuilder
         foreach ($b in $Bytes) {
@@ -67,11 +68,11 @@ function Get-PrintableStrings {
                 [void]$builder.Append([char]$b)
             }
             else {
-                if ($builder.Length -ge $MinimumLength) { $results.Add($builder.ToString()) | Out-Null }
+                if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
                 [void]$builder.Clear()
             }
         }
-        if ($builder.Length -ge $MinimumLength) { $results.Add($builder.ToString()) | Out-Null }
+        if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
     }
     else {
         $builder = New-Object Text.StringBuilder
@@ -81,13 +82,13 @@ function Get-PrintableStrings {
                 [void]$builder.Append([char]$code)
             }
             else {
-                if ($builder.Length -ge $MinimumLength) { $results.Add($builder.ToString()) | Out-Null }
+                if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
                 [void]$builder.Clear()
             }
         }
-        if ($builder.Length -ge $MinimumLength) { $results.Add($builder.ToString()) | Out-Null }
+        if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
     }
-    $results
+    @($results)
 }
 
 $patterns = @(
@@ -111,7 +112,7 @@ foreach ($encoding in @('Ascii','Unicode')) {
         $matches += [pscustomobject]@{
             Encoding = $encoding
             Pattern  = $matchedPattern
-            Text     = $text
+            Text     = [string]$text
         }
     }
 }
@@ -124,6 +125,6 @@ $matches = @($matches | Sort-Object Encoding,Text -Unique)
     DllPath          = $resolvedDll
     DllVersion       = (Get-Item -LiteralPath $resolvedDll).VersionInfo.FileVersion
     Registrations    = @($registrations)
-    StringMatches    = $matches
+    StringMatches    = @($matches)
     ReadOnly         = $true
 }
