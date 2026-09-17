@@ -17,7 +17,8 @@ $files=@(
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkManagerVtableTargetInventory.ps1'),
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkWinRtMetadataInventory.ps1'),
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkRoMetadataContract.ps1'),
-    (Join-Path $PSScriptRoot '..\tools\Invoke-DeviceLinkDiscoveryResearch.ps1')
+    (Join-Path $PSScriptRoot '..\tools\Invoke-DeviceLinkDiscoveryResearch.ps1'),
+    (Join-Path $PSScriptRoot '..\tools\Invoke-DeviceLinkConfigureResearch.ps1')
 )
 
 foreach($file in $files){
