@@ -80,6 +80,7 @@ function Initialize-WindowsDeviceLink {
         $changed = $false
         $registration = $null
         $completion = $null
+        $completionResult = $null
         $afterStatus = $beforeStatus
         $afterHealth = $beforeHealth
         $message = $beforeHealth.Summary
@@ -129,6 +130,7 @@ function Initialize-WindowsDeviceLink {
                     $completeParameters.WindowsManagementServicePath = $WindowsManagementServicePath
                 }
                 $completion = Complete-WindowsDeviceLinkAssociation @completeParameters
+                $completionResult = [string]$completion.Result
                 if ($completion.Changed) { $changed = $true }
 
                 $afterStatus = Get-WindowsDeviceLinkStatus @statusParameters
@@ -139,14 +141,17 @@ function Initialize-WindowsDeviceLink {
                 $message = 'DeviceLink association completion succeeded and the final state was verified as Associated.'
             }
             else {
+                $completionResult = 'WouldComplete'
                 $message = 'The DeviceLink is preassociated; device-side association completion would be performed.'
             }
         }
         elseif ($CompleteAssociation -and $afterHealth.State -eq 'Associated') {
             if ($completion) {
+                $completionResult = [string]$completion.Result
                 $message = 'DeviceLink association completion succeeded and the final state was verified as Associated.'
             }
             else {
+                $completionResult = 'AlreadyAssociated'
                 $message = 'The DeviceLink is already associated. No completion change was required.'
             }
         }
@@ -156,7 +161,8 @@ function Initialize-WindowsDeviceLink {
             Action=$action
             Changed=$changed
             CompletionRequested=[bool]$CompleteAssociation
-            CompletionResult=$completion
+            CompletionResult=$completionResult
+            CompletionDetails=$completion
             BeforeState=$beforeHealth.State
             AfterState=$afterHealth.State
             Severity=$afterHealth.Severity
