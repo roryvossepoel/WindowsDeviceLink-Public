@@ -30,5 +30,16 @@ $blocked=& $module {param($Checks) Resolve-WindowsDeviceLinkPreflightState -Chec
 Assert-True ($blocked.State -eq 'Blocked' -and -not $blocked.Ready -and $blocked.BlockingCount -eq 2 -and $blocked.WarningCount -eq 1) 'Blocked preflight matrix did not take precedence over warnings.'
 Write-Host 'PASS: blockers take precedence and remain counted'
 
+# Regression for Windows PowerShell 5.1 generic List[object] materialization.
+# Direct @($genericList) can throw "Argument types do not match" in this runtime.
+$generic = New-Object System.Collections.Generic.List[object]
+$generic.Add((New-Check Runtime Ready)) | Out-Null
+$generic.Add((New-Check TPM Warning)) | Out-Null
+$materialized = @($generic | ForEach-Object { $_ })
+Assert-True ($materialized -is [object[]]) 'Generic preflight check list did not materialize to Object[].'
+$genericResult=& $module {param($Checks) Resolve-WindowsDeviceLinkPreflightState -Checks $Checks} $materialized
+Assert-True ($genericResult.State -eq 'Warning' -and $genericResult.WarningCount -eq 1) 'Materialized generic preflight list did not resolve correctly.'
+Write-Host 'PASS: Windows PowerShell generic-list materialization regression'
+
 Write-Host ''
 Write-Host 'Preflight decision regression set passed.'
