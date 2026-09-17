@@ -1,0 +1,143 @@
+# DeviceLink Discover/Link research
+
+This document records research for issue #14. It is intentionally non-implementing: no public Discover/Link command is introduced here.
+
+## Current module boundary
+
+The current native wrapper activates the WinRT runtime class:
+
+`ModernDeployment.Autopilot.Core.DeviceLinkUtilities`
+
+and queries interface IID:
+
+`6410BEE7-60A9-5627-9EB2-FEDA7518A4EB`
+
+The wrapper currently calls only:
+
+- vtable slot 6: `ExportDeviceLinkInfoCsvAsync`
+- vtable slot 7: `GetDeviceLinkInfoAsync`
+
+These are sufficient for generating/exporting the TPM-backed DeviceLink identity package but do not complete tenant association.
+
+## Observed successful lifecycle
+
+The current research model is:
+
+1. Generate local DeviceLink identity.
+2. Import/preassociate identity in Intune.
+3. Tenant-side state becomes `preassociated`.
+4. Device performs preassociation discovery against the global Autopilot association service.
+5. Discovery returns tenant context and enrollment discovery routing information.
+6. Windows resolves the tenant-specific association/attestation endpoints.
+7. Windows proves possession of the TPM-backed device identity through Microsoft Azure Attestation.
+8. Windows requests the signed tenant association using device/link context plus attestation evidence.
+9. Windows receives the signed association JWT.
+10. Windows writes the association to UEFI (`DeviceLinkJwtCompressed` plus timestamp/related state).
+11. Windows acknowledges successful local apply to the service.
+12. Tenant-side association progresses from `preassociated` to `associated`.
+13. OOBE can then retrieve current device-targeted Device Preparation settings before user sign-in.
+
+This is distinct from Intune enrollment and Microsoft Entra join.
+
+## Known service/routing observations
+
+Community research has observed the global preassociation discovery endpoint:
+
+`https://aps.windowsautopilot.microsoft.com/ztd/devicelink/preassociationDiscovery`
+
+Observed routing state is stored under:
+
+`HKLM\SOFTWARE\Microsoft\Provisioning\AutopilotSettings`
+
+with values whose names are based on the DeviceLink identifier and include tenant/discovery hints.
+
+Microsoft documentation separately confirms that Device Association requires network access to Autopilot/device-association services and Microsoft Azure Attestation endpoints.
+
+These observations are research inputs, not a supported network contract for WindowsDeviceLink. Regional/service endpoints must not be hard-coded from one lab capture.
+
+## Firmware transition model
+
+Known local base state before completed association:
+
+- `DeviceLinkId`
+- `DeviceLinkCreationTimeUtc`
+
+Known completed-state variables observed by this project:
+
+- `DeviceLinkId`
+- `DeviceLinkJwtCompressed`
+- `DeviceLinkJwtLastWrite`
+- `DeviceLinkCreationTimeUtc`
+
+The expected research transition is therefore:
+
+`Preassociated + 2/4` -> discovery/attestation/link -> `Associated + 4/4`
+
+The precise point at which each firmware variable is committed and how rollback behaves after a partial failure still needs live validation.
+
+## Signed association contents
+
+Published research indicates that the resulting association JWT can contain context such as:
+
+- LinkId
+- TPM key identifier
+- tenant identifier
+- device inventory
+- discovery URL
+- issuer/audience/time claims
+
+WindowsDeviceLink already treats this material as sensitive. The raw JWT must not appear in normal output, verbose/debug output, logs or errors.
+
+The current `Test-WindowsDeviceLinkAssociationJwt` validates only structure/time/identity correlation unless signature validation is explicitly implemented from a trustworthy documented key source in the future.
+
+## Requirements relevant to Discover/Link
+
+Microsoft currently documents Device Association as requiring:
+
+- a physical device (VMs unsupported)
+- Windows 11 24H2 or 25H2 with the required servicing level
+- a supported Windows edition
+- TPM 2.0 enabled and in a good state (not Reduced Functionality Mode)
+- network access to Device Association and Azure Attestation endpoints
+
+Our existing preflight covers runtime activation, elevation, firmware access, TPM 2.0 indication, Secure Boot and local DeviceLink identity. Build/edition/virtual-machine/network checks should be considered before any future live Discover/Link implementation.
+
+## Known failure signals from public research
+
+Published tooling/research reports useful native HRESULT categories including:
+
+- `0x80004001` (`E_NOTIMPL`) - required DeviceLink API unavailable on the build
+- `0x8103C00F` - missing attestation material
+- `0x80090029` / `0x80090016` - TPM/key operation failure
+- `0x80070005` - access denied / insufficient elevation
+
+These must be independently reproduced before WindowsDeviceLink treats them as stable public error classifications.
+
+## Safety boundary for experiments
+
+Any experimental call must:
+
+1. require an already validated preflight;
+2. capture local firmware/JWT/cloud association state before invocation;
+3. invoke one narrow native operation only;
+4. expose exact safe HRESULT/status output;
+5. perform no destructive cleanup on failure;
+6. perform no automatic retry unless proven idempotent;
+7. never delete the tenant record or reset firmware;
+8. never reboot automatically;
+9. re-read local firmware/JWT/cloud state after the operation;
+10. stop immediately on a partial or unknown transition.
+
+## Next research task
+
+Identify the exact DeviceLink WinRT/native interfaces used for the Discover and Link operations on the current Windows 11 build and determine:
+
+- interface IID(s)
+- vtable slots/method signatures
+- input/output types
+- async result/error contract
+- whether Discover and Link are independent calls or a higher-level orchestration wrapper
+- whether the methods are callable from full Windows outside OOBE
+- whether the same surface can activate through direct DLL loading in WinPE
+
+Do not add these calls to the public module surface until these details are reproducibly validated.
