@@ -17,40 +17,41 @@ $namespace='root\cimv2\mdm\dmmap'
 $patterns=@('DevicePreparation','DeviceAssociation','TenantAssociation','DeviceLink')
 
 $classes=@(Get-CimClass -Namespace $namespace -ErrorAction Stop)
-$foundClasses=@()
 
-foreach($class in $classes){
-    $qualifierText = @($class.CimClassQualifiers | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
-    $haystack = "$($class.CimClassName) $qualifierText"
-    $matchedPattern = $patterns | Where-Object { $haystack -match [regex]::Escape($_) } | Select-Object -First 1
-    if(-not $matchedPattern){ continue }
+$foundClasses = @(
+    foreach($class in $classes){
+        $qualifierText = @($class.CimClassQualifiers | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join '; '
+        $haystack = "$($class.CimClassName) $qualifierText"
+        $matchedPattern = $patterns | Where-Object { $haystack -match [regex]::Escape($_) } | Select-Object -First 1
+        if(-not $matchedPattern){ continue }
 
-    $properties=@($class.CimClassProperties | ForEach-Object {
+        $properties=@($class.CimClassProperties | ForEach-Object {
+            [pscustomobject]@{
+                Name=[string]$_.Name
+                CimType=[string]$_.CimType
+                Flags=[string]$_.Flags
+            }
+        })
+
+        $methods=@($class.CimClassMethods | ForEach-Object {
+            [pscustomobject]@{
+                Name=[string]$_.Name
+                ReturnType=[string]$_.ReturnType
+                Parameters=@($_.Parameters | ForEach-Object {
+                    [pscustomobject]@{Name=[string]$_.Name;CimType=[string]$_.CimType;Flags=[string]$_.Flags}
+                })
+            }
+        })
+
         [pscustomobject]@{
-            Name=[string]$_.Name
-            CimType=[string]$_.CimType
-            Flags=[string]$_.Flags
+            CimClassName=[string]$class.CimClassName
+            MatchedPattern=[string]$matchedPattern
+            Qualifiers=$qualifierText
+            Properties=@($properties)
+            Methods=@($methods)
         }
-    })
-
-    $methods=@($class.CimClassMethods | ForEach-Object {
-        [pscustomobject]@{
-            Name=[string]$_.Name
-            ReturnType=[string]$_.ReturnType
-            Parameters=@($_.Parameters | ForEach-Object {
-                [pscustomobject]@{Name=[string]$_.Name;CimType=[string]$_.CimType;Flags=[string]$_.Flags}
-            })
-        }
-    })
-
-    $foundClasses += [pscustomobject]@{
-        CimClassName=[string]$class.CimClassName
-        MatchedPattern=[string]$matchedPattern
-        Qualifiers=$qualifierText
-        Properties=@($properties)
-        Methods=@($methods)
     }
-}
+)
 
 [pscustomobject]@{
     PSTypeName='Windows.DeviceLink.Research.CspInventory'
