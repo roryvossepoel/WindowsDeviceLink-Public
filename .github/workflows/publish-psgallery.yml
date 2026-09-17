@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_version:
-        description: 'Exact Gallery version to publish, for example 0.4.4-preview1. The matching v<version> Git tag must already exist.'
+        description: 'Exact Gallery version to publish, for example 0.5.0-preview1. The matching v<version> Git tag must already exist.'
         required: true
         type: string
 
@@ -68,17 +68,22 @@ jobs:
           }
 
           $requiredFunctions = @(
+              'Complete-WindowsDeviceLinkAssociation',
               'Connect-WindowsDeviceLink',
               'Export-WindowsDeviceLinkCsv',
               'Get-WindowsDeviceLink',
               'Get-WindowsDeviceLinkAssociation',
               'Get-WindowsDeviceLinkFirmwareState',
+              'Get-WindowsDeviceLinkRepairPlan',
               'Get-WindowsDeviceLinkStatus',
               'Initialize-WindowsDeviceLink',
               'Register-WindowsDeviceLink',
               'Remove-WindowsDeviceLinkAssociation',
               'Reset-WindowsDeviceLinkFirmwareState',
+              'Test-WindowsDeviceLinkAssociationJwt',
+              'Test-WindowsDeviceLinkDiscovery',
               'Test-WindowsDeviceLinkHealth',
+              'Test-WindowsDeviceLinkPreflight',
               'Test-WindowsDeviceLinkSupport'
           )
           foreach ($function in $requiredFunctions) {
@@ -107,6 +112,19 @@ jobs:
           if (-not $initializer.Parameters.ContainsKey('WhatIf')) {
               throw 'Initialize-WindowsDeviceLink must support ShouldProcess / -WhatIf.'
           }
+          if (-not $initializer.Parameters.ContainsKey('CompleteAssociation')) {
+              throw 'Initialize-WindowsDeviceLink must expose explicit -CompleteAssociation opt-in.'
+          }
+
+          $completion = Get-Command Complete-WindowsDeviceLinkAssociation -Module WindowsDeviceLink -ErrorAction Stop
+          if (-not $completion.Parameters.ContainsKey('WhatIf')) {
+              throw 'Complete-WindowsDeviceLinkAssociation must support ShouldProcess / -WhatIf.'
+          }
+
+          $discovery = Get-Command Test-WindowsDeviceLinkDiscovery -Module WindowsDeviceLink -ErrorAction Stop
+          if ($discovery.Parameters.ContainsKey('WhatIf') -or $discovery.Parameters.ContainsKey('Confirm')) {
+              throw 'Test-WindowsDeviceLinkDiscovery must remain read-only and must not expose ShouldProcess controls.'
+          }
 
           $firmwareReset = Get-Command Reset-WindowsDeviceLinkFirmwareState -Module WindowsDeviceLink -ErrorAction Stop
           if (-not $firmwareReset.Parameters.ContainsKey('WhatIf')) {
@@ -124,6 +142,9 @@ jobs:
           }
 
           # Hardware-independent regression suites run against the exact staged artifact.
+          & (Join-Path $PWD 'tests\Public-Contract-Validation.ps1') -ModulePath $manifestPath -PackageRoot $packagePath
+          if (-not $?) { throw 'Public-Contract-Validation.ps1 failed.' }
+
           & (Join-Path $PWD 'tests\Health-State-Validation.ps1') -ModulePath $manifestPath
           if (-not $?) { throw 'Health-State-Validation.ps1 failed.' }
 

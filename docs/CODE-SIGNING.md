@@ -1,14 +1,16 @@
 # Code signing policy
 
-WindowsDeviceLink is applying for code signing through the SignPath Foundation. Until that application is approved and the signing integration is complete, preview packages may remain unsigned.
+WindowsDeviceLink is currently unsigned.
 
-> **Free code signing provided by SignPath.io, certificate by SignPath Foundation.**
+The project applied to the SignPath Foundation program in September 2026. SignPath reviewed the application but did not approve it at this stage because the project does not yet show enough external trust/visibility signals such as community adoption, independent references, institutional backing, or sustained external engagement.
+
+The project may reapply when those signals have grown or adopt another suitable signing path. Until a signing solution is active, preview packages remain unsigned.
 
 ## Signing scope
 
-Only WindowsDeviceLink artifacts built from source maintained by the WindowsDeviceLink project are eligible for signing. The team responsible for signing is the same team responsible for development and maintenance of the project.
+If code signing is introduced, only WindowsDeviceLink artifacts built from source maintained by the WindowsDeviceLink project are eligible for signing. The team responsible for signing is the same team responsible for development and maintenance of the project.
 
-The canonical public source repository for signed releases is:
+The canonical public source repository for releases is:
 
 - https://github.com/roryvossepoel/WindowsDeviceLink-Public
 
@@ -19,21 +21,21 @@ WindowsDeviceLink does not redistribute or sign Microsoft's `Windows.Management.
 WindowsDeviceLink is currently maintained by a single maintainer.
 
 - **Committer and reviewer:** Rory Vossepoel (`@roryvossepoel`)
-- **Signing approver:** Rory Vossepoel (`@roryvossepoel`)
+- **Signing approver:** Rory Vossepoel (`@roryvossepoel`) if a signing service is introduced
 
-Changes submitted by contributors who do not have direct commit access are reviewed before merge. Every signing request must be explicitly approved before a signature is issued.
+Changes submitted by contributors who do not have direct commit access are reviewed before merge. Any future signing request must be explicitly approved before a signature is issued.
 
 ## Build and provenance
 
 Official release artifacts are built from the project's source repository using automated GitHub Actions workflows. Source code, build scripts, packaging scripts, and workflow definitions are version controlled together.
 
-Signed artifacts must be traceable to the corresponding source revision and automated build. Signing must not be used for locally modified, manually assembled, third-party, or unrelated artifacts.
+Any future signed artifacts must be traceable to the corresponding source revision and automated build. Signing must not be used for locally modified, manually assembled, third-party, or unrelated artifacts.
 
 ## Release policy
 
-Official releases are distributed through the WindowsDeviceLink GitHub repository and/or the PowerShell Gallery. Product and version metadata for signed artifacts must identify WindowsDeviceLink and match the corresponding release.
+Official releases are distributed through the WindowsDeviceLink GitHub repository and/or the PowerShell Gallery. Product and version metadata must identify WindowsDeviceLink and match the corresponding release.
 
-Releases created before SignPath Foundation approval or before completion of the signing integration can be unsigned and will not be represented as SignPath-signed releases.
+Unsigned releases must not be represented as signed releases. If signing is introduced later, the release process and documentation will be updated to distinguish signed artifacts clearly.
 
 ## Privacy
 
@@ -47,4 +49,4 @@ Signing credentials, private keys, API keys, DeviceLink payloads, raw firmware J
 
 ## Policy status
 
-This policy is intended to satisfy the project's SignPath Foundation application and will be updated if SignPath requires additional controls or once the signing service is activated.
+The SignPath Foundation application is not active. This document records the controls that should continue to apply if code signing is introduced in the future.
