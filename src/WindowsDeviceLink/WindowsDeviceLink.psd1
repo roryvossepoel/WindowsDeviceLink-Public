@@ -5,7 +5,7 @@
     Author            = 'Rory Vossepoel'
     CompanyName       = 'Community'
     Copyright         = '(c) 2026 Rory Vossepoel. MIT License.'
-    Description       = 'Generate TPM-backed DeviceLink identity information, inspect and reset local DeviceLink firmware state, export the official Windows-generated .devicelink.csv, query/pre-associate/remove Microsoft Intune Device Association records for Windows Autopilot Device Preparation, and provide combined diagnostics, health assessment, and safe idempotent initialization. Local DeviceLink identity, firmware state, and tenant-side Device Association are exposed as explicit separate operations.'
+    Description       = 'Generate TPM-backed DeviceLink identity information, inspect and reset local DeviceLink firmware state, export the official Windows-generated .devicelink.csv, query/pre-associate/remove Microsoft Intune Device Association records for Windows Autopilot Device Preparation, and provide combined diagnostics, health assessment, non-destructive repair planning, and safe idempotent initialization. Local DeviceLink identity, firmware state, and tenant-side Device Association are exposed as explicit separate operations.'
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop')
     FunctionsToExport = @(
@@ -14,6 +14,7 @@
         'Get-WindowsDeviceLink'
         'Get-WindowsDeviceLinkAssociation'
         'Get-WindowsDeviceLinkFirmwareState'
+        'Get-WindowsDeviceLinkRepairPlan'
         'Get-WindowsDeviceLinkStatus'
         'Initialize-WindowsDeviceLink'
         'Register-WindowsDeviceLink'

@@ -52,6 +52,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Health-State-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate lifecycle repair planning safety
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Repair-Plan-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate Graph failure-state safety
         shell: powershell
         run: |
