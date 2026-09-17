@@ -11,11 +11,17 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 > [!IMPORTANT]
 > This is preview / proof-of-concept software. The WinPE implementation and native DeviceLink association completion use undocumented Windows Runtime interfaces, and the Device Association cloud operations use Microsoft Graph beta endpoints. These can change without notice.
 
+## Start here
+
+- **New to Device Preparation?** Read [Windows Autopilot v1 vs Windows Autopilot device preparation](docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md).
+- **Want to know which command to run?** See the [WindowsDeviceLink FAQ / common operations](docs/FAQ.md).
+- **Installing on Windows 11 or WinPE?** Read the [installation guide](docs/INSTALLATION.md).
+
 ## Current version
 
-The current preview release line is `0.5.0-preview1`.
+The current preview release line is `0.5.1-preview1`.
 
-This preview adds native DeviceLink discovery and guarded device-side association completion, while preserving the explicit separation between local identity, local firmware, native device-side association, and tenant-side Device Association operations. The completion flow has been validated end to end on physical AMD64 Windows 11 hardware.
+This preview adds progress visibility and timing telemetry to guarded device-side association completion, while preserving the explicit separation between local identity, local firmware, native device-side association, and tenant-side Device Association operations. The completion flow has been validated end to end on physical AMD64 Windows 11 hardware.
 
 ## Mental model
 
@@ -390,6 +396,8 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 
 ## Documentation
 
+- [`docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md`](docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md) - classic Windows Autopilot vs Windows Autopilot device preparation, terminology, lifecycle and coexistence.
+- [`docs/FAQ.md`](docs/FAQ.md) - practical common operations: what to run to preassociate, complete, remove, reset, restart, move tenants, or troubleshoot.
 - [`docs/INSTALLATION.md`](docs/INSTALLATION.md) - Windows 11 and WinPE installation, PowerShellGet/PackageManagement and troubleshooting.
 - [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - cloud operations and authentication methods.
 - [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
@@ -401,7 +409,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 
 ## Validation
 
-`0.5.0-preview1` includes the previously validated physical AMD64 Windows 11 / WinPE identity, firmware and cloud operations plus live Windows 11 validation of native device-side association completion.
+`0.5.1-preview1` includes the previously validated physical AMD64 Windows 11 / WinPE identity, firmware and cloud operations plus live Windows 11 validation of native device-side association completion and progress telemetry.
 
 The controlled completion test started from tenant-side `preassociated` plus local firmware `2/4`. Native discovery returned the expected Intune enrollment discovery route and tenant ID. A single `ConfigureDeviceLinkAsync` call completed with HRESULT `0x00000000` and operation result `1`; local firmware transitioned to `4/4`, the association JWT became present and identity-matching, and the tenant-side record changed to `associated`. No retry, cleanup, reset, cloud deletion or reboot was performed.
 
@@ -411,7 +419,7 @@ See [`TESTING.md`](TESTING.md) and [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCO
 
 ## Scope
 
-Preview release line: `0.5.0-preview1`.
+Preview release line: `0.5.1-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure Automation receiver.
 
