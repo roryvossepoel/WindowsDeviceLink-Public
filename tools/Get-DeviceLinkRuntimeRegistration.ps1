@@ -19,36 +19,37 @@ param(
 $ErrorActionPreference = 'Stop'
 $className = 'ModernDeployment.Autopilot.Core.DeviceLinkUtilities'
 
-$registrations = @()
 $registryCandidates = @(
     "HKLM:\SOFTWARE\Microsoft\WindowsRuntime\ActivatableClassId\$className",
     "HKLM:\SOFTWARE\Classes\ActivatableClasses\ActivatableClassId\$className",
     "HKLM:\SOFTWARE\WOW6432Node\Microsoft\WindowsRuntime\ActivatableClassId\$className"
 )
 
-foreach ($path in $registryCandidates) {
-    if (-not (Test-Path -LiteralPath $path)) { continue }
-    try {
-        $item = Get-ItemProperty -LiteralPath $path -ErrorAction Stop
-        $safeProperties = [ordered]@{}
-        foreach ($property in $item.PSObject.Properties) {
-            if ($property.Name -like 'PS*') { continue }
-            $safeProperties[$property.Name] = $property.Value
+$registrations = @(
+    foreach ($path in $registryCandidates) {
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        try {
+            $item = Get-ItemProperty -LiteralPath $path -ErrorAction Stop
+            $safeProperties = [ordered]@{}
+            foreach ($property in $item.PSObject.Properties) {
+                if ($property.Name -like 'PS*') { continue }
+                $safeProperties[$property.Name] = $property.Value
+            }
+            [pscustomobject]@{
+                Path       = $path
+                Properties = [pscustomobject]$safeProperties
+                Error      = $null
+            }
         }
-        $registrations += [pscustomobject]@{
-            Path       = $path
-            Properties = [pscustomobject]$safeProperties
-            Error      = $null
+        catch {
+            [pscustomobject]@{
+                Path       = $path
+                Properties = $null
+                Error      = $_.Exception.Message
+            }
         }
     }
-    catch {
-        $registrations += [pscustomobject]@{
-            Path       = $path
-            Properties = $null
-            Error      = $_.Exception.Message
-        }
-    }
-}
+)
 
 $resolvedDll = (Resolve-Path -LiteralPath $DllPath -ErrorAction Stop).Path
 $bytes = [IO.File]::ReadAllBytes($resolvedDll)
@@ -60,7 +61,6 @@ function Get-PrintableStrings {
         [int]$MinimumLength = 5
     )
 
-    $results = @()
     if ($Encoding -eq 'Ascii') {
         $builder = New-Object Text.StringBuilder
         foreach ($b in $Bytes) {
@@ -68,27 +68,26 @@ function Get-PrintableStrings {
                 [void]$builder.Append([char]$b)
             }
             else {
-                if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
+                if ($builder.Length -ge $MinimumLength) { $builder.ToString() }
                 [void]$builder.Clear()
             }
         }
-        if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
+        if ($builder.Length -ge $MinimumLength) { $builder.ToString() }
+        return
     }
-    else {
-        $builder = New-Object Text.StringBuilder
-        for ($i=0; $i -lt ($Bytes.Length-1); $i+=2) {
-            $code = $Bytes[$i] -bor ($Bytes[$i+1] -shl 8)
-            if ($code -ge 32 -and $code -le 126) {
-                [void]$builder.Append([char]$code)
-            }
-            else {
-                if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
-                [void]$builder.Clear()
-            }
+
+    $builder = New-Object Text.StringBuilder
+    for ($i=0; $i -lt ($Bytes.Length-1); $i+=2) {
+        $code = $Bytes[$i] -bor ($Bytes[$i+1] -shl 8)
+        if ($code -ge 32 -and $code -le 126) {
+            [void]$builder.Append([char]$code)
         }
-        if ($builder.Length -ge $MinimumLength) { $results += $builder.ToString() }
+        else {
+            if ($builder.Length -ge $MinimumLength) { $builder.ToString() }
+            [void]$builder.Clear()
+        }
     }
-    @($results)
+    if ($builder.Length -ge $MinimumLength) { $builder.ToString() }
 }
 
 $patterns = @(
@@ -104,20 +103,19 @@ $patterns = @(
     'enrollment'
 )
 
-$foundItems = @()
-foreach ($encoding in @('Ascii','Unicode')) {
-    foreach ($text in @(Get-PrintableStrings -Bytes $bytes -Encoding $encoding)) {
-        $matchedPattern = $patterns | Where-Object { $text -match [regex]::Escape($_) } | Select-Object -First 1
-        if (-not $matchedPattern) { continue }
-        $foundItems += [pscustomobject]@{
-            Encoding = $encoding
-            Pattern  = $matchedPattern
-            Text     = [string]$text
+$foundItems = @(
+    foreach ($encoding in @('Ascii','Unicode')) {
+        foreach ($text in @(Get-PrintableStrings -Bytes $bytes -Encoding $encoding)) {
+            $matchedPattern = $patterns | Where-Object { $text -match [regex]::Escape($_) } | Select-Object -First 1
+            if (-not $matchedPattern) { continue }
+            [pscustomobject]@{
+                Encoding = $encoding
+                Pattern  = [string]$matchedPattern
+                Text     = [string]$text
+            }
         }
     }
-}
-
-$foundItems = @($foundItems | Sort-Object Encoding,Text -Unique)
+) | Sort-Object Encoding,Text -Unique
 
 [pscustomobject]@{
     PSTypeName       = 'Windows.DeviceLink.Research.RuntimeRegistration'
