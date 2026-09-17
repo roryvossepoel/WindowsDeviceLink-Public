@@ -9,7 +9,8 @@ $ErrorActionPreference='Stop'
 
 $files=@(
     (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkRuntimeInventory.ps1'),
-    (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkRuntimeRegistration.ps1')
+    (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkRuntimeRegistration.ps1'),
+    (Join-Path $PSScriptRoot '..\tools\Get-DeviceLinkCspInventory.ps1')
 )
 
 foreach($file in $files){
