@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -25,6 +26,9 @@ namespace WinPEDeviceLink.Native
         public int ConfigureAsyncStatus { get; set; }
         public int ConfigureAsyncError { get; set; }
         public int ConfigureOperationResult { get; set; }
+        public double DiscoveryDurationSeconds { get; set; }
+        public double ConfigureDurationSeconds { get; set; }
+        public double NativeDurationSeconds { get; set; }
     }
 
     public static class DeviceLinkManagerClient
@@ -34,6 +38,7 @@ namespace WinPEDeviceLink.Native
         private const int AsyncStatusCompleted = 1;
         private const int AsyncStatusCanceled = 2;
         private const int AsyncStatusError = 3;
+        private const int HeartbeatSeconds = 15;
 
         [ComImport, Guid("1F79101B-A792-5008-A82A-A4B232229026"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         private interface IDeviceLinkManager
@@ -126,7 +131,7 @@ namespace WinPEDeviceLink.Native
                 blob = IntPtr.Zero;
 
                 int status;
-                WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(operation), timeoutSeconds, "RequestDiscoveryUrlAsync", false, out status);
+                WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(operation), timeoutSeconds, "RequestDiscoveryUrlAsync", false, out status, null, null);
 
                 resultObject = GetObjectResult(operation, 8, "RequestDiscoveryUrlAsync.GetResults");
                 if (resultObject == IntPtr.Zero) throw new InvalidOperationException("RequestDiscoveryUrlAsync returned a null result object.");
@@ -165,8 +170,17 @@ namespace WinPEDeviceLink.Native
 
         public static DeviceLinkConfigureResult ConfigureRegistered(string deviceLinkBase64, int timeoutSeconds)
         {
+            return ConfigureRegistered(deviceLinkBase64, timeoutSeconds, null);
+        }
+
+        public static DeviceLinkConfigureResult ConfigureRegistered(string deviceLinkBase64, int timeoutSeconds, Action<string> progressCallback)
+        {
             if (String.IsNullOrWhiteSpace(deviceLinkBase64)) throw new ArgumentException("DeviceLink identity is required.", "deviceLinkBase64");
             if (timeoutSeconds < 5) throw new ArgumentOutOfRangeException("timeoutSeconds");
+
+            Stopwatch totalTimer = Stopwatch.StartNew();
+            Stopwatch discoveryTimer = new Stopwatch();
+            Stopwatch configureTimer = new Stopwatch();
 
             IntPtr className = IntPtr.Zero;
             IntPtr instance = IntPtr.Zero;
@@ -193,13 +207,15 @@ namespace WinPEDeviceLink.Native
                     throw new InvalidOperationException("ConfigureDeviceLinkAsync was refused because the current configure result is " + before + ", expected 0.");
                 }
 
+                SafeProgress(progressCallback, "Starting DeviceLink discovery...");
+                discoveryTimer.Start();
                 ThrowIfFailed(WindowsCreateString(deviceLinkBase64, deviceLinkBase64.Length, out blob), "WindowsCreateString(DeviceLink)");
                 ThrowIfFailed(manager.RequestDiscoveryUrlAsync(blob, out discoveryOperation), "RequestDiscoveryUrlAsync");
                 WindowsDeleteString(blob);
                 blob = IntPtr.Zero;
 
                 int discoveryStatus;
-                WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(discoveryOperation), timeoutSeconds, "RequestDiscoveryUrlAsync", false, out discoveryStatus);
+                WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(discoveryOperation), timeoutSeconds, "RequestDiscoveryUrlAsync", false, out discoveryStatus, progressCallback, "DeviceLink discovery is still running");
 
                 resultObject = GetObjectResult(discoveryOperation, 8, "RequestDiscoveryUrlAsync.GetResults");
                 if (resultObject == IntPtr.Zero) throw new InvalidOperationException("RequestDiscoveryUrlAsync returned a null result object.");
@@ -212,6 +228,9 @@ namespace WinPEDeviceLink.Native
 
                 string url = HStringToString(discoveryUrl);
                 string tenant = HStringToString(tenantId);
+                discoveryTimer.Stop();
+                SafeProgress(progressCallback, "DeviceLink discovery completed in " + discoveryTimer.Elapsed.TotalSeconds.ToString("F1") + " seconds. Discovery result: " + discoveryResult + ".");
+
                 if (discoveryResult != 1 && discoveryResult != 2)
                 {
                     throw new InvalidOperationException("ConfigureDeviceLinkAsync was refused because discovery result is " + discoveryResult + ", expected 1 or 2.");
@@ -221,20 +240,25 @@ namespace WinPEDeviceLink.Native
                     throw new InvalidOperationException("ConfigureDeviceLinkAsync was refused because discovery URL or tenant ID is empty.");
                 }
 
+                SafeProgress(progressCallback, "Starting native DeviceLink configuration...");
+                configureTimer.Start();
                 ThrowIfFailed(manager.ConfigureDeviceLinkAsync(discoveryUrl, tenantId, IntPtr.Zero, out configureOperation), "ConfigureDeviceLinkAsync");
                 if (configureOperation == IntPtr.Zero) throw new InvalidOperationException("ConfigureDeviceLinkAsync returned a null async operation.");
 
                 int configureStatus;
-                int configureError = WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(configureOperation), timeoutSeconds, "ConfigureDeviceLinkAsync", true, out configureStatus);
+                int configureError = WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(configureOperation), timeoutSeconds, "ConfigureDeviceLinkAsync", true, out configureStatus, progressCallback, "Waiting for Windows to retrieve, attest and apply the DeviceLink association");
 
                 int operationResult = -1;
                 if (configureStatus == AsyncStatusCompleted && configureError == 0)
                 {
                     operationResult = GetIntResult(configureOperation, 10);
                 }
+                configureTimer.Stop();
+                SafeProgress(progressCallback, "Native DeviceLink configuration completed in " + configureTimer.Elapsed.TotalSeconds.ToString("F1") + " seconds. Operation result: " + operationResult + ".");
 
                 int after;
                 ThrowIfFailed(manager.GetConfigureDeviceLinkResult(out after), "GetConfigureDeviceLinkResult(after)");
+                totalTimer.Stop();
 
                 return new DeviceLinkConfigureResult
                 {
@@ -246,11 +270,17 @@ namespace WinPEDeviceLink.Native
                     DiscoveryAsyncStatus = discoveryStatus,
                     ConfigureAsyncStatus = configureStatus,
                     ConfigureAsyncError = configureError,
-                    ConfigureOperationResult = operationResult
+                    ConfigureOperationResult = operationResult,
+                    DiscoveryDurationSeconds = discoveryTimer.Elapsed.TotalSeconds,
+                    ConfigureDurationSeconds = configureTimer.Elapsed.TotalSeconds,
+                    NativeDurationSeconds = totalTimer.Elapsed.TotalSeconds
                 };
             }
             finally
             {
+                if (discoveryTimer.IsRunning) discoveryTimer.Stop();
+                if (configureTimer.IsRunning) configureTimer.Stop();
+                if (totalTimer.IsRunning) totalTimer.Stop();
                 Release(configureOperation);
                 if (discoveryUrl != IntPtr.Zero) WindowsDeleteString(discoveryUrl);
                 if (tenantId != IntPtr.Zero) WindowsDeleteString(tenantId);
@@ -263,14 +293,21 @@ namespace WinPEDeviceLink.Native
             }
         }
 
-        private static int WaitForTerminal(IAsyncInfo asyncInfo, int timeoutSeconds, string operation, bool returnErrorOnly, out int status)
+        private static int WaitForTerminal(IAsyncInfo asyncInfo, int timeoutSeconds, string operation, bool returnErrorOnly, out int status, Action<string> progressCallback, string heartbeatMessage)
         {
-            DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+            Stopwatch timer = Stopwatch.StartNew();
+            double nextHeartbeat = HeartbeatSeconds;
             do
             {
                 Thread.Sleep(250);
                 ThrowIfFailed(asyncInfo.get_Status(out status), operation + ".Status");
-                if (DateTime.UtcNow > deadline) throw new TimeoutException(operation + " timed out with status " + status + ".");
+                if (timer.Elapsed.TotalSeconds >= timeoutSeconds) throw new TimeoutException(operation + " timed out with status " + status + ".");
+
+                if (status == AsyncStatusStarted && progressCallback != null && !String.IsNullOrWhiteSpace(heartbeatMessage) && timer.Elapsed.TotalSeconds >= nextHeartbeat)
+                {
+                    SafeProgress(progressCallback, heartbeatMessage + "... " + ((int)timer.Elapsed.TotalSeconds) + " seconds elapsed.");
+                    nextHeartbeat += HeartbeatSeconds;
+                }
             }
             while (status == AsyncStatusStarted);
 
@@ -294,6 +331,19 @@ namespace WinPEDeviceLink.Native
             }
 
             return 0;
+        }
+
+        private static void SafeProgress(Action<string> progressCallback, string message)
+        {
+            if (progressCallback == null || String.IsNullOrWhiteSpace(message)) return;
+            try
+            {
+                progressCallback(message);
+            }
+            catch
+            {
+                // Progress reporting is observational only and must never affect DeviceLink state changes.
+            }
         }
 
         private static IntPtr GetObjectResult(IntPtr operation, int slot, string operationName)
