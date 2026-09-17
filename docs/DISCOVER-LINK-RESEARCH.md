@@ -1,214 +1,167 @@
 # DeviceLink Discover/Link research
 
-This document records research for issue #14. It is intentionally non-implementing: no public Discover/Link command is introduced here.
+This document records the research that led to device-side Device Association completion support in WindowsDeviceLink.
 
-## Current module boundary
+## Outcome
 
-The current native wrapper activates the WinRT runtime class:
+The DeviceLink association lifecycle has been reproduced end to end on a controlled physical Windows 11 test device.
 
-`ModernDeployment.Autopilot.Core.DeviceLinkUtilities`
+Validated transition:
 
-and queries interface IID:
+`Preassociated + firmware 2/4` -> discovery -> `ConfigureDeviceLinkAsync` -> `Associated + firmware 4/4`
 
-`6410BEE7-60A9-5627-9EB2-FEDA7518A4EB`
+The successful live run produced all of the following:
 
-The wrapper currently calls only:
+- tenant-side Device Association state changed from `preassociated` to `associated`;
+- `DeviceLinkJwtCompressed` was written to UEFI;
+- `DeviceLinkJwtLastWrite` was written to UEFI;
+- all four known DeviceLink firmware variables were present;
+- the resulting association JWT parsed successfully as RS256/GZip, was temporally valid, and matched the local DeviceLink identity;
+- no retry, reboot, reset, cleanup, or cloud deletion was required.
 
-- vtable slot 6: `ExportDeviceLinkInfoCsvAsync`
-- vtable slot 7: `GetDeviceLinkInfoAsync`
+Cryptographic signature validation of the association JWT remains a separate concern; local validation reports `SignatureValidation = NotPerformed` unless a trusted signature-validation path is explicitly used.
 
-These are sufficient for generating/exporting the TPM-backed DeviceLink identity package but do not complete tenant association.
+## Runtime contracts
 
-## Live runtime inventory
+### DeviceLinkUtilities
 
-Live read-only inventory on the controlled Surface Laptop 3 / Windows 11 build `10.0.26100.8875` reported three IInspectable interfaces on `ModernDeployment.Autopilot.Core.DeviceLinkUtilities`:
+Existing identity generation/export continues to use:
 
-- `6410BEE7-60A9-5627-9EB2-FEDA7518A4EB` - the interface already used by WindowsDeviceLink for identity export/generation;
-- `00000038-0000-0000-C000-000000000046` - standard `IWeakReferenceSource`;
-- `8A3B7C2E-5D1F-4E9A-B6C8-2F0E1D3A4B5C` - additional interface reported directly by `IInspectable.GetIids()` and not injected by the research tool.
+- runtime class: `ModernDeployment.Autopilot.Core.DeviceLinkUtilities`
+- interface IID: `6410BEE7-60A9-5627-9EB2-FEDA7518A4EB`
+- slot 6: `ExportDeviceLinkInfoCsvAsync`
+- slot 7: `GetDeviceLinkInfoAsync`
 
-Binary IID-context inspection did **not** correlate the third IID with DeviceLink orchestration. Its nearby strings were dominated by `ApplyProperties`, `ConfigureProperties` and `Windows.Management.Service.Autopilot.AutopilotSurfaceHubHelper.*`, so it is no longer treated as the primary Discover/Link candidate.
+### DeviceLinkManager
 
-The runtime is registered under `WindowsManagementService` with `ActivationType=1` and `TrustLevel=0`.
+Live runtime inventory and independent public implementation evidence converged on:
 
-A second live read-only inventory of `ModernDeployment.Autopilot.Core.DeviceLinkManager` succeeded and reported exactly two interfaces:
+- runtime class: `ModernDeployment.Autopilot.Core.DeviceLinkManager`
+- interface IID: `1F79101B-A792-5008-A82A-A4B232229026`
 
-- `1F79101B-A792-5008-A82A-A4B232229026` - the sole functional interface currently associated with the `DeviceLinkManager` runtime class;
-- `00000038-0000-0000-C000-000000000046` - standard `IWeakReferenceSource`.
+Validated functional contract:
 
-`DeviceLinkManager` activation returned HRESULT `0x00000000`, `TrustLevel=0`, and runtime class name `ModernDeployment.Autopilot.Core.DeviceLinkManager`. This interface is now the primary candidate for the higher-level DeviceLink orchestration surface.
+- slot 6: `GetDiscoveryUrlRequestInfo`
+- slot 7: `RequestDiscoveryUrlAsync(HSTRING deviceLinkInfo, out asyncOperation)`
+- slot 8: `GetConfigureDeviceLinkResult(out int result)`
+- slot 9: `ConfigureDeviceLinkAsync(HSTRING discoveryUrl, HSTRING tenantId, null, out asyncOperation)`
 
-Live vtable inventory showed six DeviceLinkManager-specific slots, 6 through 11. Each slot is a COM/WinRT proxy dispatch stub in `combase.dll` of the form `mov eax,<slot>; jmp <shared dispatcher>`, and all six converge on the same dispatcher. Therefore the vtable itself proves a six-method contract, but does not reveal the underlying method names or implementation RVAs.
+The configure async operation exposes the WinRT generic shape:
 
-## Observed successful lifecycle
+`IAsyncOperationWithProgress<ConfigureDeviceLinkResult, DeviceLinkConfigurationStatus>`
 
-The current research model is:
+The completed configure operation returns its result value from the operation's `GetResults` slot.
 
-1. Generate local DeviceLink identity.
-2. Import/preassociate identity in Intune.
-3. Tenant-side state becomes `preassociated`.
-4. Device performs preassociation discovery against the global Autopilot association service.
-5. Discovery returns tenant context and enrollment discovery routing information.
-6. Windows resolves the tenant-specific association/attestation endpoints.
-7. Windows proves possession of the TPM-backed device identity through Microsoft Azure Attestation.
-8. Windows requests the signed tenant association using device/link context plus attestation evidence.
-9. Windows receives the signed association JWT.
-10. Windows writes the association to UEFI (`DeviceLinkJwtCompressed` plus timestamp/related state).
-11. Windows acknowledges successful local apply to the service.
-12. Tenant-side association progresses from `preassociated` to `associated`.
-13. OOBE can then retrieve current device-targeted Device Preparation settings before user sign-in.
+An important live observation is that `GetConfigureDeviceLinkResult` remained `0` immediately after a successful configure operation even though the async operation completed successfully with result `1` and the firmware/cloud post-state transitioned to complete. WindowsDeviceLink therefore does not use that getter alone as proof of success.
 
-This is distinct from Intune enrollment and Microsoft Entra join.
+## Discovery validation
 
-## Live binary evidence
+A live discovery call on the preassociated test device returned:
 
-Read-only string inventory of `C:\Windows\System32\Windows.Management.Service.dll` version `10.0.26100.8875` exposed direct DeviceLink implementation evidence including:
+- discovery result: `1`
+- discovery URL: `https://enrollment.manage.microsoft.com/EnrollmentServer/Discovery.svc`
+- tenant ID: the expected tenant
+- async status: completed
+- configure result before/after discovery: `0`
 
-- `AcquireApplyAckDeviceLink`
-- `ApplyDeviceLink`
-- `AcknowledgeDeviceLink`
-- `RetrieveDeviceLinkFromUrl`
-- `GetSignedDeviceAssociationInfo`
-- `GetDiscoveryResults`
-- `AcquireEnrollmentDiscoveryEndpoint`
-- `PerformAttestation`
-- `GenerateMaaAttestationClaims`
-- `DeviceLinkPreassociateDiscoveryUri`
-- `DeviceLinkJwtDownloadUri`
-- `AcknowledgeDeviceLinkUri`
-- `DeviceLinkManager`
-- `DeviceLinkUtilities`
-- `https://aps.windowsautopilot.microsoft.com/ztd/devicelink/preassociationDiscovery`
+Discovery did not write association firmware state and did not change the tenant-side association state.
 
-Targeted metadata/string-context inventory produced the first concrete high-level async contract evidence. The embedded metadata exposes:
+## Configure validation
 
-`Windows.Foundation.IAsyncOperationWithProgress<ModernDeployment.Autopilot.Core.ConfigureDeviceLinkResult, ModernDeployment.Autopilot.Core.DeviceLinkConfigurationStatus>`
+A single guarded configure operation was then invoked with the discovery URL and tenant ID returned by Windows, with the headers parameter set to null.
 
-and the corresponding completed-handler type.
+Observed result:
 
-This establishes the progress type name as `DeviceLinkConfigurationStatus` and strongly supports a high-level `ConfigureDeviceLink` operation returning `ConfigureDeviceLinkResult` while reporting DeviceLink configuration status/progress.
+- configure async status: completed;
+- configure async HRESULT: `0x00000000`;
+- configure operation result: `1`;
+- retry count: `0`;
+- cleanup invoked: false;
+- reboot invoked: false.
 
-The same compact metadata/string cluster contains `ConfigureDeviceLink`, `AcquireApplyAckDeviceLink`, `ApplyDeviceLink`, `AcknowledgeDeviceLink`, `AcquireEnrollmentDiscoveryEndpoint`, `RetrieveDeviceLinkFromUrl`, `MaaAttestImpl`, `GetIdkKeyInfoAsync`, `GetKeyIdSummaryAsync`, and the `DeviceLinkManager` type name. This is strong evidence that the high-level operation orchestrates the internal discovery/attestation/apply/ack pipeline, but it still does not establish the exact method slot or parameter list.
+Immediately afterward the local firmware state was `4/4` and Intune reported the association state as `associated`.
 
-Targeted metadata scanning across likely Windows metadata locations found all DeviceLinkManager/ConfigureDeviceLink contract names only in `Windows.Management.Service.dll`; no separate `.winmd` carrying this private/internal contract was found.
+## Public module implementation
 
-## DevicePreparation CSP / MDM Bridge observation
+The research has been converted into the normal module implementation rather than retained as standalone experimental invocation scripts.
 
-Live metadata enumeration of `root\cimv2\mdm\dmmap` found three DevicePreparation-related classes:
+### `Test-WindowsDeviceLinkDiscovery`
 
-- `MDM_DevicePreparation_MDMProvider01`
-- `MDM_DevicePreparation_BootstrapperAgent01`
-- `MDM_DevicePreparation`
+Read-only/public discovery command. It:
 
-On the tested build these classes exposed properties only; no callable CIM methods were returned by `CimClassMethods` for `RefreshTenantAssociationInfo` or another tenant-association Exec surface.
+- obtains the local DeviceLink identity;
+- invokes `RequestDiscoveryUrlAsync`;
+- returns discovery result, URL, tenant ID, async status, and configure-result observations;
+- does not invoke configure or write association state.
 
-Therefore the documented DevicePreparation CSP remains useful as a lifecycle/status model, but the local MDM Bridge does not currently provide an obvious direct callable association-completion method on this device. The WinRT/native route remains the primary implementation research path unless another bridge class is discovered.
+### `Complete-WindowsDeviceLinkAssociation`
 
-## Known service/routing observations
+Guarded state-changing completion command. It:
 
-The binary and community research both identify the global preassociation discovery endpoint:
+- runs preflight checks;
+- refuses unsupported or unexpected states;
+- returns `AlreadyComplete` without invoking configure when firmware/JWT state is already complete;
+- performs one discovery followed by at most one `ConfigureDeviceLinkAsync` call;
+- performs no automatic retry;
+- performs no reset, cleanup, cloud deletion, or reboot;
+- verifies firmware `4/4` and a valid identity-matching association JWT after completion.
 
-`https://aps.windowsautopilot.microsoft.com/ztd/devicelink/preassociationDiscovery`
+### `Initialize-WindowsDeviceLink -CompleteAssociation`
 
-Observed routing state is stored under:
+The initializer keeps its previous safe default behavior: create/verify tenant-side preassociation only when appropriate.
 
-`HKLM\SOFTWARE\Microsoft\Provisioning\AutopilotSettings`
+Device-side association completion is opt-in through `-CompleteAssociation`.
 
-with values whose names are based on the DeviceLink identifier and include tenant/discovery hints.
+With that switch, the supported path is:
 
-Microsoft documentation separately confirms that Device Association requires network access to Autopilot/device-association services and Microsoft Azure Attestation endpoints.
+`LocalOnly -> Register -> Preassociated -> Complete -> Associated`
 
-These observations are research inputs, not a supported network contract for WindowsDeviceLink. Regional/service endpoints must not be hard-coded from one lab capture.
+Already-associated devices remain idempotent and report `CompletionResult = AlreadyAssociated` without invoking configure again.
 
-## Firmware transition model
+## Firmware state model
 
-Known local base state before completed association:
-
-- `DeviceLinkId`
-- `DeviceLinkCreationTimeUtc`
-
-Known completed-state variables observed by this project:
+Known variables in namespace `{B3DE75DA-819C-4FD5-9F01-C3D49E8CBBD7}`:
 
 - `DeviceLinkId`
 - `DeviceLinkJwtCompressed`
 - `DeviceLinkJwtLastWrite`
 - `DeviceLinkCreationTimeUtc`
 
-The expected research transition is therefore:
+Validated pre-completion state:
 
-`Preassociated + 2/4` -> discovery/attestation/link -> `Associated + 4/4`
+- `DeviceLinkId`
+- `DeviceLinkCreationTimeUtc`
 
-The precise point at which each firmware variable is committed and how rollback behaves after a partial failure still needs live validation.
+Validated completed state:
 
-## Signed association contents
+- all four variables present.
 
-Published research indicates that the resulting association JWT can contain context such as:
+## Safety boundary retained in production code
 
-- LinkId
-- TPM key identifier
-- tenant identifier
-- device inventory
-- discovery URL
-- issuer/audience/time claims
+The permanent implementation preserves the safeguards used during research:
 
-WindowsDeviceLink already treats this material as sensitive. The raw JWT must not appear in normal output, verbose/debug output, logs or errors.
+1. no destructive automatic repair;
+2. no automatic firmware reset;
+3. no automatic tenant-record deletion;
+4. no reboot;
+5. no configure retry;
+6. explicit `SupportsShouldProcess` on state-changing public commands;
+7. preflight before configure;
+8. local post-state verification after configure;
+9. raw JWT/device identity material is not written to normal output or logs.
 
-The current `Test-WindowsDeviceLinkAssociationJwt` validates only structure/time/identity correlation unless signature validation is explicitly implemented from a trustworthy documented key source in the future.
+## Test environment
 
-## Requirements relevant to Discover/Link
+The end-to-end validation was performed on a physical Microsoft Surface Laptop 3 running the registered Windows DeviceLink runtime from:
 
-Microsoft currently documents Device Association as requiring:
+`C:\Windows\System32\Windows.Management.Service.dll`
 
-- a physical device (VMs unsupported)
-- Windows 11 24H2 or 25H2 with the required servicing level
-- a supported Windows edition
-- TPM 2.0 enabled and in a good state (not Reduced Functionality Mode)
-- network access to Device Association and Azure Attestation endpoints
+Validated DLL version:
 
-Our existing preflight covers runtime activation, elevation, firmware access, TPM 2.0 indication, Secure Boot and local DeviceLink identity. Build/edition/virtual-machine/network checks should be considered before any future live Discover/Link implementation.
+`10.0.26100.8875 (WinBuild.160101.0800)`
 
-## Known failure signals from public research
+The exact private/native ABI should still be treated as Windows implementation detail and may change in future Windows builds. Runtime support checks and guarded failure behavior remain required.
 
-Published tooling/research reports useful native HRESULT categories including:
+## Conclusion
 
-- `0x80004001` (`E_NOTIMPL`) - required DeviceLink API unavailable on the build
-- `0x8103C00F` - missing attestation material
-- `0x80090029` / `0x80090016` - TPM/key operation failure
-- `0x80070005` - access denied / insufficient elevation
-
-These must be independently reproduced before WindowsDeviceLink treats them as stable public error classifications.
-
-## Safety boundary for experiments
-
-Any experimental call must:
-
-1. require an already validated preflight;
-2. capture local firmware/JWT/cloud association state before invocation;
-3. invoke one narrow native operation only;
-4. expose exact safe HRESULT/status output;
-5. perform no destructive cleanup on failure;
-6. perform no automatic retry unless proven idempotent;
-7. never delete the tenant record or reset firmware;
-8. never reboot automatically;
-9. re-read local firmware/JWT/cloud state after the operation;
-10. stop immediately on a partial or unknown transition.
-
-## Next research task
-
-Recover the embedded enum/value contracts for:
-
-- `ConfigureDeviceLinkResult`
-- `DeviceLinkConfigurationStatus`
-
-Then correlate the six `DeviceLinkManager` proxy-dispatch slots with method names/signatures, prioritizing any slot whose return type matches `IAsyncOperationWithProgress<ConfigureDeviceLinkResult, DeviceLinkConfigurationStatus>`.
-
-The remaining contract questions are:
-
-- exact `ConfigureDeviceLink` parameter list;
-- exact vtable slot;
-- enum/result values and terminal-state semantics;
-- progress values/stages;
-- async error contract;
-- whether lower-level Discover/Link calls remain independently exposed.
-
-Only after that mapping is reproducible should a controlled private experimental call be considered.
+Issue #14's central question is resolved: WindowsDeviceLink can complete the device-side Windows Autopilot Device Association flow after tenant-side preassociation using the native `DeviceLinkManager` contract, and can verify the resulting local association state safely.
