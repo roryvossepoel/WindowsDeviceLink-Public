@@ -58,6 +58,18 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Repair-Plan-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate DeviceLink preflight decisions
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Preflight-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
+      - name: Validate Association JWT parsing and redaction
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\AssociationJwt-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate Graph failure-state safety
         shell: powershell
         run: |
