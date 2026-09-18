@@ -1,6 +1,8 @@
 # Multitenant backend app registration
 
-The Azure Function and multi-tenant Azure Automation receiver use a Microsoft Entra application registration for app-only Microsoft Graph authentication.
+This document applies when WindowsDeviceLink uses an App Registration for app-only Microsoft Graph authentication, especially for **multi-tenant** backends.
+
+For a same-tenant Azure Automation backend, Managed Identity is preferred and an App Registration is not required for that authentication path. See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
 
 ## Recommended application design
 
@@ -35,7 +37,9 @@ Admin consent is required in every tenant in which this application will create 
 
 ## Credential
 
-### Preferred: certificate
+For App Registration-based authentication, certificate-based client credentials are preferred over client secrets.
+
+### Preferred for App Registration: certificate
 
 Create a certificate whose private key is controlled by the backend operator.
 
@@ -77,11 +81,15 @@ For each target tenant:
 
 The Function additionally uses an explicit tenant allow list and rejects unknown tenant IDs before authentication.
 
-## Same-tenant managed identity
+## Same-tenant Managed Identity
 
-Azure Automation can use a managed identity when the target tenant is the same tenant that owns the Automation Account identity and that identity has the required Graph application role.
+Azure Automation can use its system-assigned Managed Identity when the target tenant is the same tenant that owns the Automation Account identity and that identity has the required Graph application role.
 
-Managed identity should not be described as the general cross-tenant solution. For cross-tenant routing, use the multitenant application registration with certificate authentication.
+For that same-tenant scenario, Managed Identity is preferred over both certificate and client secret because no application credential needs to be stored or rotated by the backend operator.
+
+Managed Identity is not the general cross-tenant solution. For cross-tenant routing, use the multitenant App Registration with certificate authentication.
+
+The Azure Function reference implementation currently uses its Managed Identity for Key Vault access only; Graph authentication uses the App Registration.
 
 ## Required backend values
 
