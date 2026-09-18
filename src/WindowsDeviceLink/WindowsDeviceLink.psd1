@@ -24,6 +24,7 @@
         'Test-WindowsDeviceLinkAssociationJwt'
         'Test-WindowsDeviceLinkDiscovery'
         'Test-WindowsDeviceLinkHealth'
+        'Test-WindowsDeviceLinkManagerRuntime'
         'Test-WindowsDeviceLinkPreflight'
         'Test-WindowsDeviceLinkRuntime'
         'Test-WindowsDeviceLinkSupport'
