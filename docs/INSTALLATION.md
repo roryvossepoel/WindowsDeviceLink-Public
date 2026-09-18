@@ -1,6 +1,6 @@
 # WindowsDeviceLink installation guide
 
-This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL.
+This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL. For the intended pre-association -> Windows 11 OOBE lifecycle and the WinPE native-completion boundary, see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 > [!IMPORTANT]
 > WindowsDeviceLink is currently preview software. The published version documented here is `0.4.4-preview1`.
@@ -265,7 +265,7 @@ Architecture   : AMD64
 ActivationMode : DirectDll
 ```
 
-After supplying a compatible DLL, the validated result reports support with direct-DLL activation. The installed `0.4.4-preview1` package has been smoke-tested this way on physical AMD64 WinPE hardware.
+After supplying a compatible DLL, the validated result reports support with direct-DLL activation. Identity generation/readout and the WinPE pre-association workflow have been validated on physical AMD64 hardware. Native DeviceLink discovery/completion in WinPE is not currently a supported workflow; see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 ## Validate status and health
 
@@ -412,6 +412,7 @@ For a Gallery smoke test, make sure `Get-Module WindowsDeviceLink` points to the
 
 ## Related documentation
 
+- [`WINPE-WORKFLOW.md`](WINPE-WORKFLOW.md)
 - [`FIRMWARE-STATE.md`](FIRMWARE-STATE.md)
 - [`ONLINE-METHODS.md`](ONLINE-METHODS.md)
 - [`REMOVE-ASSOCIATION.md`](REMOVE-ASSOCIATION.md)
