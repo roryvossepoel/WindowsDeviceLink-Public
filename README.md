@@ -371,7 +371,7 @@ $deviceLink | Register-WindowsDeviceLink `
     -TenantId '<target-tenant-id>'
 ```
 
-See [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md), [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md), [`function-app/README.md`](function-app/README.md), and [`runbooks/README.md`](runbooks/README.md).
+See [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md), [`docs/MULTITENANT-LOOKUP.md`](docs/MULTITENANT-LOOKUP.md), [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md), [`function-app/README.md`](function-app/README.md), and [`runbooks/README.md`](runbooks/README.md).
 
 ## Public commands
 
@@ -406,6 +406,7 @@ See [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md), [`docs/WEBHOOK-SCHEMA-v1.m
 - [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md) - Azure Function / Automation backend architecture and Deploy to Azure.
 - [`docs/APP-REGISTRATION.md`](docs/APP-REGISTRATION.md) - multitenant Entra app registration and Graph permission.
 - [`docs/MULTITENANT-CONSENT.md`](docs/MULTITENANT-CONSENT.md) - onboarding target tenants with explicit admin consent.
+- [`docs/MULTITENANT-LOOKUP.md`](docs/MULTITENANT-LOOKUP.md) - search all managed tenants for the Device Association of a serial number.
 - [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
 - [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCOVER-LINK-RESEARCH.md) - validated DeviceLinkManager contract, discovery and association-completion evidence.
 - [`docs/REMOVE-ASSOCIATION.md`](docs/REMOVE-ASSOCIATION.md) - tenant-side Device Association removal.
