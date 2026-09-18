@@ -18,6 +18,7 @@
         'Get-WindowsDeviceLinkDiscoveryPrerequisites'
         'Get-WindowsDeviceLinkRepairPlan'
         'Get-WindowsDeviceLinkStatus'
+        'Get-WindowsDeviceLinkDiscoveryTrace'
         'Initialize-WindowsDeviceLink'
         'Register-WindowsDeviceLink'
         'Remove-WindowsDeviceLinkAssociation'
