@@ -76,6 +76,12 @@ namespace WinPEDeviceLink.Native
             [PreserveSig] int Close();
         }
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibraryEx(string fileName, IntPtr file, uint flags);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
+        private static extern IntPtr GetProcAddress(IntPtr module, string name);
+
         [DllImport("combase.dll")]
         private static extern int RoInitialize(uint initType);
 
@@ -95,10 +101,107 @@ namespace WinPEDeviceLink.Native
         private static extern IntPtr WindowsGetStringRawBuffer(IntPtr hstring, out uint length);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int DllGetActivationFactoryDelegate(IntPtr activatableClassId, out IntPtr activationFactory);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int ActivateInstanceDelegate(IntPtr self, out IntPtr instance);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate int GetResultsObjectDelegate(IntPtr self, out IntPtr result);
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate int GetResultsIntDelegate(IntPtr self, out int result);
+
+        public static DeviceLinkDiscoveryResult Discover(string dllPath, string deviceLinkBase64, int timeoutSeconds)
+        {
+            if (String.IsNullOrWhiteSpace(dllPath)) throw new ArgumentException("Runtime DLL path is required.", "dllPath");
+            if (String.IsNullOrWhiteSpace(deviceLinkBase64)) throw new ArgumentException("DeviceLink identity is required.", "deviceLinkBase64");
+            if (timeoutSeconds < 5) throw new ArgumentOutOfRangeException("timeoutSeconds");
+
+            IntPtr module = IntPtr.Zero;
+            IntPtr className = IntPtr.Zero;
+            IntPtr factory = IntPtr.Zero;
+            IntPtr instance = IntPtr.Zero;
+            IntPtr blob = IntPtr.Zero;
+            IntPtr operation = IntPtr.Zero;
+            IntPtr resultObject = IntPtr.Zero;
+            IntPtr discoveryUrl = IntPtr.Zero;
+            IntPtr tenantId = IntPtr.Zero;
+            bool uninitialize = false;
+
+            try
+            {
+                int init = RoInitialize(1);
+                uninitialize = init >= 0;
+
+                module = LoadLibraryEx(dllPath, IntPtr.Zero, 0x00001100);
+                if (module == IntPtr.Zero)
+                {
+                    throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "LoadLibraryEx failed");
+                }
+
+                IntPtr entryPoint = GetProcAddress(module, "DllGetActivationFactory");
+                if (entryPoint == IntPtr.Zero) throw new EntryPointNotFoundException("DllGetActivationFactory");
+
+                ThrowIfFailed(WindowsCreateString(RuntimeClassName, RuntimeClassName.Length, out className), "WindowsCreateString(class)");
+                DllGetActivationFactoryDelegate getFactory =
+                    (DllGetActivationFactoryDelegate)Marshal.GetDelegateForFunctionPointer(entryPoint, typeof(DllGetActivationFactoryDelegate));
+                ThrowIfFailed(getFactory(className, out factory), "DllGetActivationFactory(DeviceLinkManager)");
+
+                IntPtr vtable = Marshal.ReadIntPtr(factory);
+                IntPtr activateMethod = Marshal.ReadIntPtr(vtable, 6 * IntPtr.Size);
+                ActivateInstanceDelegate activate =
+                    (ActivateInstanceDelegate)Marshal.GetDelegateForFunctionPointer(activateMethod, typeof(ActivateInstanceDelegate));
+                ThrowIfFailed(activate(factory, out instance), "ActivateInstance(DeviceLinkManager)");
+
+                IDeviceLinkManager manager = (IDeviceLinkManager)Marshal.GetObjectForIUnknown(instance);
+
+                int before;
+                ThrowIfFailed(manager.GetConfigureDeviceLinkResult(out before), "GetConfigureDeviceLinkResult(before)");
+
+                ThrowIfFailed(WindowsCreateString(deviceLinkBase64, deviceLinkBase64.Length, out blob), "WindowsCreateString(DeviceLink)");
+                ThrowIfFailed(manager.RequestDiscoveryUrlAsync(blob, out operation), "RequestDiscoveryUrlAsync");
+                WindowsDeleteString(blob);
+                blob = IntPtr.Zero;
+
+                int status;
+                WaitForTerminal((IAsyncInfo)Marshal.GetObjectForIUnknown(operation), timeoutSeconds, "RequestDiscoveryUrlAsync", false, out status, null, null);
+
+                resultObject = GetObjectResult(operation, 8, "RequestDiscoveryUrlAsync.GetResults");
+                if (resultObject == IntPtr.Zero) throw new InvalidOperationException("RequestDiscoveryUrlAsync returned a null result object.");
+
+                IDiscoveryUrlRequestInfo info = (IDiscoveryUrlRequestInfo)Marshal.GetObjectForIUnknown(resultObject);
+                int discoveryResult;
+                ThrowIfFailed(info.get_DiscoveryUrl(out discoveryUrl), "DiscoveryUrlRequestInfo.DiscoveryUrl");
+                ThrowIfFailed(info.get_TenantId(out tenantId), "DiscoveryUrlRequestInfo.TenantId");
+                ThrowIfFailed(info.get_DiscoveryUrlRequestResultValue(out discoveryResult), "DiscoveryUrlRequestInfo.ResultValue");
+
+                int after;
+                ThrowIfFailed(manager.GetConfigureDeviceLinkResult(out after), "GetConfigureDeviceLinkResult(after)");
+
+                return new DeviceLinkDiscoveryResult
+                {
+                    ConfigureResultBefore = before,
+                    ConfigureResultAfter = after,
+                    DiscoveryResult = discoveryResult,
+                    DiscoveryUrl = HStringToString(discoveryUrl),
+                    TenantId = HStringToString(tenantId),
+                    AsyncStatus = status
+                };
+            }
+            finally
+            {
+                if (discoveryUrl != IntPtr.Zero) WindowsDeleteString(discoveryUrl);
+                if (tenantId != IntPtr.Zero) WindowsDeleteString(tenantId);
+                Release(resultObject);
+                Release(operation);
+                if (blob != IntPtr.Zero) WindowsDeleteString(blob);
+                Release(instance);
+                Release(factory);
+                if (className != IntPtr.Zero) WindowsDeleteString(className);
+                if (uninitialize) RoUninitialize();
+            }
+        }
 
         public static DeviceLinkDiscoveryResult DiscoverRegistered(string deviceLinkBase64, int timeoutSeconds)
         {
