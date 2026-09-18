@@ -371,7 +371,7 @@ $deviceLink | Register-WindowsDeviceLink `
     -TenantId '<target-tenant-id>'
 ```
 
-See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/README.md`](runbooks/README.md).
+See [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md), [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md), [`function-app/README.md`](function-app/README.md), and [`runbooks/README.md`](runbooks/README.md).
 
 ## Public commands
 
@@ -403,6 +403,9 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 - [`docs/INSTALLATION.md`](docs/INSTALLATION.md) - Windows 11 and WinPE installation, PowerShellGet/PackageManagement and troubleshooting.
 - [`docs/WINPE-WORKFLOW.md`](docs/WINPE-WORKFLOW.md) - WinPE pre-association workflow, administrator-supplied runtime, and native discovery/completion support boundary.
 - [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - cloud operations and authentication methods.
+- [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md) - Azure Function / Automation backend architecture and Deploy to Azure.
+- [`docs/APP-REGISTRATION.md`](docs/APP-REGISTRATION.md) - multitenant Entra app registration and Graph permission.
+- [`docs/MULTITENANT-CONSENT.md`](docs/MULTITENANT-CONSENT.md) - onboarding target tenants with explicit admin consent.
 - [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
 - [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCOVER-LINK-RESEARCH.md) - validated DeviceLinkManager contract, discovery and association-completion evidence.
 - [`docs/REMOVE-ASSOCIATION.md`](docs/REMOVE-ASSOCIATION.md) - tenant-side Device Association removal.
@@ -424,7 +427,7 @@ See [`TESTING.md`](TESTING.md) and [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCO
 
 Preview release line: `0.5.2-preview1`.
 
-In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure Automation receiver.
+In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport, Azure Automation receiver, and Azure Function receiver.
 
 Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot V1 management, automatic destructive repair, cryptographic association-JWT signature verification, or production support guarantees.
 
