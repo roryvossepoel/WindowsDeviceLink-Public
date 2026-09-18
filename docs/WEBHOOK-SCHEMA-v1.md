@@ -1,6 +1,6 @@
 # WindowsDeviceLink webhook schema v1
 
-This document defines the schema contract used by `Get-WindowsDeviceLink -Online -Method Webhook`.
+This document defines the schema contract used by `Register-WindowsDeviceLink -Method Webhook`.
 
 ## Compatibility policy
 
@@ -46,7 +46,7 @@ The webhook API key is never included in the JSON body.
     "computerName": "COMPUTER",
     "environment": "Windows",
     "architecture": "AMD64",
-    "moduleVersion": "0.4.x",
+    "moduleVersion": "0.5.x",
     "powerShellVersion": "5.1.0",
     "dllSource": "System",
     "dllVersion": "10.0.x",
@@ -71,3 +71,26 @@ A compatible receiver must require:
 The payload contains device identity data including the complete TPM-backed DeviceLink. Do not write the full request body to unrestricted operational logs.
 
 The recommended correlation value for diagnostics is `requestId`.
+
+
+## Compatible receivers
+
+Schema version 1 is shared by:
+
+- the Azure Automation receiver in `runbooks/`;
+- the Azure Function receiver in `function-app/`;
+- compatible third-party/custom receivers.
+
+The client contract does not change based on the backend implementation.
+
+## Tenant routing
+
+When `-TenantId` is supplied to `Register-WindowsDeviceLink -Method Webhook`, it is copied to `tenantId` in the request body.
+
+The receiving backend is responsible for:
+
+- validating/allow-listing that tenant ID;
+- selecting the appropriate backend identity;
+- ensuring admin consent exists in that tenant.
+
+`tenantId` is routing metadata. It is not a credential.
