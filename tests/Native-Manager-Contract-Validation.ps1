@@ -12,41 +12,11 @@ Import-Module $ModulePath -Force -ErrorAction Stop
 $type='WinPEDeviceLink.Native.DeviceLinkManagerClient' -as [type]
 if(-not $type){ throw 'FAIL: DeviceLinkManagerClient type was not loaded by the module.' }
 
-$required=@('Probe','ProbeRegistered','Discover','DiscoverRegistered','ConfigureRegistered')
+$required=@('DiscoverRegistered','ConfigureRegistered')
 $publicStatic=@($type.GetMethods([Reflection.BindingFlags]'Public,Static') | Select-Object -ExpandProperty Name -Unique)
 foreach($name in $required){
     if($name -notin $publicStatic){ throw "FAIL: DeviceLinkManagerClient is missing public static method '$name'." }
 }
-
-$directDiscover=$type.GetMethods([Reflection.BindingFlags]'Public,Static') | Where-Object Name -eq 'Discover' | Where-Object {
-    $parameters=$_.GetParameters()
-    $parameters.Count -eq 3 -and
-    $parameters[0].ParameterType -eq [string] -and
-    $parameters[1].ParameterType -eq [string] -and
-    $parameters[2].ParameterType -eq [int]
-} | Select-Object -First 1
-if(-not $directDiscover){ throw 'FAIL: Discover is missing the direct-DLL overload (string dllPath, string deviceLinkBase64, int timeoutSeconds).' }
-
-$probeDirect=$type.GetMethods([Reflection.BindingFlags]'Public,Static') | Where-Object Name -eq 'Probe' | Where-Object {
-    $parameters=$_.GetParameters()
-    $parameters.Count -eq 1 -and
-    $parameters[0].ParameterType -eq [string]
-} | Select-Object -First 1
-if(-not $probeDirect){ throw 'FAIL: Probe is missing the direct-DLL overload (string dllPath).' }
-
-$probeRegistered=$type.GetMethods([Reflection.BindingFlags]'Public,Static') | Where-Object Name -eq 'ProbeRegistered' | Where-Object {
-    $_.GetParameters().Count -eq 0
-} | Select-Object -First 1
-if(-not $probeRegistered){ throw 'FAIL: ProbeRegistered is missing the registered-runtime overload().' }
-
-$probeResultType='WinPEDeviceLink.Native.DeviceLinkManagerProbeResult' -as [type]
-if(-not $probeResultType){ throw 'FAIL: DeviceLinkManagerProbeResult type was not loaded by the module.' }
-foreach($propertyName in @('Success','FailedPhase','HResultHex','ConfigureResult','DiscoveryInfoAvailable','DiscoveryResult','DiscoveryUrl','TenantId')){
-    if(-not $probeResultType.GetProperty($propertyName)){
-        throw "FAIL: DeviceLinkManagerProbeResult is missing property '$propertyName'."
-    }
-}
-
 
 $configureOverloads=@($type.GetMethods([Reflection.BindingFlags]'Public,Static') | Where-Object Name -eq 'ConfigureRegistered')
 $callbackOverload=$configureOverloads | Where-Object {
@@ -73,10 +43,6 @@ $source=[IO.File]::ReadAllText($sourcePath)
 $requiredContract=@(
     '1F79101B-A792-5008-A82A-A4B232229026',
     'B93C372F-472F-4BEA-B90B-9FAA9BDC178F',
-    'LoadLibraryEx',
-    'DllGetActivationFactory',
-    'ProbeRegistered',
-    'GetDiscoveryUrlRequestInfo',
     'RequestDiscoveryUrlAsync',
     'GetConfigureDeviceLinkResult',
     'ConfigureDeviceLinkAsync',
