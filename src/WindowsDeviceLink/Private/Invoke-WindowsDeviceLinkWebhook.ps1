@@ -55,7 +55,7 @@ function Invoke-WindowsDeviceLinkWebhook {
     catch {
         $statusCode = $null
         try { if ($_.Exception.Response -and $_.Exception.Response.StatusCode) { $statusCode = [int]$_.Exception.Response.StatusCode } } catch {}
-        if ($null -eq $statusCode -and $_.Exception.Message -match '(?<!\d)(400|401|403|404|408|429|500|502|503|504)(?!\d)') { $statusCode = [int]$Matches[1] }
+        if ($null -eq $statusCode -and $_.Exception.Message -match '(?i)\bHTTP\s+(400|401|403|404|408|429|500|502|503|504)\b') { $statusCode = [int]$Matches[1] }
         $detail = Protect-WindowsDeviceLinkSensitiveText -Text ([string]$_.Exception.Message) -SensitiveValue @($WebhookApiKey,[string]$InputObject.DeviceLink)
 
         switch ($statusCode) {
