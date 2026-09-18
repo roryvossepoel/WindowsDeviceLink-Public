@@ -1,5 +1,8 @@
 # Azure backend options
 
+> [!IMPORTANT]
+> The Azure templates in this repository are **reference deployments**: functional, security-conscious starting points rather than a prescribed production landing zone. Network isolation, ingress restrictions, private endpoints, SIEM integration and other environment-specific hardening remain the deploying organization's responsibility. See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
+
 WindowsDeviceLink can send a pre-association request to a server-side receiver instead of authenticating directly to Microsoft Graph from Windows or WinPE.
 
 The client-side module already supports the routing values needed by both receivers:
@@ -67,9 +70,13 @@ Useful when an Automation Account already exists or when a PowerShell-centric op
 
 The current runbook is in [../runbooks](../runbooks).
 
-For cross-tenant use, certificate authentication through a multitenant app registration is the portable option. A managed identity is tied to its home tenant and is therefore suited to same-tenant Automation scenarios, not general cross-tenant routing.
+For same-tenant Azure Automation, Managed Identity is preferred because no application credential needs to be managed. For cross-tenant use, certificate authentication through a multitenant App Registration is the portable option. Client-secret authentication is a fallback, not the preferred design.
 
 ## Deploy to Azure
+
+Both Azure backends now have resource-group deployment templates.
+
+### Azure Function
 
 The Function backend has a resource-group ARM template generated from the Bicep design.
 
@@ -136,7 +143,7 @@ The target tenant must also:
 
 ## Security model
 
-The Azure Function uses its **managed identity only to read its Key Vault secrets**. It does not use that managed identity for cross-tenant Graph calls.
+The Azure Function reference deployment uses its **managed identity only to read Key Vault secrets**. Microsoft Graph authentication in the reference implementation uses the backend App Registration. For cross-tenant use, certificate-based client credentials are preferred; client secret is supported as a fallback.
 
 Microsoft Graph authentication uses the separate multitenant Entra application:
 
@@ -149,6 +156,12 @@ Multitenant backend app + certificate
 ```
 
 This separation avoids storing Graph credentials on Windows/WinPE endpoints and keeps tenant onboarding explicit.
+
+### Azure Automation
+
+[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
+
+The Automation deployment creates the Automation Account, PowerShell 7.4 Runtime Environment, Microsoft.Graph.Authentication package, published runbook, variables, managed identity, and optional certificate asset. The Automation webhook is intentionally created afterwards so its secret URL is not exposed through deployment outputs/history. See [../infrastructure/automation/README.md](../infrastructure/automation/README.md).
 
 
 ## Multitenant lookup

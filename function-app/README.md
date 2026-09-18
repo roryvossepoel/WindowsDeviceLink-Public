@@ -35,7 +35,13 @@ The Function reads these application settings:
 | `WINDOWSDEVICELINK_CERTIFICATE_PASSWORD` | Optional PFX password. |
 | `WINDOWSDEVICELINK_CLIENT_SECRET` | Fallback Graph client secret, normally supplied through a Key Vault reference. |
 
-Certificate authentication is preferred. When both certificate and client secret are configured, the certificate is used.
+For Microsoft Graph authentication in this **reference Function implementation**, certificate-based App Registration authentication is preferred over a client secret. When both are configured, the certificate is used.
+
+The Function's system-assigned Managed Identity is used for Key Vault access in the reference deployment; it is not the Graph identity used by the supplied multi-tenant Function code.
+
+## Deployment scope
+
+The supplied Function App and Deploy to Azure template are a reference deployment, not a complete production network/security architecture. Organizations can add Private Endpoints, access restrictions, API Management, VNet integration or other controls according to their own requirements without changing the webhook schema. See [../docs/SECURITY-HARDENING.md](../docs/SECURITY-HARDENING.md).
 
 ## Security behavior
 

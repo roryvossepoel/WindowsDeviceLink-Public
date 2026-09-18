@@ -21,8 +21,10 @@ $sharedBackendPath = Join-Path $functionRoot 'shared\BackendAuth.ps1'
 $hostPath = Join-Path $functionRoot 'host.json'
 $bicepPath = Join-Path $root 'infrastructure\function-app\main.bicep'
 $armPath = Join-Path $root 'infrastructure\function-app\azuredeploy.json'
+$automationBicepPath = Join-Path $root 'infrastructure\automation\main.bicep'
+$automationArmPath = Join-Path $root 'infrastructure\automation\azuredeploy.json'
 
-foreach ($path in @($runPath,$functionJsonPath,$lookupRunPath,$lookupFunctionJsonPath,$sharedBackendPath,$hostPath,$bicepPath,$armPath)) {
+foreach ($path in @($runPath,$functionJsonPath,$lookupRunPath,$lookupFunctionJsonPath,$sharedBackendPath,$hostPath,$bicepPath,$armPath,$automationBicepPath,$automationArmPath)) {
     Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure backend file is missing: $path"
 }
 
@@ -116,4 +118,26 @@ Assert-True ($bicep -match 'loadTextContent') 'Bicep deployment must source the 
 Assert-True ($bicep -match 'PowerShellVersion.*7\.4|powerShellVersion:\s*''7\.4''') 'Bicep deployment must target PowerShell 7.4.'
 Assert-True ($bicep -match 'enableRbacAuthorization:\s*true') 'Key Vault must use Azure RBAC.'
 
-Write-Host 'PASS: Azure pre-association and multitenant lookup Functions, webhook contract, and deployment templates satisfy static security/contract checks.'
+$automationArm = Get-Content -LiteralPath $automationArmPath -Raw | ConvertFrom-Json
+Assert-True ($automationArm.parameters.webhookApiKey.type -eq 'secureString') 'Automation webhookApiKey must be secureString.'
+Assert-True ($automationArm.parameters.certificateBase64.type -eq 'secureString') 'Automation certificateBase64 must be secureString.'
+
+$automationArmText = Get-Content -LiteralPath $automationArmPath -Raw
+foreach ($needle in @(
+    'Microsoft.Automation/automationAccounts/runtimeEnvironments',
+    'Microsoft.Automation/automationAccounts/runtimeEnvironments/packages',
+    'Microsoft.Automation/automationAccounts/runbooks',
+    'Microsoft.Automation/automationAccounts/variables',
+    'WindowsDeviceLinkWebhookApiKey',
+    'WindowsDeviceLinkTenantConfiguration',
+    'Microsoft.Graph.Authentication',
+    'Register-WindowsDeviceLinkWebhook.ps1'
+)) {
+    Assert-True ($automationArmText.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Automation ARM template is missing expected resource/configuration '$needle'."
+}
+
+Assert-True ($automationArmText.IndexOf('Microsoft.Automation/automationAccounts/webhooks',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Automation template must not create a webhook because the webhook URI is a secret.'
+$automationBicep = Get-Content -LiteralPath $automationBicepPath -Raw
+Assert-True ($automationBicep -match "version:\s*'7\.4'") 'Automation Runtime Environment must target PowerShell 7.4.'
+
+Write-Host 'PASS: Azure Function and Automation backends, webhook contract, and deployment templates satisfy static security/contract checks.'
