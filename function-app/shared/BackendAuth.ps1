@@ -2,6 +2,18 @@ using namespace System.Security.Cryptography
 using namespace System.Security.Cryptography.X509Certificates
 using namespace System.Text
 
+function Test-WindowsDeviceLinkSharedSecret {
+    param(
+        [Parameter(Mandatory)][string]$Expected,
+        [Parameter(Mandatory)][string]$Provided
+    )
+
+    $left = [Encoding]::UTF8.GetBytes($Expected)
+    $right = [Encoding]::UTF8.GetBytes($Provided)
+    if ($left.Length -ne $right.Length) { return $false }
+    [CryptographicOperations]::FixedTimeEquals($left, $right)
+}
+
 function ConvertTo-Base64Url {
     param([Parameter(Mandatory)][byte[]]$Bytes)
     [Convert]::ToBase64String($Bytes).TrimEnd('=').Replace('+','-').Replace('/','_')
