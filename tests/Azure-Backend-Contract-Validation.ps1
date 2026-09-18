@@ -53,7 +53,7 @@ Assert-True ($run.IndexOf('Write-Information $body',[StringComparison]::OrdinalI
 Assert-True ($run.IndexOf('Write-Host $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 Assert-True ($run.IndexOf('Write-Output $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 
-$arm = Get-Content -LiteralPath $armPath -Raw | ConvertFrom-Json -Depth 100
+$arm = Get-Content -LiteralPath $armPath -Raw | ConvertFrom-Json
 Assert-True ($arm.parameters.webhookApiKey.type -eq 'secureString') 'ARM webhookApiKey must be secureString.'
 Assert-True ($arm.parameters.graphCredential.type -eq 'secureString') 'ARM graphCredential must be secureString.'
 Assert-True ($arm.parameters.graphCertificatePassword.type -eq 'secureString') 'ARM graphCertificatePassword must be secureString.'
