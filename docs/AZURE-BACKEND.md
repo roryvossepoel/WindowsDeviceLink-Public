@@ -71,6 +71,10 @@ For cross-tenant use, certificate authentication through a multitenant app regis
 
 ## Deploy to Azure
 
+Both Azure backends now have resource-group deployment templates.
+
+### Azure Function
+
 The Function backend has a resource-group ARM template generated from the Bicep design.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
@@ -149,6 +153,12 @@ Multitenant backend app + certificate
 ```
 
 This separation avoids storing Graph credentials on Windows/WinPE endpoints and keeps tenant onboarding explicit.
+
+### Azure Automation
+
+[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
+
+The Automation deployment creates the Automation Account, PowerShell 7.4 Runtime Environment, Microsoft.Graph.Authentication package, published runbook, variables, managed identity, and optional certificate asset. The Automation webhook is intentionally created afterwards so its secret URL is not exposed through deployment outputs/history. See [../infrastructure/automation/README.md](../infrastructure/automation/README.md).
 
 
 ## Multitenant lookup
