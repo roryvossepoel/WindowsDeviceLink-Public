@@ -127,6 +127,103 @@ namespace WinPEDeviceLink.Native
         private delegate int GetResultsIntDelegate(IntPtr self, out int result);
 
 
+        public static DeviceLinkManagerProbeResult ProbeRegistered()
+        {
+            DeviceLinkManagerProbeResult result = new DeviceLinkManagerProbeResult
+            {
+                Success = false,
+                FailedPhase = null,
+                HResult = 0,
+                HResultHex = null,
+                Message = null,
+                ConfigureResult = Int32.MinValue,
+                DiscoveryInfoAvailable = false,
+                DiscoveryResult = Int32.MinValue,
+                DiscoveryUrl = null,
+                TenantId = null
+            };
+
+            IntPtr className = IntPtr.Zero;
+            IntPtr instance = IntPtr.Zero;
+            IntPtr infoPtr = IntPtr.Zero;
+            IntPtr discoveryUrl = IntPtr.Zero;
+            IntPtr tenantId = IntPtr.Zero;
+            bool uninitialize = false;
+            string phase = "RoInitialize";
+
+            try
+            {
+                int init = RoInitialize(1);
+                uninitialize = init >= 0;
+
+                phase = "WindowsCreateString(DeviceLinkManager)";
+                ThrowIfFailed(WindowsCreateString(RuntimeClassName, RuntimeClassName.Length, out className), phase);
+
+                phase = "RoActivateInstance(DeviceLinkManager)";
+                ThrowIfFailed(RoActivateInstance(className, out instance), phase);
+
+                phase = "GetObjectForIUnknown(DeviceLinkManager)";
+                IDeviceLinkManager manager = (IDeviceLinkManager)Marshal.GetObjectForIUnknown(instance);
+
+                phase = "GetConfigureDeviceLinkResult";
+                int configureResult;
+                ThrowIfFailed(manager.GetConfigureDeviceLinkResult(out configureResult), phase);
+                result.ConfigureResult = configureResult;
+
+                phase = "GetDiscoveryUrlRequestInfo";
+                int infoHr = manager.GetDiscoveryUrlRequestInfo(out infoPtr);
+                ThrowIfFailed(infoHr, phase);
+
+                if (infoPtr != IntPtr.Zero)
+                {
+                    result.DiscoveryInfoAvailable = true;
+                    IDiscoveryUrlRequestInfo info = (IDiscoveryUrlRequestInfo)Marshal.GetObjectForIUnknown(infoPtr);
+
+                    phase = "DiscoveryUrlRequestInfo.ResultValue";
+                    int discoveryResult;
+                    ThrowIfFailed(info.get_DiscoveryUrlRequestResultValue(out discoveryResult), phase);
+                    result.DiscoveryResult = discoveryResult;
+
+                    phase = "DiscoveryUrlRequestInfo.DiscoveryUrl";
+                    ThrowIfFailed(info.get_DiscoveryUrl(out discoveryUrl), phase);
+                    result.DiscoveryUrl = HStringToString(discoveryUrl);
+
+                    phase = "DiscoveryUrlRequestInfo.TenantId";
+                    ThrowIfFailed(info.get_TenantId(out tenantId), phase);
+                    result.TenantId = HStringToString(tenantId);
+                }
+
+                result.Success = true;
+                result.Message = "Registered DeviceLinkManager prerequisite probe succeeded.";
+                return result;
+            }
+            catch (COMException ex)
+            {
+                result.FailedPhase = phase;
+                result.HResult = ex.HResult;
+                result.HResultHex = "0x" + ex.HResult.ToString("X8");
+                result.Message = ex.Message;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.FailedPhase = phase;
+                result.HResult = ex.HResult;
+                result.HResultHex = "0x" + ex.HResult.ToString("X8");
+                result.Message = ex.Message;
+                return result;
+            }
+            finally
+            {
+                if (discoveryUrl != IntPtr.Zero) WindowsDeleteString(discoveryUrl);
+                if (tenantId != IntPtr.Zero) WindowsDeleteString(tenantId);
+                Release(infoPtr);
+                Release(instance);
+                if (className != IntPtr.Zero) WindowsDeleteString(className);
+                if (uninitialize) RoUninitialize();
+            }
+        }
+
         public static DeviceLinkManagerProbeResult Probe(string dllPath)
         {
             DeviceLinkManagerProbeResult result = new DeviceLinkManagerProbeResult
