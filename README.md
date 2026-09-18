@@ -408,6 +408,7 @@ See [`docs/AZURE-BACKEND.md`](docs/AZURE-BACKEND.md), [`docs/MULTITENANT-LOOKUP.
 - [`infrastructure/automation/README.md`](infrastructure/automation/README.md) - Deploy the Azure Automation backend.
 - [`docs/APP-REGISTRATION.md`](docs/APP-REGISTRATION.md) - multitenant Entra app registration and Graph permission.
 - [`docs/MULTITENANT-CONSENT.md`](docs/MULTITENANT-CONSENT.md) - onboarding target tenants with explicit admin consent.
+- [`docs/SECURITY-HARDENING.md`](docs/SECURITY-HARDENING.md) - reference deployment security boundary and optional organization-specific hardening.
 - [`docs/MULTITENANT-LOOKUP.md`](docs/MULTITENANT-LOOKUP.md) - search all managed tenants for the Device Association of a serial number.
 - [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
 - [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCOVER-LINK-RESEARCH.md) - validated DeviceLinkManager contract, discovery and association-completion evidence.
