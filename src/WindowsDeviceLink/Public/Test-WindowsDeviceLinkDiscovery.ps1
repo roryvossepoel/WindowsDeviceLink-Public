@@ -54,10 +54,22 @@ function Test-WindowsDeviceLinkDiscovery {
         $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::DiscoverRegistered($identity.DeviceLink,$TimeoutSeconds)
     }
     elseif ($support.ActivationMode -eq 'DirectDll') {
+        $directDiscover = [WinPEDeviceLink.Native.DeviceLinkManagerClient].GetMethods([Reflection.BindingFlags]'Public,Static') |
+            Where-Object { $_.Name -eq 'Discover' } |
+            Select-Object -First 1
+
+        if (-not $directDiscover) {
+            throw 'The loaded DeviceLinkManagerClient does not include direct-DLL discovery. PowerShell cannot unload Add-Type classes; after updating this research branch, close this PowerShell process, start a new one, and import the module again.'
+        }
+
         $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::Discover($support.DllPath,$identity.DeviceLink,$TimeoutSeconds)
     }
     else {
         throw "Unsupported DeviceLink discovery activation mode '$($support.ActivationMode)'."
+    }
+
+    if ($null -eq $result) {
+        throw 'DeviceLink discovery returned no native result.'
     }
 
     [pscustomobject]@{
