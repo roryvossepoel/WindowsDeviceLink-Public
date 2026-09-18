@@ -361,12 +361,17 @@ The identity-reset and preassociation sequence has been validated on physical AM
 
 WindowsDeviceLink includes two optional Azure reference backends:
 
+### Azure Function
+
+HTTP API backend with pre-association and multitenant lookup.
+
 [![Deploy Azure Function](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
 
-[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
+### Azure Automation
 
-- **Azure Function** — HTTP API backend with pre-association and multitenant lookup.
-- **Azure Automation** — PowerShell runbook backend; the webhook itself is created afterwards so its secret URL is not exposed through deployment output.
+PowerShell runbook backend. The webhook itself is created afterwards so its secret URL is not exposed through deployment output.
+
+[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
 
 These are reference deployments, not prescribed production landing zones. See [Azure backend options](docs/AZURE-BACKEND.md) and [security/hardening guidance](docs/SECURITY-HARDENING.md).
 
