@@ -64,6 +64,7 @@ $expectedFunctions = @(
     'Test-WindowsDeviceLinkAssociationJwt'
     'Test-WindowsDeviceLinkDiscovery'
     'Test-WindowsDeviceLinkHealth'
+    'Test-WindowsDeviceLinkManagerRuntime'
     'Test-WindowsDeviceLinkPreflight'
     'Test-WindowsDeviceLinkRuntime'
     'Test-WindowsDeviceLinkSupport'
@@ -96,7 +97,7 @@ $getLocal = Get-Command Get-WindowsDeviceLink
 Assert-True (-not $getLocal.Parameters.ContainsKey('Online')) 'Get-WindowsDeviceLink unexpectedly exposes -Online.'
 Write-Host 'PASS: local DeviceLink retrieval has no -Online parameter'
 
-foreach ($name in @('Get-WindowsDeviceLinkRepairPlan','Test-WindowsDeviceLinkPreflight','Test-WindowsDeviceLinkAssociationJwt','Test-WindowsDeviceLinkDiscovery','Test-WindowsDeviceLinkRuntime')) {
+foreach ($name in @('Get-WindowsDeviceLinkRepairPlan','Test-WindowsDeviceLinkPreflight','Test-WindowsDeviceLinkAssociationJwt','Test-WindowsDeviceLinkDiscovery','Test-WindowsDeviceLinkRuntime','Test-WindowsDeviceLinkManagerRuntime')) {
     $command = Get-Command $name
     Assert-True (-not $command.Parameters.ContainsKey('WhatIf')) "$name must remain read-only and must not expose -WhatIf."
     Assert-True (-not $command.Parameters.ContainsKey('Confirm')) "$name must remain read-only and must not expose -Confirm."
