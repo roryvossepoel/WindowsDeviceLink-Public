@@ -357,6 +357,19 @@ Complete-WindowsDeviceLinkAssociation
 
 The identity-reset and preassociation sequence has been validated on physical AMD64 hardware. Native completion has separately been validated from a known `Preassociated + 2/4` state to `Associated + 4/4`.
 
+## Azure backend deployment
+
+WindowsDeviceLink includes two optional Azure reference backends:
+
+[![Deploy Azure Function](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
+
+[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
+
+- **Azure Function** — HTTP API backend with pre-association and multitenant lookup.
+- **Azure Automation** — PowerShell runbook backend; the webhook itself is created afterwards so its secret URL is not exposed through deployment output.
+
+These are reference deployments, not prescribed production landing zones. See [Azure backend options](docs/AZURE-BACKEND.md) and [security/hardening guidance](docs/SECURITY-HARDENING.md).
+
 ## Webhook registration
 
 For centralized/unattended workflows:
