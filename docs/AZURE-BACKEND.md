@@ -1,5 +1,8 @@
 # Azure backend options
 
+> [!IMPORTANT]
+> The Azure templates in this repository are **reference deployments**: functional, security-conscious starting points rather than a prescribed production landing zone. Network isolation, ingress restrictions, private endpoints, SIEM integration and other environment-specific hardening remain the deploying organization's responsibility. See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
+
 WindowsDeviceLink can send a pre-association request to a server-side receiver instead of authenticating directly to Microsoft Graph from Windows or WinPE.
 
 The client-side module already supports the routing values needed by both receivers:
@@ -67,7 +70,7 @@ Useful when an Automation Account already exists or when a PowerShell-centric op
 
 The current runbook is in [../runbooks](../runbooks).
 
-For cross-tenant use, certificate authentication through a multitenant app registration is the portable option. A managed identity is tied to its home tenant and is therefore suited to same-tenant Automation scenarios, not general cross-tenant routing.
+For same-tenant Azure Automation, Managed Identity is preferred because no application credential needs to be managed. For cross-tenant use, certificate authentication through a multitenant App Registration is the portable option. Client-secret authentication is a fallback, not the preferred design.
 
 ## Deploy to Azure
 
@@ -140,7 +143,7 @@ The target tenant must also:
 
 ## Security model
 
-The Azure Function uses its **managed identity only to read its Key Vault secrets**. It does not use that managed identity for cross-tenant Graph calls.
+The Azure Function reference deployment uses its **managed identity only to read Key Vault secrets**. Microsoft Graph authentication in the reference implementation uses the backend App Registration. For cross-tenant use, certificate-based client credentials are preferred; client secret is supported as a fallback.
 
 Microsoft Graph authentication uses the separate multitenant Entra application:
 
