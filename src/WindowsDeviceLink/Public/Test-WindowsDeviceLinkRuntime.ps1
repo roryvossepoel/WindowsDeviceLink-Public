@@ -162,7 +162,50 @@ function Test-WindowsDeviceLinkRuntime {
         }
     }
 
-    $probe = [WinPEDeviceLink.Native.DeviceLinkClient]::Test($resolvedPath)
+    # Direct DLL activation is only exercised in Windows PE. On full Windows, DeviceLink
+    # is a registered WinRT component and probing the system DLL through its private
+    # activation factory is unnecessary and has been observed to terminate PowerShell
+    # with a native access violation on some builds.
+    if ($environment -eq 'Windows') {
+        $systemDll = Join-Path $env:SystemRoot 'System32\Windows.Management.Service.dll'
+        $isSystemRuntime = $false
+        try {
+            $isSystemRuntime = ([IO.Path]::GetFullPath($resolvedPath)).TrimEnd('\') -ieq ([IO.Path]::GetFullPath($systemDll)).TrimEnd('\')
+        }
+        catch { }
+
+        if ($isSystemRuntime) {
+            $probe = [WinPEDeviceLink.Native.DeviceLinkClient]::TestRegistered()
+            $activationMode = 'RegisteredWinRT'
+        }
+        else {
+            return [pscustomobject]@{
+                PSTypeName              = 'Windows.DeviceLink.RuntimeProbe'
+                State                   = 'InspectionOnly'
+                Ready                   = $false
+                Environment             = $environment
+                HostArchitecture        = $hostArchitecture
+                DllPath                 = $resolvedPath
+                DllPresent              = $true
+                DllArchitecture         = $pe.Architecture
+                PeMachine               = $pe.Machine
+                FileVersion             = $file.VersionInfo.FileVersion
+                ProductVersion          = $file.VersionInfo.ProductVersion
+                SignatureStatus         = $signatureStatus
+                MicrosoftSigned         = $microsoftSigned
+                ActivationMode          = 'NotAttempted'
+                LoadActivationSucceeded = $false
+                NativeProbe             = $null
+                NativeErrorCode         = $null
+                BlockingReason          = 'Direct DLL activation is intentionally not attempted on full Windows. Use Windows PE for administrator-supplied runtime validation.'
+            }
+        }
+    }
+    else {
+        $probe = [WinPEDeviceLink.Native.DeviceLinkClient]::Test($resolvedPath)
+        $activationMode = 'DirectDll'
+    }
+
     $nativeMessage = [string]$probe.Message
     $nativeErrorCode = $null
 
@@ -207,6 +250,7 @@ function Test-WindowsDeviceLinkRuntime {
         ProductVersion          = $file.VersionInfo.ProductVersion
         SignatureStatus         = $signatureStatus
         MicrosoftSigned         = $microsoftSigned
+        ActivationMode          = $activationMode
         LoadActivationSucceeded = [bool]$probe.Success
         NativeProbe             = $nativeMessage
         NativeErrorCode         = $nativeErrorCode
