@@ -73,6 +73,8 @@ Assert-True ($run.IndexOf('Write-Host $body',[StringComparison]::OrdinalIgnoreCa
 Assert-True ($run.IndexOf('Write-Output $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 
 $lookupRun = Get-Content -LiteralPath $lookupRunPath -Raw
+$sharedBackend = Get-Content -LiteralPath $sharedBackendPath -Raw
+$lookupContract = $lookupRun + [Environment]::NewLine + $sharedBackend
 foreach ($needle in @(
     'serialNumber',
     'X-WindowsDeviceLink-Key',
@@ -84,7 +86,7 @@ foreach ($needle in @(
     'tenantErrors',
     'Get-WindowsDeviceLinkBackendGraphToken'
 )) {
-    Assert-True ($lookupRun.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Lookup Function is missing expected contract text '$needle'."
+    Assert-True ($lookupContract.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Lookup Function/shared backend is missing expected contract text '$needle'."
 }
 
 Assert-True ($lookupRun.IndexOf('device.deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Lookup Function must not retrieve or return DeviceLink payload data.'
