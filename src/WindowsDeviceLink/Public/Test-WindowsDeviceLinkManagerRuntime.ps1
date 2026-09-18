@@ -1,33 +1,57 @@
 function Test-WindowsDeviceLinkManagerRuntime {
     <#
     .SYNOPSIS
-    Performs a read-only prerequisite probe of DeviceLinkManager using an administrator-supplied runtime.
+    Performs a read-only prerequisite probe of DeviceLinkManager.
 
     .DESCRIPTION
-    Intended for Windows PE research. The probe validates the direct-DLL DeviceLinkManager
-    activation path and reads the current configure/discovery request information without
-    invoking RequestDiscoveryUrlAsync or ConfigureDeviceLinkAsync.
+    On full Windows, the registered DeviceLinkManager WinRT runtime is used.
+    In Windows PE, an administrator-supplied Windows.Management.Service.dll is required
+    and activated directly.
+
+    The probe reads current configure/discovery request information without invoking
+    RequestDiscoveryUrlAsync or ConfigureDeviceLinkAsync.
 
     This command does not create/remove a tenant association and does not write DeviceLink
     association state to firmware.
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$WindowsManagementServicePath
     )
 
-    $support = Test-WindowsDeviceLinkSupport -WindowsManagementServicePath $WindowsManagementServicePath
-    if (-not $support.Supported) {
-        throw "DeviceLink isn't supported: $($support.Reason)"
-    }
+    $isWinPE = Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT'
 
-    if ($support.Environment -ne 'WindowsPE' -or $support.ActivationMode -ne 'DirectDll') {
-        throw 'This research probe currently targets Windows PE with an explicitly supplied Windows.Management.Service.dll.'
-    }
+    if ($isWinPE) {
+        if (-not $PSBoundParameters.ContainsKey('WindowsManagementServicePath')) {
+            throw 'Windows PE requires -WindowsManagementServicePath because WindowsDeviceLink does not redistribute the Microsoft runtime.'
+        }
 
-    $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::Probe($support.DllPath)
+        $support = Test-WindowsDeviceLinkSupport -WindowsManagementServicePath $WindowsManagementServicePath
+        if (-not $support.Supported) {
+            throw "DeviceLink isn't supported: $($support.Reason)"
+        }
+        if ($support.ActivationMode -ne 'DirectDll') {
+            throw "Unexpected Windows PE activation mode '$($support.ActivationMode)'."
+        }
+
+        $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::Probe($support.DllPath)
+    }
+    else {
+        if ($PSBoundParameters.ContainsKey('WindowsManagementServicePath')) {
+            throw 'Do not supply -WindowsManagementServicePath on full Windows. The registered WinRT runtime is used as the comparison baseline.'
+        }
+
+        $support = Test-WindowsDeviceLinkSupport
+        if (-not $support.Supported) {
+            throw "DeviceLink isn't supported: $($support.Reason)"
+        }
+        if ($support.ActivationMode -ne 'RegisteredWinRT') {
+            throw "Unexpected full-Windows activation mode '$($support.ActivationMode)'."
+        }
+
+        $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::ProbeRegistered()
+    }
 
     [pscustomobject]@{
         PSTypeName             = 'Windows.DeviceLink.ManagerRuntimeProbe'
