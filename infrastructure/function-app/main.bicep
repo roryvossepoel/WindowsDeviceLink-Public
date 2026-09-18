@@ -13,6 +13,9 @@ param allowedTenantIds string
 @description('Optional default tenant ID when the webhook request does not include tenantId.')
 param defaultTenantId string = ''
 
+@description('Optional JSON object mapping tenant IDs to friendly names used by the multitenant lookup endpoint.')
+param tenantNamesJson string = '{}'
+
 @description('Credential type used by the Function App for Microsoft Graph app-only authentication.')
 @allowed([
   'Certificate'
@@ -47,6 +50,9 @@ var graphCertificatePasswordSecretName = 'windowsdevicelink-graph-certificate-pa
 
 var functionScript = loadTextContent('../../function-app/Register-WindowsDeviceLink/run.ps1')
 var functionConfigText = loadTextContent('../../function-app/Register-WindowsDeviceLink/function.json')
+var lookupFunctionScript = loadTextContent('../../function-app/Lookup-WindowsDeviceLink/run.ps1')
+var lookupFunctionConfigText = loadTextContent('../../function-app/Lookup-WindowsDeviceLink/function.json')
+var backendAuthScript = loadTextContent('../../function-app/shared/BackendAuth.ps1')
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
@@ -173,6 +179,10 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
           value: defaultTenantId
         }
         {
+          name: 'WINDOWSDEVICELINK_TENANT_NAMES_JSON'
+          value: tenantNamesJson
+        }
+        {
           name: 'WINDOWSDEVICELINK_API_KEY'
           value: '@Microsoft.KeyVault(SecretUri=${apiKeySecret.properties.secretUriWithVersion})'
         }
@@ -226,7 +236,28 @@ resource preassociateFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
   ]
 }
 
+
+
+resource lookupFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
+  parent: functionApp
+  name: 'Lookup-WindowsDeviceLink'
+  properties: {
+    language: 'powershell'
+    isDisabled: false
+    config: json(lookupFunctionConfigText)
+    files: {
+      'function.json': lookupFunctionConfigText
+      'run.ps1': lookupFunctionScript
+      'BackendAuth.ps1': backendAuthScript
+    }
+  }
+  dependsOn: [
+    keyVaultSecretsUser
+  ]
+}
+
 output functionAppName string = functionApp.name
 output functionEndpoint string = 'https://${functionApp.properties.defaultHostName}/api/devicelink/preassociate'
+output lookupEndpoint string = 'https://${functionApp.properties.defaultHostName}/api/devicelink/lookup'
 output keyVaultName string = keyVault.name
 output applicationInsightsName string = appInsights.name
