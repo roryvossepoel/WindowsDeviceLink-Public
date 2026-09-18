@@ -1,0 +1,207 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for the Automation Account."
+      }
+    },
+    "automationAccountName": {
+      "type": "string",
+      "defaultValue": "wdl-automation",
+      "metadata": {
+        "description": "Azure Automation Account name."
+      }
+    },
+    "runtimeEnvironmentName": {
+      "type": "string",
+      "defaultValue": "WindowsDeviceLink-PS74"
+    },
+    "runbookName": {
+      "type": "string",
+      "defaultValue": "Register-WindowsDeviceLinkWebhook"
+    },
+    "graphAuthenticationVersion": {
+      "type": "string",
+      "defaultValue": "2.39.0"
+    },
+    "defaultTenantId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "webhookApiKey": {
+      "type": "secureString"
+    },
+    "tenantConfigurationJson": {
+      "type": "string",
+      "defaultValue": "{}"
+    },
+    "certificateBase64": {
+      "type": "secureString",
+      "defaultValue": ""
+    },
+    "certificateAssetName": {
+      "type": "string",
+      "defaultValue": "WindowsDeviceLinkBackend"
+    },
+    "certificateThumbprint": {
+      "type": "string",
+      "defaultValue": ""
+    }
+  },
+  "variables": {
+    "graphPackageUri": "[concat('https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Authentication/', parameters('graphAuthenticationVersion'))]",
+    "runbookUri": "https://raw.githubusercontent.com/roryvossepoel/WindowsDeviceLink-Public/main/runbooks/Register-WindowsDeviceLinkWebhook.ps1"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Automation/automationAccounts",
+      "apiVersion": "2024-10-23",
+      "name": "[parameters('automationAccountName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "publicNetworkAccess": true,
+        "sku": {
+          "name": "Basic"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/runtimeEnvironments",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), parameters('runtimeEnvironmentName'))]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ],
+      "properties": {
+        "description": "WindowsDeviceLink PowerShell 7.4 runtime",
+        "runtime": {
+          "language": "PowerShell",
+          "version": "7.4"
+        },
+        "defaultPackages": {}
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/runtimeEnvironments/packages",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/{1}/Microsoft.Graph.Authentication', parameters('automationAccountName'), parameters('runtimeEnvironmentName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts/runtimeEnvironments', parameters('automationAccountName'), parameters('runtimeEnvironmentName'))]"
+      ],
+      "allOf": {
+        "location": "[parameters('location')]",
+        "tags": {}
+      },
+      "properties": {
+        "contentLink": {
+          "uri": "[variables('graphPackageUri')]",
+          "version": "[parameters('graphAuthenticationVersion')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/runbooks",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), parameters('runbookName'))]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts/runtimeEnvironments/packages', parameters('automationAccountName'), parameters('runtimeEnvironmentName'), 'Microsoft.Graph.Authentication')]"
+      ],
+      "properties": {
+        "description": "WindowsDeviceLink webhook receiver for Device Association pre-association.",
+        "logProgress": false,
+        "logVerbose": false,
+        "runbookType": "PowerShell",
+        "runtimeEnvironment": "[parameters('runtimeEnvironmentName')]",
+        "publishContentLink": {
+          "uri": "[variables('runbookUri')]",
+          "version": "1.0"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/variables",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/WindowsDeviceLinkDefaultTenantId', parameters('automationAccountName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ],
+      "properties": {
+        "description": "Optional default target tenant ID.",
+        "isEncrypted": false,
+        "value": "[parameters('defaultTenantId')]"
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/variables",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/WindowsDeviceLinkWebhookApiKey', parameters('automationAccountName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ],
+      "properties": {
+        "description": "Shared webhook API key expected in X-WindowsDeviceLink-Key.",
+        "isEncrypted": true,
+        "value": "[parameters('webhookApiKey')]"
+      }
+    },
+    {
+      "type": "Microsoft.Automation/automationAccounts/variables",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/WindowsDeviceLinkTenantConfiguration', parameters('automationAccountName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ],
+      "properties": {
+        "description": "Tenant routing/authentication JSON used by the WindowsDeviceLink webhook runbook.",
+        "isEncrypted": false,
+        "value": "[parameters('tenantConfigurationJson')]"
+      }
+    },
+    {
+      "condition": "[not(empty(parameters('certificateBase64')))]",
+      "type": "Microsoft.Automation/automationAccounts/certificates",
+      "apiVersion": "2024-10-23",
+      "name": "[format('{0}/{1}', parameters('automationAccountName'), parameters('certificateAssetName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName'))]"
+      ],
+      "properties": {
+        "base64Value": "[parameters('certificateBase64')]",
+        "description": "WindowsDeviceLink backend certificate for cross-tenant Graph authentication.",
+        "isExportable": false,
+        "thumbprint": "[parameters('certificateThumbprint')]"
+      }
+    }
+  ],
+  "outputs": {
+    "automationAccountName": {
+      "type": "string",
+      "value": "[parameters('automationAccountName')]"
+    },
+    "runtimeEnvironmentName": {
+      "type": "string",
+      "value": "[parameters('runtimeEnvironmentName')]"
+    },
+    "runbookName": {
+      "type": "string",
+      "value": "[parameters('runbookName')]"
+    },
+    "managedIdentityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Automation/automationAccounts', parameters('automationAccountName')), '2024-10-23', 'full').identity.principalId]"
+    },
+    "webhookCreationRequired": {
+      "type": "bool",
+      "value": true
+    }
+  }
+}
