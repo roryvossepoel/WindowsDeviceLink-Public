@@ -22,6 +22,11 @@ function Test-WindowsDeviceLinkManagerRuntime {
 
     $isWinPE = Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT'
 
+    $managerType = 'WinPEDeviceLink.Native.DeviceLinkManagerClient' -as [type]
+    if (-not $managerType) {
+        throw 'DeviceLinkManagerClient is not loaded. Import the WindowsDeviceLink module first.'
+    }
+
     if ($isWinPE) {
         if (-not $PSBoundParameters.ContainsKey('WindowsManagementServicePath')) {
             throw 'Windows PE requires -WindowsManagementServicePath because WindowsDeviceLink does not redistribute the Microsoft runtime.'
@@ -33,6 +38,13 @@ function Test-WindowsDeviceLinkManagerRuntime {
         }
         if ($support.ActivationMode -ne 'DirectDll') {
             throw "Unexpected Windows PE activation mode '$($support.ActivationMode)'."
+        }
+
+        $probeMethod = $managerType.GetMethods([Reflection.BindingFlags]'Public,Static') |
+            Where-Object { $_.Name -eq 'Probe' } |
+            Select-Object -First 1
+        if (-not $probeMethod) {
+            throw 'The loaded DeviceLinkManagerClient does not include Probe(). PowerShell cannot unload Add-Type classes; close this PowerShell process, start a new one, and import the updated module.'
         }
 
         $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::Probe($support.DllPath)
@@ -48,6 +60,13 @@ function Test-WindowsDeviceLinkManagerRuntime {
         }
         if ($support.ActivationMode -ne 'RegisteredWinRT') {
             throw "Unexpected full-Windows activation mode '$($support.ActivationMode)'."
+        }
+
+        $probeRegisteredMethod = $managerType.GetMethods([Reflection.BindingFlags]'Public,Static') |
+            Where-Object { $_.Name -eq 'ProbeRegistered' } |
+            Select-Object -First 1
+        if (-not $probeRegisteredMethod) {
+            throw 'The loaded DeviceLinkManagerClient does not include ProbeRegistered(). PowerShell cannot unload Add-Type classes; close this PowerShell process, start a new one, and import the updated module.'
         }
 
         $result = [WinPEDeviceLink.Native.DeviceLinkManagerClient]::ProbeRegistered()
