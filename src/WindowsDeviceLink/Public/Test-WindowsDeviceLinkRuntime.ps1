@@ -94,6 +94,7 @@ function Test-WindowsDeviceLinkRuntime {
             ProductVersion          = $null
             SignatureStatus         = $null
             MicrosoftSigned         = $false
+            SignatureNote           = $null
             LoadActivationSucceeded = $false
             NativeProbe             = $null
             NativeErrorCode         = $null
@@ -106,13 +107,18 @@ function Test-WindowsDeviceLinkRuntime {
 
     $signatureStatus = $null
     $microsoftSigned = $false
+    $signatureNote = $null
     try {
         $signature = Get-AuthenticodeSignature -LiteralPath $resolvedPath -ErrorAction Stop
         $signatureStatus = [string]$signature.Status
         $microsoftSigned = $signature.Status -eq 'Valid' -and $signature.SignerCertificate -and $signature.SignerCertificate.Subject -match 'Microsoft'
+        if ($signature.Status -eq 'NotSigned') {
+            $signatureNote = 'No embedded Authenticode signature was detected. Windows catalog signing can still apply and is not evaluated by this probe.'
+        }
     }
     catch {
         $signatureStatus = 'Unavailable'
+        $signatureNote = 'Authenticode inspection was unavailable in the current environment.'
     }
 
     $hostSupported = [Environment]::Is64BitProcess -and $hostArchitecture -eq 'AMD64'
@@ -133,6 +139,7 @@ function Test-WindowsDeviceLinkRuntime {
             ProductVersion          = $file.VersionInfo.ProductVersion
             SignatureStatus         = $signatureStatus
             MicrosoftSigned         = $microsoftSigned
+            SignatureNote           = $signatureNote
             LoadActivationSucceeded = $false
             NativeProbe             = $null
             NativeErrorCode         = $null
@@ -155,6 +162,7 @@ function Test-WindowsDeviceLinkRuntime {
             ProductVersion          = $file.VersionInfo.ProductVersion
             SignatureStatus         = $signatureStatus
             MicrosoftSigned         = $microsoftSigned
+            SignatureNote           = $signatureNote
             LoadActivationSucceeded = $false
             NativeProbe             = $null
             NativeErrorCode         = $null
@@ -193,6 +201,7 @@ function Test-WindowsDeviceLinkRuntime {
                 ProductVersion          = $file.VersionInfo.ProductVersion
                 SignatureStatus         = $signatureStatus
                 MicrosoftSigned         = $microsoftSigned
+                SignatureNote           = $signatureNote
                 ActivationMode          = 'NotAttempted'
                 LoadActivationSucceeded = $false
                 NativeProbe             = $null
@@ -250,6 +259,7 @@ function Test-WindowsDeviceLinkRuntime {
         ProductVersion          = $file.VersionInfo.ProductVersion
         SignatureStatus         = $signatureStatus
         MicrosoftSigned         = $microsoftSigned
+        SignatureNote           = $signatureNote
         ActivationMode          = $activationMode
         LoadActivationSucceeded = [bool]$probe.Success
         NativeProbe             = $nativeMessage
