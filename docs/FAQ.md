@@ -433,13 +433,28 @@ The reappearance of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` after reboot 
 
 ## Can the module be used in WinPE?
 
-The identity, firmware and Device Association operations have been validated in AMD64 WinPE when a compatible user-supplied `Windows.Management.Service.dll` is provided.
+Yes. The identity, firmware and tenant-side Device Association operations have been validated in AMD64 WinPE when a compatible administrator-supplied `Windows.Management.Service.dll` is provided.
 
 The Microsoft DLL is intentionally not redistributed by this project.
 
-Native device-side association completion currently requires full Windows with the registered DeviceLink WinRT runtime.
+The normal WinPE deployment flow is:
 
-See [INSTALLATION.md](INSTALLATION.md).
+```text
+WinPE
+  -> generate/read DeviceLink identity
+  -> create tenant-side pre-association
+  -> install Windows 11
+  -> OOBE connects to the network
+  -> Windows completes Device Association automatically
+```
+
+Microsoft documents that pre-associated devices complete Device Association automatically when they connect to a network during OOBE. Because WinPE is normally used before installing Windows 11, native association completion inside WinPE is not required for this standard flow.
+
+Direct DeviceLinkManager activation has been validated in WinPE, but native discovery currently fails at `RequestDiscoveryUrlAsync` with HRESULT `0x81036C00`. Native discovery/completion in WinPE is therefore experimental and not currently treated as a supported workflow.
+
+Full Windows remains the validated environment for explicit native discovery and `ConfigureDeviceLinkAsync`.
+
+See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md) and [INSTALLATION.md](INSTALLATION.md).
 
 ## Which command changes which layer?
 
@@ -461,3 +476,4 @@ See [INSTALLATION.md](INSTALLATION.md).
 - [REMOVE-ASSOCIATION.md](REMOVE-ASSOCIATION.md)
 - [DISCOVER-LINK-RESEARCH.md](DISCOVER-LINK-RESEARCH.md)
 - [INSTALLATION.md](INSTALLATION.md)
+- [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md)
