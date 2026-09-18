@@ -2,6 +2,9 @@
 
 This folder deploys the Azure Automation backend for WindowsDeviceLink.
 
+> [!NOTE]
+> This is a **reference deployment**. It deliberately does not attempt to implement every possible networking, Private Link, SIEM, firewall or enterprise-hardening pattern. See [../../docs/SECURITY-HARDENING.md](../../docs/SECURITY-HARDENING.md).
+
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
 
 ## What is deployed
@@ -47,7 +50,9 @@ Copy the URI immediately to your password manager / deployment secret store.
 
 ## Single-tenant Managed Identity
 
-For a same-tenant receiver:
+For a same-tenant receiver, Managed Identity is the preferred Graph authentication method because no application secret or certificate private key needs to be managed:
+
+
 
 1. deploy with `tenantConfigurationJson = {}`;
 2. set `defaultTenantId` to that tenant;
