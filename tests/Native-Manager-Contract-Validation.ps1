@@ -12,11 +12,21 @@ Import-Module $ModulePath -Force -ErrorAction Stop
 $type='WinPEDeviceLink.Native.DeviceLinkManagerClient' -as [type]
 if(-not $type){ throw 'FAIL: DeviceLinkManagerClient type was not loaded by the module.' }
 
-$required=@('DiscoverRegistered','ConfigureRegistered')
+$required=@('Discover','DiscoverRegistered','ConfigureRegistered')
 $publicStatic=@($type.GetMethods([Reflection.BindingFlags]'Public,Static') | Select-Object -ExpandProperty Name -Unique)
 foreach($name in $required){
     if($name -notin $publicStatic){ throw "FAIL: DeviceLinkManagerClient is missing public static method '$name'." }
 }
+
+$directDiscover=$type.GetMethods([Reflection.BindingFlags]'Public,Static') | Where-Object Name -eq 'Discover' | Where-Object {
+    $parameters=$_.GetParameters()
+    $parameters.Count -eq 3 -and
+    $parameters[0].ParameterType -eq [string] -and
+    $parameters[1].ParameterType -eq [string] -and
+    $parameters[2].ParameterType -eq [int]
+} | Select-Object -First 1
+if(-not $directDiscover){ throw 'FAIL: Discover is missing the direct-DLL overload (string dllPath, string deviceLinkBase64, int timeoutSeconds).' }
+
 
 $configureOverloads=@($type.GetMethods([Reflection.BindingFlags]'Public,Static') | Where-Object Name -eq 'ConfigureRegistered')
 $callbackOverload=$configureOverloads | Where-Object {
@@ -43,6 +53,8 @@ $source=[IO.File]::ReadAllText($sourcePath)
 $requiredContract=@(
     '1F79101B-A792-5008-A82A-A4B232229026',
     'B93C372F-472F-4BEA-B90B-9FAA9BDC178F',
+    'LoadLibraryEx',
+    'DllGetActivationFactory',
     'RequestDiscoveryUrlAsync',
     'GetConfigureDeviceLinkResult',
     'ConfigureDeviceLinkAsync',
