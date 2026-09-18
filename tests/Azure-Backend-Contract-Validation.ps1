@@ -41,7 +41,7 @@ foreach ($needle in @(
     'X-WindowsDeviceLink-RequestId',
     'WINDOWSDEVICELINK_ALLOWED_TENANTS',
     'WINDOWSDEVICELINK_CLIENT_ID',
-    'DeviceManagementServiceConfig',
+    'https://graph.microsoft.com/.default',
     'importTenantAssociatedDevice',
     'FixedTimeEquals',
     'AssociationConflict'
