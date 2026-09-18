@@ -20,9 +20,9 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 
 ## Current version
 
-The current preview release line is `0.5.1-preview1`.
+The current preview release line is `0.5.2-preview1`.
 
-This preview adds progress visibility and timing telemetry to guarded device-side association completion, while preserving the explicit separation between local identity, local firmware, native device-side association, and tenant-side Device Association operations. The completion flow has been validated end to end on physical AMD64 Windows 11 hardware.
+This preview adds a read-only runtime diagnostic for administrator-supplied `Windows.Management.Service.dll` files, documents the validated WinPE pre-association -> Windows 11 OOBE flow, and clarifies the support boundary for native discovery/completion in WinPE. It also retains the completion progress/timing telemetry introduced in 0.5.1-preview1.
 
 ## Mental model
 
@@ -393,6 +393,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 | `Test-WindowsDeviceLinkDiscovery` | Perform read-only native DeviceLink association discovery. |
 | `Test-WindowsDeviceLinkHealth` | Non-destructively classify a status object into machine-readable health/lifecycle states. |
 | `Test-WindowsDeviceLinkPreflight` | Assess local runtime, firmware, TPM, Secure Boot and DeviceLink prerequisites. |
+| `Test-WindowsDeviceLinkRuntime` | Read-only validation of an administrator-supplied DeviceLink runtime DLL, including architecture, version, signature context and activation. |
 | `Test-WindowsDeviceLinkSupport` | Validate runtime, architecture and DeviceLink activation. |
 
 ## Documentation
@@ -421,7 +422,7 @@ See [`TESTING.md`](TESTING.md) and [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCO
 
 ## Scope
 
-Preview release line: `0.5.1-preview1`.
+Preview release line: `0.5.2-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/preassociation/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure Automation receiver.
 

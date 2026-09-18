@@ -3,7 +3,7 @@
 This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL. For the intended pre-association -> Windows 11 OOBE lifecycle and the WinPE native-completion boundary, see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 > [!IMPORTANT]
-> WindowsDeviceLink is currently preview software. The published version documented here is `0.5.1-preview1`.
+> WindowsDeviceLink is currently preview software. The published version documented here is `0.5.2-preview1`.
 
 ## Quick start - Windows 11
 
@@ -59,7 +59,7 @@ This distinction matters when multiple PowerShellGet versions are present. A Pow
 
 ## Prerelease support
 
-WindowsDeviceLink `0.5.1-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
+WindowsDeviceLink `0.5.2-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
 
 ```powershell
 Install-Module WindowsDeviceLink `
@@ -125,7 +125,7 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-For `0.5.1-preview1`, verify the exported command set directly:
+For `0.5.2-preview1`, verify the exported command set directly:
 
 ```powershell
 Get-Command -Module WindowsDeviceLink |
@@ -133,7 +133,7 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-The WinPE runtime research branch additionally introduces the read-only `Test-WindowsDeviceLinkRuntime` diagnostic before it is considered for the next preview release.
+`0.5.2-preview1` includes the read-only `Test-WindowsDeviceLinkRuntime` diagnostic for validating an administrator-supplied runtime DLL before using DeviceLink identity workflows.
 
 Then run:
 
@@ -183,7 +183,7 @@ The current preview remains unsigned while the project remains unsigned. In the 
 
 This is documented as a WinPE installation limitation/workaround for the unsigned preview, not as a WindowsDeviceLink runtime failure.
 
-### Recommended WinPE installation for 0.5.1-preview1
+### Recommended WinPE installation for 0.5.2-preview1
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -213,10 +213,10 @@ Save-Module WindowsDeviceLink `
     -Force
 ```
 
-Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.5.1`:
+Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.5.2`:
 
 ```powershell
-Import-Module 'X:\Temp\WindowsDeviceLink\0.5.1\WindowsDeviceLink.psd1' -Force
+Import-Module 'X:\Temp\WindowsDeviceLink\0.5.2\WindowsDeviceLink.psd1' -Force
 ```
 
 ## Windows.Management.Service.dll in WinPE
@@ -232,7 +232,7 @@ A compatible AMD64 copy must be supplied by the user for DeviceLink runtime acti
 For example:
 
 ```text
-X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.5.1\Runtime\Windows.Management.Service.dll
+X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.5.2\Runtime\Windows.Management.Service.dll
 ```
 
 Or pass the DLL explicitly to commands that expose `-WindowsManagementServicePath`.

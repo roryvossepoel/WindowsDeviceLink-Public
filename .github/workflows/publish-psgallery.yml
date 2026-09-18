@@ -84,6 +84,7 @@ jobs:
               'Test-WindowsDeviceLinkDiscovery',
               'Test-WindowsDeviceLinkHealth',
               'Test-WindowsDeviceLinkPreflight',
+              'Test-WindowsDeviceLinkRuntime',
               'Test-WindowsDeviceLinkSupport'
           )
           foreach ($function in $requiredFunctions) {
