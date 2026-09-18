@@ -315,7 +315,7 @@ try {
     }
 }
 catch {
-    Write-Error "DeviceLink backend request failed. RequestId=$requestId TenantId=$tenantId ErrorType=$($_.Exception.GetType().Name)"
+    Write-Warning "DeviceLink backend request failed. RequestId=$requestId TenantId=$tenantId ErrorType=$($_.Exception.GetType().Name)"
     Write-JsonResponse -StatusCode 502 -Body @{
         success = $false
         requestId = $requestId
