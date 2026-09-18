@@ -6,6 +6,8 @@ The endpoint receives a DeviceLink generated locally on Windows/WinPE and perfor
 
 For the Azure Function alternative and common backend architecture, see [../docs/AZURE-BACKEND.md](../docs/AZURE-BACKEND.md).
 
+A Deploy to Azure template for the Automation backend is available in [../infrastructure/automation](../infrastructure/automation). It creates the account, PowerShell 7.4 Runtime Environment, Graph authentication package, runbook and configuration assets. The webhook is intentionally created afterwards because its URL is a secret.
+
 ## Runtime Environment
 
 Use an Azure Automation Runtime Environment with PowerShell 7.4 and `Microsoft.Graph.Authentication`.
