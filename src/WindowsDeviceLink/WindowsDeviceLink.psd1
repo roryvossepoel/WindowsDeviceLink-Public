@@ -25,6 +25,7 @@
         'Test-WindowsDeviceLinkDiscovery'
         'Test-WindowsDeviceLinkHealth'
         'Test-WindowsDeviceLinkPreflight'
+        'Test-WindowsDeviceLinkRuntime'
         'Test-WindowsDeviceLinkSupport'
     )
     CmdletsToExport   = @()

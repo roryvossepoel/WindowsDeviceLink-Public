@@ -16,6 +16,7 @@ WindowsDeviceLink can generate the TPM-backed DeviceLink identity, export the of
 - **New to Device Preparation?** Read [Windows Autopilot v1 vs Windows Autopilot device preparation](docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md).
 - **Want to know which command to run?** See the [WindowsDeviceLink FAQ / common operations](docs/FAQ.md).
 - **Installing on Windows 11 or WinPE?** Read the [installation guide](docs/INSTALLATION.md).
+- **Using WinPE before Windows installation?** Read the [WinPE workflow and support boundaries](docs/WINPE-WORKFLOW.md).
 
 ## Current version
 
@@ -161,7 +162,7 @@ You can also query the exact record with `-AssociationId`. The cmdlet returns te
 
 ## Discover device-side association routing
 
-`Test-WindowsDeviceLinkDiscovery` performs the native DeviceLink discovery phase without invoking configure or changing association firmware state:
+`Test-WindowsDeviceLinkDiscovery` performs the native DeviceLink discovery phase without invoking configure or changing association firmware state. Native discovery is validated on full Windows. In WinPE, direct runtime activation and DeviceLink identity generation work with an administrator-supplied runtime, but native discovery currently fails at `RequestDiscoveryUrlAsync` with HRESULT `0x81036C00`; this is not required for the normal WinPE pre-association -> Windows 11 OOBE flow:
 
 ```powershell
 Test-WindowsDeviceLinkDiscovery | Format-List *
@@ -399,6 +400,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md) and [`runbooks/READ
 - [`docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md`](docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md) - classic Windows Autopilot vs Windows Autopilot device preparation, terminology, lifecycle and coexistence.
 - [`docs/FAQ.md`](docs/FAQ.md) - practical common operations: what to run to preassociate, complete, remove, reset, restart, move tenants, or troubleshoot.
 - [`docs/INSTALLATION.md`](docs/INSTALLATION.md) - Windows 11 and WinPE installation, PowerShellGet/PackageManagement and troubleshooting.
+- [`docs/WINPE-WORKFLOW.md`](docs/WINPE-WORKFLOW.md) - WinPE pre-association workflow, administrator-supplied runtime, and native discovery/completion support boundary.
 - [`docs/ONLINE-METHODS.md`](docs/ONLINE-METHODS.md) - cloud operations and authentication methods.
 - [`docs/FIRMWARE-STATE.md`](docs/FIRMWARE-STATE.md) - UEFI state and validated reset lifecycle.
 - [`docs/DISCOVER-LINK-RESEARCH.md`](docs/DISCOVER-LINK-RESEARCH.md) - validated DeviceLinkManager contract, discovery and association-completion evidence.

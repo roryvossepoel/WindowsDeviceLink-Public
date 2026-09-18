@@ -1,9 +1,9 @@
 # WindowsDeviceLink installation guide
 
-This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL.
+This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL. For the intended pre-association -> Windows 11 OOBE lifecycle and the WinPE native-completion boundary, see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 > [!IMPORTANT]
-> WindowsDeviceLink is currently preview software. The published version documented here is `0.4.4-preview1`.
+> WindowsDeviceLink is currently preview software. The published version documented here is `0.5.1-preview1`.
 
 ## Quick start - Windows 11
 
@@ -59,7 +59,7 @@ This distinction matters when multiple PowerShellGet versions are present. A Pow
 
 ## Prerelease support
 
-WindowsDeviceLink `0.4.4-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
+WindowsDeviceLink `0.5.1-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
 
 ```powershell
 Install-Module WindowsDeviceLink `
@@ -125,22 +125,15 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-For `0.4.4-preview1`, the public commands are:
+For `0.5.1-preview1`, verify the exported command set directly:
 
-```text
-Connect-WindowsDeviceLink
-Export-WindowsDeviceLinkCsv
-Get-WindowsDeviceLink
-Get-WindowsDeviceLinkAssociation
-Get-WindowsDeviceLinkFirmwareState
-Get-WindowsDeviceLinkStatus
-Initialize-WindowsDeviceLink
-Register-WindowsDeviceLink
-Remove-WindowsDeviceLinkAssociation
-Reset-WindowsDeviceLinkFirmwareState
-Test-WindowsDeviceLinkHealth
-Test-WindowsDeviceLinkSupport
+```powershell
+Get-Command -Module WindowsDeviceLink |
+    Sort-Object Name |
+    Select-Object Name
 ```
+
+The WinPE runtime research branch additionally introduces the read-only `Test-WindowsDeviceLinkRuntime` diagnostic before it is considered for the next preview release.
 
 Then run:
 
@@ -186,11 +179,11 @@ The Gallery smoke tests were performed in AMD64 WinPE with PowerShellGet `2.2.5`
 
 ### Current WinPE install behavior for unsigned preview packages
 
-The current preview remains unsigned while the SignPath Foundation application is in progress. In the validated AMD64 WinPE environment, normal `Install-Module ... -AllowPrerelease -Force` can fail with `InvalidModuleAuthenticodeSignature`, while `Find-Module`, `Save-Module`, direct import, and installation with `-SkipPublisherCheck` work.
+The current preview remains unsigned while the project remains unsigned. In the validated AMD64 WinPE environment, normal `Install-Module ... -AllowPrerelease -Force` can fail with `InvalidModuleAuthenticodeSignature`, while `Find-Module`, `Save-Module`, direct import, and installation with `-SkipPublisherCheck` work.
 
 This is documented as a WinPE installation limitation/workaround for the unsigned preview, not as a WindowsDeviceLink runtime failure.
 
-### Recommended WinPE installation for 0.4.4-preview1
+### Recommended WinPE installation for 0.5.1-preview1
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -204,7 +197,7 @@ Install-Module WindowsDeviceLink `
 
 `-SkipPublisherCheck` bypasses PowerShellGet's publisher check. Use it only when you intentionally trust the package source and understand the tradeoff. It is **not** required for the validated Windows 11 installation.
 
-The project plans to add trusted code signing and retest whether this WinPE workaround can then be removed.
+The SignPath Foundation application was reviewed but not approved at this stage because the project does not yet have enough external adoption/visibility signals. Code signing can be revisited as the project grows.
 
 ### WinPE fallback: Save-Module + Import-Module
 
@@ -220,10 +213,10 @@ Save-Module WindowsDeviceLink `
     -Force
 ```
 
-Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.4.4`:
+Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.5.1`:
 
 ```powershell
-Import-Module 'X:\Temp\WindowsDeviceLink\0.4.4\WindowsDeviceLink.psd1' -Force
+Import-Module 'X:\Temp\WindowsDeviceLink\0.5.1\WindowsDeviceLink.psd1' -Force
 ```
 
 ## Windows.Management.Service.dll in WinPE
@@ -239,7 +232,7 @@ A compatible AMD64 copy must be supplied by the user for DeviceLink runtime acti
 For example:
 
 ```text
-X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.4.4\Runtime\Windows.Management.Service.dll
+X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.5.1\Runtime\Windows.Management.Service.dll
 ```
 
 Or pass the DLL explicitly to commands that expose `-WindowsManagementServicePath`.
@@ -265,7 +258,7 @@ Architecture   : AMD64
 ActivationMode : DirectDll
 ```
 
-After supplying a compatible DLL, the validated result reports support with direct-DLL activation. The installed `0.4.4-preview1` package has been smoke-tested this way on physical AMD64 WinPE hardware.
+After supplying a compatible DLL, the validated result reports support with direct-DLL activation. Identity generation/readout and the WinPE pre-association workflow have been validated on physical AMD64 hardware. Native DeviceLink discovery/completion in WinPE is not currently a supported workflow; see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 ## Validate status and health
 
@@ -407,11 +400,12 @@ For a Gallery smoke test, make sure `Get-Module WindowsDeviceLink` points to the
 - Prefer PSGallery over arbitrary download locations.
 - Do not publish or log DeviceLink payloads, raw firmware JWT data, tenant secrets, API keys, certificate private keys, serial-number test data, or exported identity files.
 - `-SkipPublisherCheck` reduces a publisher-verification control. It is a current WinPE workaround for the unsigned preview, not the preferred long-term state.
-- WindowsDeviceLink plans to introduce trusted code signing and then retest the WinPE installation path without `-SkipPublisherCheck`.
+- If trusted code signing is added later, the WinPE installation path should be retested without `-SkipPublisherCheck`.
 - The separately supplied Microsoft DLL remains subject to Microsoft's licensing and redistribution terms.
 
 ## Related documentation
 
+- [`WINPE-WORKFLOW.md`](WINPE-WORKFLOW.md)
 - [`FIRMWARE-STATE.md`](FIRMWARE-STATE.md)
 - [`ONLINE-METHODS.md`](ONLINE-METHODS.md)
 - [`REMOVE-ASSOCIATION.md`](REMOVE-ASSOCIATION.md)
