@@ -15,6 +15,7 @@
         'Get-WindowsDeviceLink'
         'Get-WindowsDeviceLinkAssociation'
         'Get-WindowsDeviceLinkFirmwareState'
+        'Get-WindowsDeviceLinkDiscoveryPrerequisites'
         'Get-WindowsDeviceLinkRepairPlan'
         'Get-WindowsDeviceLinkStatus'
         'Initialize-WindowsDeviceLink'
