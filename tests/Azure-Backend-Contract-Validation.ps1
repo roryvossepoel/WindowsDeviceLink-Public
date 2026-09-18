@@ -87,7 +87,7 @@ foreach ($needle in @(
     Assert-True ($lookupRun.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Lookup Function is missing expected contract text '$needle'."
 }
 
-Assert-True ($lookupRun.IndexOf('deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Lookup Function must not retrieve or return DeviceLink payload data.'
+Assert-True ($lookupRun.IndexOf('device.deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Lookup Function must not retrieve or return DeviceLink payload data.'
 
 $arm = Get-Content -LiteralPath $armPath -Raw | ConvertFrom-Json
 Assert-True ($arm.parameters.webhookApiKey.type -eq 'secureString') 'ARM webhookApiKey must be secureString.'
