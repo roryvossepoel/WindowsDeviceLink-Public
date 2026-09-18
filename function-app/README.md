@@ -6,10 +6,11 @@ The Function accepts the existing webhook schema v1 and performs the tenant-side
 
 ## Endpoint
 
-Default route:
+Endpoints:
 
 ```text
 POST /api/devicelink/preassociate
+GET  /api/devicelink/lookup?serialNumber=<serial>
 ```
 
 The module sends:
@@ -29,6 +30,7 @@ The Function reads these application settings:
 | `WINDOWSDEVICELINK_CLIENT_ID` | Client ID of the multitenant Entra application. |
 | `WINDOWSDEVICELINK_ALLOWED_TENANTS` | Comma/semicolon-separated allow list of target tenant IDs. Required; backend fails closed when empty. |
 | `WINDOWSDEVICELINK_DEFAULT_TENANT_ID` | Optional default tenant when the request omits `tenantId`. |
+| `WINDOWSDEVICELINK_TENANT_NAMES_JSON` | Optional tenant ID -> friendly name mapping used by lookup responses. |
 | `WINDOWSDEVICELINK_CERTIFICATE_PFX_BASE64` | Preferred Graph credential: base64 PFX, normally supplied through a Key Vault reference. |
 | `WINDOWSDEVICELINK_CERTIFICATE_PASSWORD` | Optional PFX password. |
 | `WINDOWSDEVICELINK_CLIENT_SECRET` | Fallback Graph client secret, normally supplied through a Key Vault reference. |
@@ -64,3 +66,19 @@ See:
 - [../docs/APP-REGISTRATION.md](../docs/APP-REGISTRATION.md)
 - [../docs/MULTITENANT-CONSENT.md](../docs/MULTITENANT-CONSENT.md)
 - [../docs/WEBHOOK-SCHEMA-v1.md](../docs/WEBHOOK-SCHEMA-v1.md)
+
+
+## Multitenant lookup
+
+The second HTTP function searches all allowed tenants for a Device Association by serial number:
+
+```powershell
+Invoke-RestMethod `
+    -Method GET `
+    -Uri 'https://<app>.azurewebsites.net/api/devicelink/lookup?serialNumber=ABC123' `
+    -Headers @{ 'X-WindowsDeviceLink-Key' = $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY }
+```
+
+It first tries the Graph serial-number filter and then falls back to paged client-side matching when needed.
+
+See [../docs/MULTITENANT-LOOKUP.md](../docs/MULTITENANT-LOOKUP.md).
