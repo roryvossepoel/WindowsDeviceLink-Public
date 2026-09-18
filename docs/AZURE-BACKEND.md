@@ -86,7 +86,8 @@ The deployment creates:
 - Key Vault Secrets User role assignment;
 - webhook API-key secret;
 - Graph credential secret;
-- inline `Register-WindowsDeviceLink` HTTP function.
+- inline `Register-WindowsDeviceLink` HTTP function;
+- inline `Lookup-WindowsDeviceLink` multitenant search function.
 
 The template intentionally does **not** create the multitenant Entra application or grant admin consent in other tenants. Those are identity-governance actions and remain explicit administrator steps.
 
@@ -97,6 +98,7 @@ The template asks for:
 - `graphClientId`;
 - `allowedTenantIds`;
 - optional `defaultTenantId`;
+- optional `tenantNamesJson` for friendly lookup results;
 - `graphCredentialType` (`Certificate` preferred, `ClientSecret` supported);
 - secure Graph credential;
 - optional certificate password;
@@ -147,3 +149,18 @@ Multitenant backend app + certificate
 ```
 
 This separation avoids storing Graph credentials on Windows/WinPE endpoints and keeps tenant onboarding explicit.
+
+
+## Multitenant lookup
+
+The same Function App also exposes:
+
+```text
+GET /api/devicelink/lookup?serialNumber=<serial>
+```
+
+The endpoint searches the configured allowed tenants and reports where the serial number has a Device Association.
+
+This is intentionally a backend/operator API and does not require WindowsDeviceLink to be installed on the lookup client.
+
+See [MULTITENANT-LOOKUP.md](MULTITENANT-LOOKUP.md).
