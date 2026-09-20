@@ -194,10 +194,7 @@ WindowsDeviceLink provides separate commands for the local and tenant-side opera
 ```powershell
 Reset-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru
 
-Remove-WindowsDeviceLinkAssociation `
-    -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+Remove-WindowsDeviceLinkAssociation -Method Interactive
 ```
 
 The operations are intentionally not combined automatically. See [OFFBOARDING.md](OFFBOARDING.md) for the complete flow.
