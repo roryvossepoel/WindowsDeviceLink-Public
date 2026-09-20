@@ -73,7 +73,7 @@ function Test-AllowedMicrosoftUri {
 
     if ($Uri.Scheme -ne 'https') { return $false }
 
-    $host = $Uri.Host.ToLowerInvariant()
+    $uriHost = $Uri.Host.ToLowerInvariant()
     $allowedSuffixes = @(
         '.microsoft.com',
         '.microsoftonline.com',
@@ -83,7 +83,7 @@ function Test-AllowedMicrosoftUri {
     )
 
     foreach ($suffix in $allowedSuffixes) {
-        if ($host -eq $suffix.TrimStart('.') -or $host.EndsWith($suffix)) { return $true }
+        if ($uriHost -eq $suffix.TrimStart('.') -or $uriHost.EndsWith($suffix)) { return $true }
     }
 
     return $false
