@@ -78,7 +78,6 @@ function Register-WindowsDeviceLink {
             }
 
             switch ($Method) {
-                'DeviceCode' { if (-not $TenantId) { throw '-TenantId is required for -Method DeviceCode.' } }
                 'Interactive' { if (-not $TenantId) { throw '-TenantId is required for -Method Interactive.' } }
                 'ClientSecret' {
                     if (-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')) {
@@ -128,11 +127,13 @@ function Register-WindowsDeviceLink {
             try {
                 switch ($Method) {
                     'DeviceCode' {
-                        $tokenParameters = @{ TenantId = $TenantId }
+                        $tokenParameters = @{}
+                        if ($TenantId) { $tokenParameters.TenantId = $TenantId }
                         if ($ClientId) { $tokenParameters.ClientId = $ClientId }
                         Write-Information -InformationAction Continue -MessageData 'Using native OAuth device-code authentication for Device Association registration.'
                         $token = Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters
                         $plainToken = $token.AccessToken
+                        $TenantId = $token.TenantId
                     }
                     'ClientSecret' {
                         Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication for Device Association registration.'
