@@ -31,7 +31,6 @@ function Get-WindowsDeviceLinkAssociation {
     if ($invalidParameters) { throw "The following parameters are not valid with -Method $Method`: $($invalidParameters -join ', ')." }
 
     switch ($Method) {
-        'Interactive' { if(-not $TenantId){throw '-TenantId is required for -Method Interactive.'} }
         'ClientSecret' { if(-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')){throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'} }
         'AccessToken' { if(-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')){throw '-TenantId and -AccessToken are required for -Method AccessToken.'} }
         'Certificate' { if(-not $TenantId -or -not $ClientId -or -not $Certificate){throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.'} }
@@ -55,7 +54,7 @@ function Get-WindowsDeviceLinkAssociation {
     } else {
         $connectParams=@{Environment=$Environment;ClientTimeout=$ClientTimeout}
         switch($Method){
-            'Interactive'{$connectParams.TenantId=$TenantId;if($ClientId){$connectParams.ClientId=$ClientId}}
+            'Interactive'{if($TenantId){$connectParams.TenantId=$TenantId};if($ClientId){$connectParams.ClientId=$ClientId}}
             'Certificate'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.Certificate=$Certificate;$connectParams.SendCertificateChain=$SendCertificateChain}
             'CertificateThumbprint'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.CertificateThumbprint=$CertificateThumbprint;$connectParams.SendCertificateChain=$SendCertificateChain}
             'CertificateSubjectName'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.CertificateSubjectName=$CertificateSubjectName;$connectParams.SendCertificateChain=$SendCertificateChain}
