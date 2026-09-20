@@ -4,6 +4,35 @@ WindowsDeviceLink can inspect and reset the local firmware state used by Windows
 
 This functionality is separate from the server-side `tenantAssociatedDevices` record in Microsoft Intune.
 
+## Where the state lives
+
+```mermaid
+flowchart TB
+    subgraph CLOUD["Microsoft cloud"]
+        AP["Classic Autopilot registration<br/>Separate lifecycle"]
+        DA["Device Association<br/>tenantAssociatedDevice"]
+    end
+
+    subgraph DEVICE["Physical device"]
+        ID["Local DeviceLink identity<br/>DeviceLinkId<br/>DeviceLinkCreationTimeUtc"]
+        UEFI["Completed association state<br/>DeviceLinkJwtCompressed<br/>DeviceLinkJwtLastWrite"]
+    end
+
+    G["Get-WindowsDeviceLink"]
+    R["Register / Remove-WindowsDeviceLinkAssociation"]
+    F["Reset-WindowsDeviceLinkFirmwareState"]
+
+    G -. "reads" .-> ID
+    R -. "manages" .-> DA
+    F -. "resets" .-> ID
+    F -. "resets" .-> UEFI
+
+    DA <-->|"Association lifecycle"| UEFI
+    AP -. "separate object" .- DA
+```
+
+Classic Autopilot registration, tenant-side Device Association, and local Device Link firmware state are separate lifecycle objects.
+
 ## UEFI namespace
 
 Validated namespace:
