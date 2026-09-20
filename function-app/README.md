@@ -11,6 +11,7 @@ Endpoints:
 ```text
 POST /api/devicelink/preassociate
 GET  /api/devicelink/lookup?serialNumber=<serial>
+POST /api/devicelink/reconcile
 ```
 
 The module sends:
@@ -88,3 +89,22 @@ Invoke-RestMethod `
 It first tries the Graph serial-number filter and then falls back to paged client-side matching when needed.
 
 See [../docs/MULTITENANT-LOOKUP.md](../docs/MULTITENANT-LOOKUP.md).
+
+
+## Reconcile: New / Move / Update
+
+The reconcile endpoint is intended for workflows that already perform a source lookup before submission, such as an imaging or provisioning form.
+
+The supplied `sourceTenantId` is treated as expected state only. The backend performs its own fresh lookup across all allowed tenants before any mutation.
+
+```text
+not found anywhere     -> New
+found in target        -> Update
+found in another tenant + matching sourceTenantId -> Move
+```
+
+A Move uses internal DELETE/POST operations, but **no standalone delete endpoint is exposed**.
+
+The endpoint fails closed when the source is ambiguous, a configured tenant cannot be searched, or the supplied source does not match current state.
+
+See [../docs/RECONCILE-SCHEMA-v1.md](../docs/RECONCILE-SCHEMA-v1.md).
