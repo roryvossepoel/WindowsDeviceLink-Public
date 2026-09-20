@@ -88,6 +88,14 @@ foreach ($commandName in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAs
 }
 Write-Host 'PASS: DeviceCode supports omitted TenantId and defaults to organizations authority.'
 
+foreach ($commandName in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAssociation','Remove-WindowsDeviceLinkAssociation')) {
+    $source = (Get-Command $commandName -Module WindowsDeviceLink).ScriptBlock.ToString()
+    if ($source -match '-TenantId and -AccessToken are required') {
+        throw "FAIL: $commandName still requires TenantId with caller-supplied AccessToken."
+    }
+}
+Write-Host 'PASS: AccessToken authentication does not require TenantId.'
+
 Write-Host ''
 Write-Host 'Cloud-operation parameter validation regression set passed.'
 
