@@ -78,16 +78,13 @@ function Register-WindowsDeviceLink {
             }
 
             switch ($Method) {
-                'DeviceCode' { if (-not $TenantId) { throw '-TenantId is required for -Method DeviceCode.' } }
                 'ClientSecret' {
                     if (-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')) {
                         throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'
                     }
                 }
                 'AccessToken' {
-                    if (-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')) {
-                        throw '-TenantId and -AccessToken are required for -Method AccessToken.'
-                    }
+                    if (-not $PSBoundParameters.ContainsKey('AccessToken')) { throw '-AccessToken is required for -Method AccessToken.' }
                 }
                 'Certificate' {
                     if (-not $TenantId -or -not $ClientId -or -not $Certificate) { throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.' }
@@ -127,11 +124,13 @@ function Register-WindowsDeviceLink {
             try {
                 switch ($Method) {
                     'DeviceCode' {
-                        $tokenParameters = @{ TenantId = $TenantId }
+                        $tokenParameters = @{}
+                        if ($TenantId) { $tokenParameters.TenantId = $TenantId }
                         if ($ClientId) { $tokenParameters.ClientId = $ClientId }
                         Write-Information -InformationAction Continue -MessageData 'Using native OAuth device-code authentication for Device Association registration.'
                         $token = Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters
                         $plainToken = $token.AccessToken
+                        $TenantId = $token.TenantId
                     }
                     'ClientSecret' {
                         Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication for Device Association registration.'
@@ -148,6 +147,7 @@ function Register-WindowsDeviceLink {
                     'AccessToken' {
                         $credential = New-Object System.Management.Automation.PSCredential('token', $AccessToken)
                         $plainToken = $credential.GetNetworkCredential().Password
+                        if (-not $TenantId) { $TenantId = Resolve-WindowsDeviceLinkAccessTokenTenantId -AccessToken $plainToken }
                         $credential = $null
                     }
                 }
