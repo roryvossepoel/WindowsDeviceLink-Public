@@ -76,7 +76,7 @@ WindowsDeviceLink does not prescribe one delegated authentication method. Use th
 
 ## DeviceCode client ID
 
-When `-Method DeviceCode` is used without an explicit `-ClientId`, WindowsDeviceLink uses this well-known Microsoft public client ID:
+When `-Method Interactive` is used without an explicit `-ClientId`, WindowsDeviceLink uses this well-known Microsoft public client ID:
 
 ```text
 14d82eec-204b-4c2f-b7e8-296a70dab67e
@@ -94,7 +94,7 @@ First obtain the local identity, then explicitly register it:
 $deviceLink = Get-WindowsDeviceLink
 
 $deviceLink | Register-WindowsDeviceLink `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 This makes the state-changing cloud operation visible in the command name and pipeline.
@@ -106,7 +106,7 @@ By serial number:
 ```powershell
 Get-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 Or by the exact association ID:
@@ -114,7 +114,7 @@ Or by the exact association ID:
 ```powershell
 Get-WindowsDeviceLinkAssociation `
     -AssociationId '<association-id>' `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 The returned object uses the type name `Windows.DeviceLink.Association` and contains the association state, managed-device linkage, timestamps and Device Preparation policy information returned by Microsoft Graph.
@@ -130,7 +130,7 @@ Live validation showed that the Graph beta endpoint can accept a `serialNumber` 
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 A confirmed lookup with no record returns `CloudChecked=True`, `AssociationPresent=False`, and `AssociationState=NotAssociated`. Authentication/Graph failures instead return `AssociationState=Unknown` plus `AssociationError`; they are not treated as proof that no association exists.
@@ -141,12 +141,12 @@ For the common workflow “preassociate this device if it is locally healthy and
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 The initializer obtains combined status, classifies it, and only registers from the validated `LocalOnly` state. It then verifies the result using the read path. `Preassociated` and `Associated` return `Action=None`; unexpected or incomplete states are blocked. It never resets firmware, removes associations, or reboots.
 
-With `-Method DeviceCode`, one access token is obtained at the start and reused for lookup, registration, and verification. The token is kept in memory only for the run and is not included in the result object.
+With `-Method Interactive`, one access token is obtained at the start and reused for lookup, registration, and verification. The token is kept in memory only for the run and is not included in the result object.
 
 `-WhatIf` still performs the required read-only cloud lookup so it can determine whether registration would be needed, but it suppresses the registration write.
 
