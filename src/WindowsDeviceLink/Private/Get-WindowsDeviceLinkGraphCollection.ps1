@@ -44,19 +44,24 @@ function Get-WindowsDeviceLinkGraphCollection {
             throw 'Microsoft Graph returned an empty response while paging Device Association records.'
         }
 
-        $propertyNames = @($page.PSObject.Properties.Name)
+        $isDictionary = $page -is [System.Collections.IDictionary]
+        $propertyNames = if ($isDictionary) { @($page.Keys) } else { @($page.PSObject.Properties.Name) }
+
         if ($propertyNames -notcontains 'value') {
             throw "Microsoft Graph returned a malformed Device Association collection response: the required 'value' property is missing."
         }
-        if ($null -eq $page.value) {
+
+        $value = if ($isDictionary) { $page['value'] } else { $page.value }
+        if ($null -eq $value) {
             throw "Microsoft Graph returned a malformed Device Association collection response: the required 'value' property is null."
         }
 
-        $records += @($page.value)
+        $records += @($value)
 
         $nextUri = $null
-        if ($propertyNames -contains '@odata.nextLink' -and $page.'@odata.nextLink') {
-            $nextUri = [string]$page.'@odata.nextLink'
+        if ($propertyNames -contains '@odata.nextLink') {
+            $nextLink = if ($isDictionary) { $page['@odata.nextLink'] } else { $page.'@odata.nextLink' }
+            if ($nextLink) { $nextUri = [string]$nextLink }
         }
     }
 
