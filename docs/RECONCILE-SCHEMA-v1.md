@@ -6,6 +6,23 @@ It is separate from the normal `DeviceLinkPreassociation` webhook request becaus
 
 ## Purpose
 
+A local WindowsDeviceLink client can now determine an expected source tenant before backend lookup by using `Get-WindowsDeviceLinkLocalAssociation`. This local result is useful for intent selection and operator UX, but the backend still performs its own fresh cloud lookup before any state-changing operation.
+
+Recommended caller flow:
+
+```text
+Get-WindowsDeviceLinkLocalAssociation
+-> source tenant available locally?
+     yes -> use as expected sourceTenantId
+     no  -> optional advisory multitenant lookup
+-> submit reconcile request
+-> backend performs fresh authoritative cloud-state lookup
+-> verify / mutate / verify
+```
+
+This separates **source-tenant discovery** from **cloud-state authority**: local metadata can identify where the device came from, while the backend remains responsible for proving the current tenant-side state immediately before mutation.
+
+
 A caller can perform a lookup before showing or submitting its form, but the backend never trusts that earlier lookup as authoritative.
 
 The supplied `sourceTenantId` is treated as the caller's **expected current state**. Immediately before any mutation, the backend searches the configured tenants again and validates the actual state.
@@ -38,7 +55,7 @@ Body:
 
 ### sourceTenantId
 
-`sourceTenantId` is optional only when the caller's earlier lookup found no existing association.
+`sourceTenantId` is optional only when the caller has no known source tenant. The source may come from a prior cloud lookup or from local DeviceLink discovery with `Get-WindowsDeviceLinkLocalAssociation`.
 
 It is required before the backend will perform a **Move**.
 
