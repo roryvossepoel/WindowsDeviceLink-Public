@@ -53,7 +53,9 @@ function Get-WindowsDeviceLinkGraphCollection {
 
         $value = if ($isDictionary) { $page['value'] } else { $page.value }
         if ($null -eq $value) {
-            throw "Microsoft Graph returned a malformed Device Association collection response: the required 'value' property is null."
+            # Some Microsoft Graph SDK response shapes represent an empty collection as
+            # an explicitly present value key with a null value. Treat that as zero records.
+            $value = @()
         }
 
         $records += @($value)
