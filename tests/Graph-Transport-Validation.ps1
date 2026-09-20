@@ -90,7 +90,9 @@ $request={param($Uri,$SdkMode,$AccessToken)[pscustomobject]@{'@odata.context'='s
 Assert-Throws -Name 'Missing collection value property is rejected' -ExpectedMessage "required 'value' property is missing" -ScriptBlock {& $module {param($Request)Get-WindowsDeviceLinkGraphCollection -Uri 'https://graph.microsoft.com/beta/test' -AccessToken 'synthetic' -RequestScript $Request} $request}
 
 $request={param($Uri,$SdkMode,$AccessToken)[pscustomobject]@{value=$null}}
-Assert-Throws -Name 'Null collection value property is rejected' -ExpectedMessage "required 'value' property is null" -ScriptBlock {& $module {param($Request)Get-WindowsDeviceLinkGraphCollection -Uri 'https://graph.microsoft.com/beta/test' -AccessToken 'synthetic' -RequestScript $Request} $request}
+$records=@(& $module {param($Request)Get-WindowsDeviceLinkGraphCollection -Uri 'https://graph.microsoft.com/beta/test' -AccessToken 'synthetic' -RequestScript $Request} $request)
+Assert-True ($records.Count -eq 0) "explicit null collection value should be treated as an empty collection."
+Write-Host 'PASS: explicit null collection value is treated as empty'
 
 # A repeated nextLink must stop instead of looping forever.
 $request={param($Uri,$SdkMode,$AccessToken)[pscustomobject]@{value=@();'@odata.nextLink'='https://graph.microsoft.com/beta/loop'}}
