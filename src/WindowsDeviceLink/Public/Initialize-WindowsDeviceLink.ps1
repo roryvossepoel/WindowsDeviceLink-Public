@@ -46,13 +46,14 @@ function Initialize-WindowsDeviceLink {
     try {
         $effectiveMethod = $Method
         if ($Method -eq 'DeviceCode') {
-            if (-not $TenantId) { throw '-TenantId is required for -Method DeviceCode.' }
             if ($Environment -ne 'Global') { throw 'Native DeviceCode initialization currently supports the Global Microsoft cloud only.' }
-            $tokenParameters = @{ TenantId = $TenantId }
+            $tokenParameters = @{}
+            if ($TenantId) { $tokenParameters.TenantId = $TenantId }
             if ($ClientId) { $tokenParameters.ClientId = $ClientId }
             Write-Information -InformationAction Continue -MessageData 'Using native OAuth device-code authentication for DeviceLink initialization.'
             $token = Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters
             $effectiveAccessToken = ConvertTo-SecureString $token.AccessToken -AsPlainText -Force
+            $TenantId = $token.TenantId
             $token = $null
             $effectiveMethod = 'AccessToken'
         }
