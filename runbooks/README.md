@@ -180,3 +180,26 @@ The receiver resolves the matching entry in `WindowsDeviceLinkTenantConfiguratio
 - [App registration](../docs/APP-REGISTRATION.md)
 - [Multitenant consent](../docs/MULTITENANT-CONSENT.md)
 - [Webhook schema v1](../docs/WEBHOOK-SCHEMA-v1.md)
+
+
+## Reconcile: New / Move / Update
+
+The same Automation webhook also accepts:
+
+```text
+requestType = DeviceLinkReconcile
+```
+
+This supports a controlled multitenant decision model:
+
+```text
+not found anywhere -> New
+found in target     -> Update
+found in source != target -> Move
+```
+
+For Move, `sourceTenantId` must be supplied and must match a fresh backend lookup before the exact source association is removed.
+
+Removal is an internal Move step only; the Automation receiver does not expose a generic delete request type.
+
+See [../docs/RECONCILE-SCHEMA-v1.md](../docs/RECONCILE-SCHEMA-v1.md).
