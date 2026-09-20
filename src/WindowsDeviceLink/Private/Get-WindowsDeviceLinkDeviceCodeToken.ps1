@@ -47,19 +47,8 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
 
             if ($tokenResponse.access_token) {
                 Write-Information -InformationAction Continue -MessageData 'Device code authentication succeeded.'
-                $effectiveTenantId = $TenantId
-                try {
-                    $segments = ([string]$tokenResponse.access_token).Split('.')
-                    if ($segments.Count -ge 2) {
-                        $payload = $segments[1].Replace('-','+').Replace('_','/')
-                        switch ($payload.Length % 4) { 2 { $payload += '==' }; 3 { $payload += '=' } }
-                        $claims = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
-                        if ($claims.tid) { $effectiveTenantId = [string]$claims.tid }
-                    }
-                }
-                catch {
-                    # Tenant resolution is best-effort. Authentication itself already succeeded.
-                }
+                $effectiveTenantId = Resolve-WindowsDeviceLinkAccessTokenTenantId -AccessToken ([string]$tokenResponse.access_token)
+                if (-not $effectiveTenantId) { $effectiveTenantId = $TenantId }
                 return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$effectiveTenantId }
             }
         }
