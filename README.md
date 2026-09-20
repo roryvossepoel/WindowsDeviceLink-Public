@@ -293,6 +293,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 - [APP-REGISTRATION.md](docs/APP-REGISTRATION.md) — multitenant Entra App Registration and Graph permission.
 - [MULTITENANT-CONSENT.md](docs/MULTITENANT-CONSENT.md) — onboarding target tenants with explicit admin consent.
 - [MULTITENANT-LOOKUP.md](docs/MULTITENANT-LOOKUP.md) — search managed tenants by serial number.
+- [RECONCILE-SCHEMA-v1.md](docs/RECONCILE-SCHEMA-v1.md) — safe multitenant New / Move / Update reconciliation.
 - [SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md) — reference-deployment security boundary and optional hardening.
 - [FIRMWARE-STATE.md](docs/FIRMWARE-STATE.md) — UEFI state and reset lifecycle.
 - [DISCOVER-LINK-RESEARCH.md](docs/DISCOVER-LINK-RESEARCH.md) — validated DeviceLinkManager research/evidence.
