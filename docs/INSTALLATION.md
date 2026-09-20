@@ -277,8 +277,7 @@ Optional tenant correlation:
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>' |
+    -Method DeviceCode |
     Test-WindowsDeviceLinkHealth |
     Format-List *
 ```
