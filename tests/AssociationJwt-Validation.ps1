@@ -19,10 +19,10 @@ function New-JwtBytes {
     $p=ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes($payloadJson))
     [Text.Encoding]::UTF8.GetBytes("$h.$p.sig")
 }
-function To-Epoch([datetime]$Utc){[int64](($Utc.ToUniversalTime()-[datetime]'1970-01-01T00:00:00Z').TotalSeconds)}
+function To-Epoch([datetimeoffset]$Utc){$Utc.ToUnixTimeSeconds()}
 
 $linkId='0B1C094B-6443-4925-87B4-1F4809716E55'
-$now=[datetime]::UtcNow
+$now=[datetimeoffset]::UtcNow
 
 $validBytes=New-JwtBytes @{iat=(To-Epoch $now.AddMinutes(-2));nbf=(To-Epoch $now.AddMinutes(-1));exp=(To-Epoch $now.AddMinutes(30));linkId=$linkId}
 $valid=& $module {param($Bytes,$LinkId) ConvertFrom-WindowsDeviceLinkAssociationJwtBytes -Bytes $Bytes -ExpectedLinkId $LinkId} $validBytes $linkId
