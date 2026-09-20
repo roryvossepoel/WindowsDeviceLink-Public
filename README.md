@@ -165,12 +165,12 @@ Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 
 ### Create a tenant-side pre-association
 
-For normal delegated use, `-TenantId` can be omitted. Supply it when you intentionally need to target a specific tenant, such as in a multi-tenant or guest-account scenario.
+For delegated authentication, `-TenantId` can be omitted unless you intentionally need to target a specific tenant. Choose the authentication method that fits the runtime and the tenant's access policies.
 
 ```powershell
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
-        -Method DeviceCode
+        -Method Interactive
 ```
 
 ### Query combined local/cloud status
@@ -178,7 +178,7 @@ Get-WindowsDeviceLink |
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode |
+    -Method Interactive |
     Format-List *
 ```
 
@@ -188,14 +188,14 @@ Pre-association only:
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 Pre-association plus explicit device-side completion:
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
+    -Method Interactive `
     -CompleteAssociation
 ```
 
