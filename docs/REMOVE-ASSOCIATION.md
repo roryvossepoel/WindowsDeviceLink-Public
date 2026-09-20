@@ -69,9 +69,25 @@ When `-AssociationId` is used directly, `SerialNumber` can be empty because no l
 
 ## Lifecycle warning
 
-The currently validated workflow removes a **preassociated** Device Association record from Intune/Graph.
+For a device that is still **Pre-associated**, removing the tenant-side Device Association record is sufficient.
 
-For a device that is already fully associated, deleting the server-side Device Association record alone may not clear device-side tenant affinity. Device-side/UEFI decommissioning is a separate lifecycle operation and is not currently implemented by WindowsDeviceLink.
+For a device that is already **Associated**, deleting the server-side Device Association record alone is not a complete offboarding operation because trusted tenant affinity is also stored locally in UEFI.
+
+For an associated device, use this order:
+
+```text
+1. Ensure the device is no longer enrolled with MDM
+2. Clear the local Device Link UEFI state
+3. Delete the tenant-side Device Association record
+```
+
+WindowsDeviceLink supports the local cleanup with:
+
+```powershell
+Reset-WindowsDeviceLinkFirmwareState
+```
+
+The local reset and cloud deletion remain separate operations intentionally. See [OFFBOARDING.md](OFFBOARDING.md) for the complete lifecycle flow.
 
 ## Validation status
 
