@@ -76,7 +76,7 @@ WindowsDeviceLink does not prescribe one delegated authentication method. Use th
 
 ## DeviceCode client ID
 
-When `-Method Interactive` is used without an explicit `-ClientId`, WindowsDeviceLink uses this well-known Microsoft public client ID:
+When `-Method DeviceCode` is used without an explicit `-ClientId`, WindowsDeviceLink uses this well-known Microsoft public client ID:
 
 ```text
 14d82eec-204b-4c2f-b7e8-296a70dab67e
