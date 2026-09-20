@@ -11,17 +11,20 @@ $deviceLink | Format-List *
 # Export official Windows-generated CSV
 Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 
-# Explicit tenant-side pre-association using delegated device-code flow
+# Standard delegated device-code pre-association; TenantId is optional
 $registration = $deviceLink | Register-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 $registration | Format-List *
 
 # Explicitly query the tenant-side Device Association
 Get-WindowsDeviceLinkAssociation `
     -SerialNumber $deviceLink.SerialNumber `
+    -Method DeviceCode | Format-List *
+
+# Explicit tenant targeting for multi-tenant / guest scenarios
+$deviceLink | Register-WindowsDeviceLink `
     -Method DeviceCode `
-    -TenantId '<tenant-id>' | Format-List *
+    -TenantId '<target-tenant-id>' | Format-List *
 
 # App-only registration example with a client secret
 $secret = Read-Host 'Client secret' -AsSecureString
