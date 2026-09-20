@@ -153,7 +153,7 @@ try {
         "$base/.well-known/jwks"
     ) | Select-Object -Unique
 
-    $results = New-Object System.Collections.Generic.List[object]
+    $results = [System.Collections.Generic.List[object]]::new()
     $jwksEndpoint = $null
     $jwks = $null
 
@@ -248,7 +248,7 @@ try {
         KidMatched          = $kidMatch
         X5tMatched          = $x5tMatch
         MatchingKeyMetadata = $matchingKeyMetadata
-        Probes              = @($results)
+        Probes              = $results.ToArray()
         JwtTransmitted      = $false
         MutationPerformed   = $false
         Conclusion          = if ($matchingKeyMetadata) {
