@@ -21,7 +21,7 @@ User-facing device-code `user_code` values are intentionally displayed because t
 | DeviceCode | Native OAuth + Graph REST | optional TenantId; optional ClientId | parameter boundaries, OAuth error redaction, Graph redaction, initializer token-reuse contract | successful sign-in + read/write smoke |
 | Interactive | Microsoft.Graph.Authentication | optional TenantId; optional ClientId | parameter boundaries / SDK argument forwarding | interactive sign-in smoke |
 | ClientSecret | Native OAuth + Graph REST | TenantId, ClientId, SecureString ClientSecret | required inputs, secret redaction, Graph error redaction | optional app-only read/write smoke |
-| AccessToken | Native Graph REST | TenantId, SecureString AccessToken | required inputs, bearer redaction, Graph error semantics | optional valid/expired token smoke |
+| AccessToken | Native Graph REST | SecureString AccessToken; optional TenantId | required inputs, bearer redaction, Graph error semantics | optional valid/expired token smoke |
 | Certificate | Microsoft.Graph.Authentication | TenantId, ClientId, X509Certificate2 | required inputs / SDK argument forwarding | certificate-backed app-only smoke |
 | CertificateThumbprint | Microsoft.Graph.Authentication | TenantId, ClientId, thumbprint | required inputs / SDK argument forwarding | certificate-store resolution smoke |
 | CertificateSubjectName | Microsoft.Graph.Authentication | TenantId, ClientId, subject name | required inputs / SDK argument forwarding | missing/ambiguous/valid certificate smoke |
