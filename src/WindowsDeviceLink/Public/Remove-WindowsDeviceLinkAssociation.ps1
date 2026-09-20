@@ -16,7 +16,21 @@ function Remove-WindowsDeviceLinkAssociation {
         [ValidateRange(1,600)][double]$ClientTimeout = 100
     )
 
-    if([string]::IsNullOrWhiteSpace($AssociationId) -eq [string]::IsNullOrWhiteSpace($SerialNumber)){throw 'Specify exactly one of -AssociationId or -SerialNumber.'}
+    if(-not [string]::IsNullOrWhiteSpace($AssociationId) -and -not [string]::IsNullOrWhiteSpace($SerialNumber)){throw 'Specify either -AssociationId or -SerialNumber, not both.'}
+    if([string]::IsNullOrWhiteSpace($AssociationId) -and [string]::IsNullOrWhiteSpace($SerialNumber)){
+        try {
+            $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
+            $SerialNumber = [string]$bios.SerialNumber
+        }
+        catch {
+            if(Get-Command Get-WmiObject -ErrorAction SilentlyContinue){
+                try {$SerialNumber=[string](Get-WmiObject -Class Win32_BIOS -ErrorAction Stop).SerialNumber}catch{}
+            }
+        }
+        if([string]::IsNullOrWhiteSpace($SerialNumber)){throw 'No target was specified and the local device serial number could not be determined. Specify -SerialNumber or -AssociationId explicitly.'}
+        $SerialNumber=$SerialNumber.Trim()
+        Write-Information -InformationAction Continue -MessageData "No target specified. Using local device serial number: $SerialNumber"
+    }
     $allowedByMethod=@{
         DeviceCode=@('TenantId','ClientId');Interactive=@('TenantId','ClientId');ClientSecret=@('TenantId','ClientId','ClientSecret');AccessToken=@('TenantId','AccessToken')
         Certificate=@('TenantId','ClientId','Certificate','SendCertificateChain');CertificateThumbprint=@('TenantId','ClientId','CertificateThumbprint','SendCertificateChain')
@@ -28,7 +42,6 @@ function Remove-WindowsDeviceLinkAssociation {
 
     switch($Method){
         'DeviceCode'{if(-not $TenantId){throw '-TenantId is required for -Method DeviceCode.'}}
-        'Interactive'{if(-not $TenantId){throw '-TenantId is required for -Method Interactive.'}}
         'ClientSecret'{if(-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')){throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'}}
         'AccessToken'{if(-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')){throw '-TenantId and -AccessToken are required for -Method AccessToken.'}}
         'Certificate'{if(-not $TenantId -or -not $ClientId -or -not $Certificate){throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.'}}
@@ -49,13 +62,13 @@ function Remove-WindowsDeviceLinkAssociation {
     } else {
         $connectParams=@{Environment=$Environment;ClientTimeout=$ClientTimeout}
         switch($Method){
-            'Interactive'{$connectParams.TenantId=$TenantId;if($ClientId){$connectParams.ClientId=$ClientId}}
+            'Interactive'{if($TenantId){$connectParams.TenantId=$TenantId};if($ClientId){$connectParams.ClientId=$ClientId}}
             'Certificate'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.Certificate=$Certificate;$connectParams.SendCertificateChain=$SendCertificateChain}
             'CertificateThumbprint'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.CertificateThumbprint=$CertificateThumbprint;$connectParams.SendCertificateChain=$SendCertificateChain}
             'CertificateSubjectName'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.CertificateSubjectName=$CertificateSubjectName;$connectParams.SendCertificateChain=$SendCertificateChain}
             'ManagedIdentity'{$connectParams.Identity=$true;if($ClientId){$connectParams.ClientId=$ClientId}}
         }
-        Connect-WindowsDeviceLink @connectParams|Out-Null;$sdkMode=$true
+        Connect-WindowsDeviceLink @connectParams|Out-Null;$sdkMode=$true;$context=Get-MgContext;if($context -and $context.TenantId){$TenantId=$context.TenantId}
     }
 
     try{
