@@ -1,11 +1,15 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
     [string]$ModulePath
 )
 
 $ErrorActionPreference='Stop'
+
+if(-not $ModulePath){
+    $ModulePath=Join-Path $PSScriptRoot '..\src\WindowsDeviceLink\WindowsDeviceLink.psd1'
+}
+$ModulePath=(Resolve-Path -LiteralPath $ModulePath).Path
 
 Import-Module $ModulePath -Force -ErrorAction Stop
 
