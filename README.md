@@ -165,6 +165,8 @@ Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 
 ### Create a tenant-side pre-association
 
+For normal delegated use, `-TenantId` can be omitted. Supply it when you intentionally need to target a specific tenant, such as in a multi-tenant or guest-account scenario.
+
 ```powershell
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
