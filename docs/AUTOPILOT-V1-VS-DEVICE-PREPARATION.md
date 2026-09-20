@@ -114,7 +114,6 @@ Or as one guarded operation:
 ```powershell
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
-    -TenantId '<tenant-id>' `
     -CompleteAssociation
 ```
 
