@@ -115,6 +115,7 @@ if (-not $jwtState -or -not $jwtState.Present) {
         DiscoveryUrl          = $null
         DiscoveryHost         = $null
         DiscoveryPath         = $null
+        UriClaims             = @()
         TenantRelatedClaims   = @()
         HeaderClaimNames      = @()
         PayloadClaimNames     = @()
@@ -200,6 +201,32 @@ try {
         catch {}
     }
 
+    $uriClaims = New-Object System.Collections.Generic.List[object]
+    foreach ($property in $payload.PSObject.Properties) {
+        $values = @()
+        if ($property.Value -is [string]) {
+            $values = @([string]$property.Value)
+        }
+        elseif ($property.Value -is [System.Collections.IEnumerable] -and $property.Value -isnot [string]) {
+            $values = @($property.Value | Where-Object { $_ -is [string] } | ForEach-Object { [string]$_ })
+        }
+
+        foreach ($value in $values) {
+            try {
+                $candidateUri = [Uri]$value
+                if ($candidateUri.IsAbsoluteUri -and $candidateUri.Scheme -eq 'https') {
+                    $uriClaims.Add([pscustomobject]@{
+                        ClaimName = $property.Name
+                        Scheme    = $candidateUri.Scheme
+                        Host      = $candidateUri.Host
+                        Path      = $candidateUri.AbsolutePath
+                    })
+                }
+            }
+            catch {}
+        }
+    }
+
     [pscustomobject]@{
         PSTypeName            = 'Windows.DeviceLink.LocalTenantResearch'
         AssociatedJwtPresent  = $true
@@ -221,6 +248,7 @@ try {
         DiscoveryUrl          = $discoveryUrl
         DiscoveryHost         = $discoveryHost
         DiscoveryPath         = $discoveryPath
+        UriClaims             = $uriClaims.ToArray()
         TenantRelatedClaims   = $tenantRelatedClaims
         HeaderClaimNames      = @($header.PSObject.Properties.Name | Sort-Object -Unique)
         PayloadClaimNames     = @($payload.PSObject.Properties.Name | Sort-Object -Unique)
