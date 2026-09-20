@@ -130,8 +130,7 @@ Then create the tenant-side pre-association:
 
 ```powershell
 $deviceLink | Register-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 Expected state:
@@ -152,8 +151,7 @@ Remove only the tenant-side Device Association:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 Reset only the local DeviceLink firmware state:
