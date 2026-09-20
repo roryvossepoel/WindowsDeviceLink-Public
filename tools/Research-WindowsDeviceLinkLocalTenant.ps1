@@ -112,6 +112,9 @@ if (-not $jwtState -or -not $jwtState.Present) {
         CandidateTenantClaim  = $null
         Issuer                = $null
         Audience              = $null
+        DiscoveryUrl          = $null
+        DiscoveryHost         = $null
+        DiscoveryPath         = $null
         TenantRelatedClaims   = @()
         HeaderClaimNames      = @()
         PayloadClaimNames     = @()
@@ -183,6 +186,20 @@ try {
     }
     else { $null }
 
+    $discoveryUrl = if ($payload.PSObject.Properties.Name -contains 'discoveryUrl') { [string]$payload.discoveryUrl } else { $null }
+    $discoveryHost = $null
+    $discoveryPath = $null
+    if (-not [string]::IsNullOrWhiteSpace($discoveryUrl)) {
+        try {
+            $uri = [Uri]$discoveryUrl
+            if ($uri.IsAbsoluteUri) {
+                $discoveryHost = $uri.Host
+                $discoveryPath = $uri.AbsolutePath
+            }
+        }
+        catch {}
+    }
+
     [pscustomobject]@{
         PSTypeName            = 'Windows.DeviceLink.LocalTenantResearch'
         AssociatedJwtPresent  = $true
@@ -201,6 +218,9 @@ try {
         CandidateTenantClaim  = $candidateTenantClaim
         Issuer                = $issuer
         Audience              = $audience
+        DiscoveryUrl          = $discoveryUrl
+        DiscoveryHost         = $discoveryHost
+        DiscoveryPath         = $discoveryPath
         TenantRelatedClaims   = $tenantRelatedClaims
         HeaderClaimNames      = @($header.PSObject.Properties.Name | Sort-Object -Unique)
         PayloadClaimNames     = @($payload.PSObject.Properties.Name | Sort-Object -Unique)
