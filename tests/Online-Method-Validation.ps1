@@ -82,8 +82,8 @@ if ($deviceCodeSource -notmatch "TenantId\\s*=\\s*'organizations'") {
 }
 foreach ($commandName in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAssociation','Remove-WindowsDeviceLinkAssociation','Initialize-WindowsDeviceLink')) {
     $source = (Get-Command $commandName -Module WindowsDeviceLink).ScriptBlock.ToString()
-    if ($source -match '-TenantId is required for -Method DeviceCode') {
-        throw "FAIL: $commandName still requires TenantId for DeviceCode."
+    if ($source -match '-TenantId is required for -Method (DeviceCode|Interactive)') {
+        throw "FAIL: $commandName still requires TenantId for delegated authentication."
     }
 }
 Write-Host 'PASS: DeviceCode supports omitted TenantId and defaults to organizations authority.'
