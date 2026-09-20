@@ -89,8 +89,7 @@ Validated command:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 Validated Graph operation:
