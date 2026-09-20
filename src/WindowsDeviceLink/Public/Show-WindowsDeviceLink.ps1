@@ -242,9 +242,6 @@ function Show-WindowsDeviceLink {
             $ui.Source.Text = [string]$local.Source
             $ui.Trust.Text = [string]$local.TrustLevel
 
-            if ([string]::IsNullOrWhiteSpace($tenantBox.Text) -and $local.TenantId) {
-                $tenantBox.PlaceholderText = [string]$local.TenantId
-            }
 
             Set-GuiStatus "Local state refreshed • $($local.FirmwareState) • $($local.TrustLevel)"
         }
