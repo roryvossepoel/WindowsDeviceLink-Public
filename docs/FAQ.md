@@ -18,7 +18,7 @@ For local + tenant-side Device Association state:
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode |
+    -Method Interactive |
     Format-List *
 ```
 
@@ -88,7 +88,7 @@ Use:
 $deviceLink = Get-WindowsDeviceLink
 
 $deviceLink | Register-WindowsDeviceLink `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 Expected transition:
@@ -132,7 +132,7 @@ Use:
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
+    -Method Interactive `
     -CompleteAssociation |
     Format-List *
 ```
@@ -151,7 +151,7 @@ Use the initializer **without** `-CompleteAssociation`:
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode |
+    -Method Interactive |
     Format-List *
 ```
 
@@ -192,7 +192,7 @@ Reset-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru
 
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 The operations are intentionally not combined automatically. See [OFFBOARDING.md](OFFBOARDING.md) for the complete flow.
@@ -204,7 +204,7 @@ Use:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 Or when the exact association ID is known:
@@ -212,7 +212,7 @@ Or when the exact association ID is known:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -AssociationId '<association-id>' `
-    -Method DeviceCode
+    -Method Interactive
 ```
 
 This deletes the Device Association record in the tenant.
@@ -261,7 +261,7 @@ Example:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode
+    -Method Interactive
 
 Reset-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru
 
@@ -274,7 +274,7 @@ After reboot:
 Get-WindowsDeviceLinkStatus
 
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
+    -Method Interactive `
     -CompleteAssociation
 ```
 
@@ -424,7 +424,7 @@ When tenant correlation is required:
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode |
+    -Method Interactive |
     Format-List *
 ```
 
@@ -448,7 +448,7 @@ Reset-WindowsDeviceLinkFirmwareState -WhatIf
 Complete-WindowsDeviceLinkAssociation -WhatIf
 
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
+    -Method Interactive `
     -CompleteAssociation `
     -WhatIf
 ```
