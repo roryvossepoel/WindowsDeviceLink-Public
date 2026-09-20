@@ -31,9 +31,8 @@ function Get-WindowsDeviceLinkAssociation {
     if ($invalidParameters) { throw "The following parameters are not valid with -Method $Method`: $($invalidParameters -join ', ')." }
 
     switch ($Method) {
-        'DeviceCode' { if(-not $TenantId){throw '-TenantId is required for -Method DeviceCode.'} }
         'ClientSecret' { if(-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')){throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'} }
-        'AccessToken' { if(-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')){throw '-TenantId and -AccessToken are required for -Method AccessToken.'} }
+        'AccessToken' { if (-not $PSBoundParameters.ContainsKey('AccessToken')) { throw '-AccessToken is required for -Method AccessToken.' } }
         'Certificate' { if(-not $TenantId -or -not $ClientId -or -not $Certificate){throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.'} }
         'CertificateThumbprint' { if(-not $TenantId -or -not $ClientId -or -not $CertificateThumbprint){throw '-TenantId, -ClientId, and -CertificateThumbprint are required for -Method CertificateThumbprint.'} }
         'CertificateSubjectName' { if(-not $TenantId -or -not $ClientId -or -not $CertificateSubjectName){throw '-TenantId, -ClientId, and -CertificateSubjectName are required for -Method CertificateSubjectName.'} }
@@ -47,10 +46,10 @@ function Get-WindowsDeviceLinkAssociation {
     if($Method -in @('DeviceCode','ClientSecret','EnvironmentVariable','AccessToken')){
         if($Environment -ne 'Global'){throw 'Native Device Association lookup currently supports the Global Microsoft cloud only.'}
         switch($Method){
-            'DeviceCode'{$tokenParameters=@{TenantId=$TenantId};if($ClientId){$tokenParameters.ClientId=$ClientId};Write-Information -InformationAction Continue -MessageData 'Using native OAuth device-code authentication for Device Association lookup.';$token=Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters;$nativeAccessToken=$token.AccessToken}
+            'DeviceCode'{$tokenParameters=@{};if($TenantId){$tokenParameters.TenantId=$TenantId};if($ClientId){$tokenParameters.ClientId=$ClientId};Write-Information -InformationAction Continue -MessageData 'Using native OAuth device-code authentication for Device Association lookup.';$token=Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters;$nativeAccessToken=$token.AccessToken;$TenantId=$token.TenantId}
             'ClientSecret'{Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication for Device Association lookup.';$token=Get-WindowsDeviceLinkClientSecretToken -TenantId $TenantId -ClientId $ClientId -ClientSecret $ClientSecret;$nativeAccessToken=$token.AccessToken}
             'EnvironmentVariable'{$environmentSecret=ConvertTo-SecureString $env:AZURE_CLIENT_SECRET -AsPlainText -Force;Write-Information -InformationAction Continue -MessageData 'Using native OAuth client-credentials authentication from environment variables for Device Association lookup.';$token=Get-WindowsDeviceLinkClientSecretToken -TenantId $env:AZURE_TENANT_ID -ClientId $env:AZURE_CLIENT_ID -ClientSecret $environmentSecret;$nativeAccessToken=$token.AccessToken;$TenantId=$env:AZURE_TENANT_ID}
-            'AccessToken'{$credential=New-Object System.Management.Automation.PSCredential('token',$AccessToken);$nativeAccessToken=$credential.GetNetworkCredential().Password;$credential=$null}
+            'AccessToken'{$credential=New-Object System.Management.Automation.PSCredential('token',$AccessToken);$nativeAccessToken=$credential.GetNetworkCredential().Password;if(-not $TenantId){$TenantId=Resolve-WindowsDeviceLinkAccessTokenTenantId -AccessToken $nativeAccessToken};$credential=$null}
         }
     } else {
         $connectParams=@{Environment=$Environment;ClientTimeout=$ClientTimeout}
