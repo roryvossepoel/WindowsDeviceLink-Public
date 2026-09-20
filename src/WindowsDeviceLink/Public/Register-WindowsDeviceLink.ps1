@@ -84,9 +84,7 @@ function Register-WindowsDeviceLink {
                     }
                 }
                 'AccessToken' {
-                    if (-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')) {
-                        throw '-TenantId and -AccessToken are required for -Method AccessToken.'
-                    }
+                    if (-not $PSBoundParameters.ContainsKey('AccessToken')) { throw '-AccessToken is required for -Method AccessToken.' }
                 }
                 'Certificate' {
                     if (-not $TenantId -or -not $ClientId -or -not $Certificate) { throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.' }
@@ -149,6 +147,7 @@ function Register-WindowsDeviceLink {
                     'AccessToken' {
                         $credential = New-Object System.Management.Automation.PSCredential('token', $AccessToken)
                         $plainToken = $credential.GetNetworkCredential().Password
+                        if (-not $TenantId) { $TenantId = Resolve-WindowsDeviceLinkAccessTokenTenantId -AccessToken $plainToken }
                         $credential = $null
                     }
                 }
