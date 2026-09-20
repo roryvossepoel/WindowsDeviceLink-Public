@@ -43,6 +43,7 @@ Local DeviceLink identity
 
 Local DeviceLink firmware state
     Get-WindowsDeviceLinkFirmwareState
+    Get-WindowsDeviceLinkLocalAssociation
     Reset-WindowsDeviceLinkFirmwareState
 
 Tenant-side Intune Device Association
@@ -291,6 +292,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 | `Get-WindowsDeviceLink` | Obtain the local DeviceLink identity; optionally export it. |
 | `Get-WindowsDeviceLinkAssociation` | Query a tenant-side Intune Device Association by serial number or association ID. |
 | `Get-WindowsDeviceLinkFirmwareState` | Read safe metadata and the validated firmware timestamp. |
+| `Get-WindowsDeviceLinkLocalAssociation` | Correlate the current local DeviceLink identity with registry and Association JWT tenant hints without cloud access. |
 | `Get-WindowsDeviceLinkRepairPlan` | Return a non-destructive repair recommendation for observed lifecycle state. |
 | `Get-WindowsDeviceLinkStatus` | Combine runtime, local identity, firmware and optional tenant-side association diagnostics. |
 | `Initialize-WindowsDeviceLink` | Safely initialize pre-association and optionally complete association with explicit `-CompleteAssociation`. |
