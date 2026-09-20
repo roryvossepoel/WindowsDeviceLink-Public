@@ -78,7 +78,6 @@ function Register-WindowsDeviceLink {
             }
 
             switch ($Method) {
-                'Interactive' { if (-not $TenantId) { throw '-TenantId is required for -Method Interactive.' } }
                 'ClientSecret' {
                     if (-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')) {
                         throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'
@@ -168,7 +167,7 @@ function Register-WindowsDeviceLink {
             $connectParams = @{ Environment = $Environment; ClientTimeout = $ClientTimeout }
             switch ($Method) {
                 'Interactive' {
-                    $connectParams.TenantId = $TenantId
+                    if ($TenantId) { $connectParams.TenantId = $TenantId }
                     if ($ClientId) { $connectParams.ClientId = $ClientId }
                 }
                 'Certificate' {
