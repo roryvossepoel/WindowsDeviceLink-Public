@@ -53,7 +53,7 @@ function Remove-WindowsDeviceLinkAssociation {
             'CertificateSubjectName'{$connectParams.TenantId=$TenantId;$connectParams.ClientId=$ClientId;$connectParams.CertificateSubjectName=$CertificateSubjectName;$connectParams.SendCertificateChain=$SendCertificateChain}
             'ManagedIdentity'{$connectParams.Identity=$true;if($ClientId){$connectParams.ClientId=$ClientId}}
         }
-        Connect-WindowsDeviceLink @connectParams|Out-Null;$sdkMode=$true
+        Connect-WindowsDeviceLink @connectParams|Out-Null;$sdkMode=$true;$context=Get-MgContext;if($context -and $context.TenantId){$TenantId=$context.TenantId}
     }
 
     try{
