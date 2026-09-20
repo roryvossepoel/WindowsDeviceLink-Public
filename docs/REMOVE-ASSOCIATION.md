@@ -10,15 +10,22 @@ DELETE /deviceManagement/tenantAssociatedDevices/{associationId}
 
 This is **not** the classic Autopilot V1 `windowsAutopilotDeviceIdentities` deletion API.
 
-## Recommended usage: serial number
+## Recommended usage: current device
 
-For normal use, identify the record by device serial number:
+For a normal interactive offboarding operation on the current machine:
+
+```powershell
+Remove-WindowsDeviceLinkAssociation -Method Interactive
+```
+
+When neither `-SerialNumber` nor `-AssociationId` is supplied, the cmdlet reads the serial number of the local machine, reports which serial number is being used, resolves the matching Device Association record, and deletes that exact record.
+
+To target another device explicitly:
 
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method Interactive
 ```
 
 The cmdlet resolves the matching Device Association record, obtains its association ID, and deletes that exact record.
@@ -32,8 +39,7 @@ If the Device Association record ID is already known, delete it directly:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -AssociationId '<association-id>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method Interactive
 ```
 
 The association ID is the `Id` returned by the `tenantAssociatedDevice` object after a successful pre-association.
@@ -52,7 +58,11 @@ The removal cmdlet supports the same direct authentication families used by the 
 - `EnvironmentVariable`
 - `ManagedIdentity`
 
-`TenantId` remains explicit for methods such as DeviceCode and certificate authentication because the tenant is determined by the authentication context. `EnvironmentVariable` obtains the tenant from `AZURE_TENANT_ID`.
+`-Method` is mandatory and uses a PowerShell `ValidateSet`, so supported authentication methods are available through tab completion / IntelliSense.
+
+For `Interactive`, `TenantId` is optional. When omitted, the tenant is determined by the interactive Microsoft Entra sign-in context. Specify `-TenantId` when an explicit tenant must be targeted, such as a multitenant workflow.
+
+Other authentication methods can require additional parameters. For example, DeviceCode currently requires `TenantId`, while `EnvironmentVariable` obtains the tenant from `AZURE_TENANT_ID`.
 
 ## Result
 
