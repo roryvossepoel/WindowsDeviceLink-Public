@@ -161,6 +161,47 @@ Initialize-WindowsDeviceLink `
 
 For a validated `LocalOnly` device this creates the preassociation and stops there.
 
+## Is deleting the Device Association record from Intune enough to offboard the device?
+
+It depends on the current association state.
+
+### Pre-associated
+
+Yes. If the device is still **Pre-associated** and has not completed association in OOBE, deleting the tenant-side Device Association record is sufficient.
+
+```text
+Pre-associated
+    -> delete Device Association record
+    -> done
+```
+
+### Associated
+
+No. Once the device is **Associated**, trusted tenant affinity is stored locally in UEFI. Deleting only the tenant-side record does not remove that local affinity.
+
+Use this order:
+
+```text
+Associated
+    -> ensure the device is no longer enrolled with MDM
+    -> clear local Device Link UEFI state
+    -> delete Device Association record
+    -> done
+```
+
+WindowsDeviceLink provides separate commands for the local and tenant-side operations:
+
+```powershell
+Reset-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru
+
+Remove-WindowsDeviceLinkAssociation `
+    -SerialNumber '<serial-number>' `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+The operations are intentionally not combined automatically. See [OFFBOARDING.md](OFFBOARDING.md) for the complete flow.
+
 ## I want to remove only the tenant-side Device Association
 
 Use:
@@ -472,6 +513,7 @@ See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md) and [INSTALLATION.md](INSTALLATION.md
 ## Further reading
 
 - [AUTOPILOT-V1-VS-DEVICE-PREPARATION.md](AUTOPILOT-V1-VS-DEVICE-PREPARATION.md)
+- [OFFBOARDING.md](OFFBOARDING.md)
 - [FIRMWARE-STATE.md](FIRMWARE-STATE.md)
 - [REMOVE-ASSOCIATION.md](REMOVE-ASSOCIATION.md)
 - [DISCOVER-LINK-RESEARCH.md](DISCOVER-LINK-RESEARCH.md)
