@@ -100,6 +100,9 @@ if (-not $jwtState -or -not $jwtState.Present) {
         FirmwareState         = ('{0}/4' -f (@($firmware | Where-Object Present).Count))
         Encoding              = $null
         Algorithm             = $null
+        SourceVariable        = 'DeviceLinkJwtCompressed'
+        SourceClaim           = $null
+        TenantId              = $null
         CandidateTenantId     = $null
         CandidateTenantClaim  = $null
         Issuer                = $null
@@ -175,6 +178,9 @@ try {
         FirmwareState         = ('{0}/4' -f (@($firmware | Where-Object Present).Count))
         Encoding              = $decoded.Encoding
         Algorithm             = if ($header.PSObject.Properties.Name -contains 'alg') { [string]$header.alg } else { $null }
+        SourceVariable        = 'DeviceLinkJwtCompressed'
+        SourceClaim           = $candidateTenantClaim
+        TenantId              = $candidateTenantId
         CandidateTenantId     = $candidateTenantId
         CandidateTenantClaim  = $candidateTenantClaim
         Issuer                = $issuer
