@@ -23,7 +23,7 @@ function Test-WindowsDeviceLinkHealth {
     Performs a local-only status collection and assessment.
 
     .EXAMPLE
-    Get-WindowsDeviceLinkStatus -Online -Method DeviceCode -TenantId '<tenant-id>' |
+    Get-WindowsDeviceLinkStatus -Online -Method DeviceCode |
         Test-WindowsDeviceLinkHealth |
         Format-List *
 
