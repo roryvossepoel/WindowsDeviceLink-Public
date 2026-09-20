@@ -32,7 +32,6 @@ function Get-WindowsDeviceLinkAssociation {
 
     switch ($Method) {
         'DeviceCode' { if(-not $TenantId){throw '-TenantId is required for -Method DeviceCode.'} }
-        'Interactive' { if(-not $TenantId){throw '-TenantId is required for -Method Interactive.'} }
         'ClientSecret' { if(-not $TenantId -or -not $ClientId -or -not $PSBoundParameters.ContainsKey('ClientSecret')){throw '-TenantId, -ClientId, and -ClientSecret are required for -Method ClientSecret.'} }
         'AccessToken' { if(-not $TenantId -or -not $PSBoundParameters.ContainsKey('AccessToken')){throw '-TenantId and -AccessToken are required for -Method AccessToken.'} }
         'Certificate' { if(-not $TenantId -or -not $ClientId -or -not $Certificate){throw '-TenantId, -ClientId, and -Certificate are required for -Method Certificate.'} }
