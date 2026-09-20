@@ -293,11 +293,11 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.6.0-preview1` is the currently published PowerShell Gallery release. The repository validation described above includes additional post-0.6.0 changes on `main`, including local tenant discovery, that have been validated locally on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
+`WindowsDeviceLink 0.6.0-preview1` is the currently published PowerShell Gallery release. The repository validation described above covers the `0.7.0-preview1` candidate on `main`, including local tenant discovery validated on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
 
 ## Remaining validation / future work
 
-- Trusted code signing; SignPath Foundation application is in progress.
+- Trusted code signing; the initial SignPath Foundation application was reviewed but not approved because the project does not yet have enough external adoption/visibility signals. Revisit SignPath or another trusted signing path later.
 - Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
 - Retest and optimize the beta Device Association serial-number server-side lookup; the current client-side fallback is functionally correct.
 - Webhook transport in AMD64 WinPE.
