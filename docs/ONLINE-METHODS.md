@@ -33,8 +33,8 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 
 | Method | Best fit | Credentials on device | Required input |
 |---|---|---:|---|
-| `DeviceCode` | Interactive admin/test workflow | No persistent secret | `TenantId` |
-| `Interactive` | Interactive Graph SDK workflow | No persistent secret | `TenantId` |
+| `DeviceCode` | Interactive admin/test workflow | No persistent secret | Optional `TenantId`, optional `ClientId` |
+| `Interactive` | Interactive Graph SDK workflow | No persistent secret | Optional `TenantId`, optional `ClientId` |
 | `ClientSecret` | Unattended direct Graph call | Yes | `TenantId`, `ClientId`, `ClientSecret` |
 | `AccessToken` | Caller already has a Graph token | Token in memory | `TenantId`, `AccessToken` |
 | `Certificate` | Unattended Graph SDK call | Certificate/private key | `TenantId`, `ClientId`, `Certificate` |
@@ -45,6 +45,30 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 | `Webhook` | Registration through an automation endpoint | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
 
 `Webhook` applies to `Register-WindowsDeviceLink`. Association lookup/removal and online diagnostics are direct tenant-side Graph operations. `Initialize-WindowsDeviceLink` intentionally excludes Webhook because it must read and verify tenant-side state as part of its idempotent workflow.
+
+## Tenant selection
+
+For delegated authentication (`DeviceCode` and `Interactive`), `-TenantId` is optional.
+
+When `DeviceCode` is used without `-TenantId`, WindowsDeviceLink authenticates through the Microsoft identity platform `organizations` authority. After sign-in, the tenant ID from the issued access token is used for operation results and tenant-side correlation.
+
+This is the recommended default for normal single-tenant use:
+
+```powershell
+Get-WindowsDeviceLink |
+    Register-WindowsDeviceLink -Method DeviceCode
+```
+
+Specify `-TenantId` when you intentionally need to target a particular tenant, especially in multi-tenant or guest-account scenarios:
+
+```powershell
+Get-WindowsDeviceLink |
+    Register-WindowsDeviceLink `
+        -Method DeviceCode `
+        -TenantId '<target-tenant-id>'
+```
+
+App-only authentication remains tenant-specific. `ClientSecret`, certificate methods, and caller-supplied access-token flows continue to require an explicit tenant context unless the method obtains it from its own environment or managed identity.
 
 ## DeviceCode client ID
 
@@ -66,8 +90,7 @@ First obtain the local identity, then explicitly register it:
 $deviceLink = Get-WindowsDeviceLink
 
 $deviceLink | Register-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 This makes the state-changing cloud operation visible in the command name and pipeline.
@@ -79,8 +102,7 @@ By serial number:
 ```powershell
 Get-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 Or by the exact association ID:
@@ -88,8 +110,7 @@ Or by the exact association ID:
 ```powershell
 Get-WindowsDeviceLinkAssociation `
     -AssociationId '<association-id>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 The returned object uses the type name `Windows.DeviceLink.Association` and contains the association state, managed-device linkage, timestamps and Device Preparation policy information returned by Microsoft Graph.
@@ -105,8 +126,7 @@ Live validation showed that the Graph beta endpoint can accept a `serialNumber` 
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 A confirmed lookup with no record returns `CloudChecked=True`, `AssociationPresent=False`, and `AssociationState=NotAssociated`. Authentication/Graph failures instead return `AssociationState=Unknown` plus `AssociationError`; they are not treated as proof that no association exists.
@@ -117,8 +137,7 @@ For the common workflow “preassociate this device if it is locally healthy and
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 The initializer obtains combined status, classifies it, and only registers from the validated `LocalOnly` state. It then verifies the result using the read path. `Preassociated` and `Associated` return `Action=None`; unexpected or incomplete states are blocked. It never resets firmware, removes associations, or reboots.
@@ -150,7 +169,7 @@ For idempotent `Initialize-WindowsDeviceLink`, use one of its supported direct a
 `Register-WindowsDeviceLink` retains the advanced connected-session pattern. If `Connect-WindowsDeviceLink` has already established a Microsoft Graph session, `-Method` can be omitted:
 
 ```powershell
-Connect-WindowsDeviceLink -TenantId '<tenant-id>'
+Connect-WindowsDeviceLink -UseDeviceCode
 Get-WindowsDeviceLink | Register-WindowsDeviceLink
 ```
 
