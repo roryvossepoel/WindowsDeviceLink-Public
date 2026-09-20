@@ -2,10 +2,15 @@
 WindowsDeviceLink - WinPE validation runner
 
 This public test runner contains no tenant-specific or device-specific values.
-Provide TenantId and ClientId when starting the script.
+
+When invoked without -Interactive, it performs automation-safe contract validation only
+and exits without prompting. Use -Interactive for the live WinPE menu.
 
 Example:
-.\WinPE-Validation.ps1 -TenantId '<tenant-id>' -ClientId '<app-id>'
+.\WinPE-Validation.ps1 -Interactive
+
+TenantId and ClientId are only required for authentication methods that technically
+need them, such as client-secret and certificate flows.
 
 For certificate tests, provide a PFX containing the private key when prompted.
 The public WindowsDeviceLink package does not include Windows.Management.Service.dll.
@@ -13,14 +18,11 @@ The public WindowsDeviceLink package does not include Windows.Management.Service
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
     [string]$TenantId,
-
-    [Parameter(Mandatory)]
     [string]$ClientId,
-
     [string]$ModulePath,
-    [string]$ExportRoot = 'X:\WindowsDeviceLink-Test'
+    [string]$ExportRoot = 'X:\WindowsDeviceLink-Test',
+    [switch]$Interactive
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,6 +56,12 @@ function Resolve-WindowsDeviceLinkModule {
     return (Resolve-Path -LiteralPath $manual -ErrorAction Stop).Path
 }
 
+function Assert-AppOnlyConfiguration {
+    if ([string]::IsNullOrWhiteSpace($TenantId) -or [string]::IsNullOrWhiteSpace($ClientId)) {
+        throw 'This authentication method requires -TenantId and -ClientId. Restart the live WinPE runner with those parameters.'
+    }
+}
+
 function Get-ClientSecret {
     if (-not $script:ClientSecret) {
         $script:ClientSecret = Read-Host 'Client secret' -AsSecureString
@@ -62,6 +70,7 @@ function Get-ClientSecret {
 }
 
 function Get-AppOnlyAccessToken {
+    Assert-AppOnlyConfiguration
     $secret = Get-ClientSecret
     $plainSecret = ConvertFrom-SecureStringPlainText -SecureString $secret
     try {
@@ -129,6 +138,26 @@ function Invoke-Test {
 $resolvedModule = Resolve-WindowsDeviceLinkModule
 Import-Module $resolvedModule -Force
 
+if (-not $Interactive) {
+    $getLocal = Get-Command Get-WindowsDeviceLink -Module WindowsDeviceLink
+    if ($getLocal.Parameters.ContainsKey('Online')) {
+        throw 'FAIL: Get-WindowsDeviceLink unexpectedly exposes the legacy -Online parameter.'
+    }
+
+    $register = Get-Command Register-WindowsDeviceLink -Module WindowsDeviceLink
+    if (-not $register.Parameters.ContainsKey('Method')) {
+        throw 'FAIL: Register-WindowsDeviceLink is missing -Method.'
+    }
+
+    $registerSource = $register.ScriptBlock.ToString()
+    if ($registerSource -match '-TenantId is required for -Method DeviceCode') {
+        throw 'FAIL: DeviceCode registration unexpectedly requires -TenantId.'
+    }
+
+    Write-Host 'PASS: WinPE validation runner uses the current local-identity + explicit cloud-registration contract and is automation-safe by default.'
+    return
+}
+
 while ($true) {
     Write-Host ''
     Write-Host 'WindowsDeviceLink - WinPE validation'
@@ -147,26 +176,31 @@ while ($true) {
     switch ($choice) {
         '1' { Invoke-Test 'Support + local generation' { Test-WindowsDeviceLinkSupport | Format-List *; Get-WindowsDeviceLink | Format-List Environment,SerialNumber,Manufacturer,Model,LinkId,DllSource,ActivationMode,DllVersion } }
         '2' { Invoke-Test 'CSV export regression' { Get-WindowsDeviceLink -OutputDirectory $ExportRoot | Out-Host } }
-        '3' { Invoke-Test 'Device code + CSV + online registration' { Get-WindowsDeviceLink -OutputDirectory $ExportRoot -Online -TenantId $TenantId -UseDeviceCode | Format-List } }
-        '4' { Invoke-Test 'Client secret' { $secret = Get-ClientSecret; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -ClientSecret $secret | Format-List } }
-        '5' { Invoke-Test 'Access token' { $token = Get-AppOnlyAccessToken; Get-WindowsDeviceLink -Online -TenantId $TenantId -AccessToken $token | Format-List } }
+        '3' { Invoke-Test 'Device code + CSV + online registration' {
+            $deviceLink = Get-WindowsDeviceLink
+            $deviceLink | Export-WindowsDeviceLinkCsv -DestinationPath $ExportRoot | Out-Host
+            $deviceLink | Register-WindowsDeviceLink -Method DeviceCode | Format-List
+        } }
+        '4' { Invoke-Test 'Client secret' { Assert-AppOnlyConfiguration; $secret = Get-ClientSecret; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method ClientSecret -TenantId $TenantId -ClientId $ClientId -ClientSecret $secret | Format-List } }
+        '5' { Invoke-Test 'Access token' { $token = Get-AppOnlyAccessToken; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method AccessToken -AccessToken $token | Format-List } }
         '6' { Invoke-Test 'Environment variables' {
+            Assert-AppOnlyConfiguration
             $secret = Get-ClientSecret
             $plainSecret = ConvertFrom-SecureStringPlainText -SecureString $secret
             try {
                 $env:AZURE_TENANT_ID = $TenantId
                 $env:AZURE_CLIENT_ID = $ClientId
                 $env:AZURE_CLIENT_SECRET = $plainSecret
-                Get-WindowsDeviceLink -Online -EnvironmentVariable | Format-List
+                Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method EnvironmentVariable | Format-List
             }
             finally {
                 Remove-Item Env:AZURE_TENANT_ID,Env:AZURE_CLIENT_ID,Env:AZURE_CLIENT_SECRET -ErrorAction SilentlyContinue
                 $plainSecret = $null
             }
         } }
-        '7' { Invoke-Test 'Certificate object' { $cert = Get-TestCertificate; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -Certificate $cert | Format-List } }
-        '8' { Invoke-Test 'Certificate thumbprint' { $cert = Install-TestCertificate; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -CertificateThumbprint $cert.Thumbprint | Format-List } }
-        '9' { Invoke-Test 'Certificate subject name' { $cert = Install-TestCertificate; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -CertificateSubjectName $cert.Subject | Format-List } }
+        '7' { Invoke-Test 'Certificate object' { Assert-AppOnlyConfiguration; $cert = Get-TestCertificate; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method Certificate -TenantId $TenantId -ClientId $ClientId -Certificate $cert | Format-List } }
+        '8' { Invoke-Test 'Certificate thumbprint' { Assert-AppOnlyConfiguration; $cert = Install-TestCertificate; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method CertificateThumbprint -TenantId $TenantId -ClientId $ClientId -CertificateThumbprint $cert.Thumbprint | Format-List } }
+        '9' { Invoke-Test 'Certificate subject name' { Assert-AppOnlyConfiguration; $cert = Install-TestCertificate; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method CertificateSubjectName -TenantId $TenantId -ClientId $ClientId -CertificateSubjectName $cert.Subject | Format-List } }
         'Q' { break }
         default { Write-Host 'Unknown selection.' }
     }
