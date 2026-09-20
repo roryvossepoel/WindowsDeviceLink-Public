@@ -12,6 +12,7 @@ WindowsDeviceLink can:
 - export the official Windows-generated `.devicelink.csv`;
 - query, pre-associate and remove Intune Device Association records;
 - inspect and reset local DeviceLink UEFI state;
+- identify the source tenant locally from current DeviceLink registry/JWT metadata without Graph;
 - discover and complete device-side association on supported full Windows builds;
 - provide diagnostics, health classification, preflight checks and safe lifecycle orchestration;
 - send pre-association requests to optional Azure Function or Azure Automation backends.
@@ -171,6 +172,18 @@ Get-WindowsDeviceLink |
     Register-WindowsDeviceLink -Method Interactive
 ```
 
+
+
+### Identify the source tenant locally
+
+```powershell
+Get-WindowsDeviceLinkLocalAssociation |
+    Format-List *
+```
+
+The command performs no Graph lookup. It uses only metadata tied to the current local `DeviceLinkId` and fails closed if the registry and Association JWT tenant identifiers disagree.
+
+See [LOCAL-TENANT-DISCOVERY.md](docs/LOCAL-TENANT-DISCOVERY.md).
 ### Query combined local/cloud status
 
 ```powershell
@@ -320,6 +333,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 - [RECONCILE-SCHEMA-v1.md](docs/RECONCILE-SCHEMA-v1.md) — safe multitenant New / Move / Update reconciliation.
 - [SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md) — reference-deployment security boundary and optional hardening.
 - [FIRMWARE-STATE.md](docs/FIRMWARE-STATE.md) — UEFI state and reset lifecycle.
+- [LOCAL-TENANT-DISCOVERY.md](docs/LOCAL-TENANT-DISCOVERY.md) — local source-tenant identification, trust levels and lifecycle.
 - [DISCOVER-LINK-RESEARCH.md](docs/DISCOVER-LINK-RESEARCH.md) — validated DeviceLinkManager research/evidence.
 - [OFFBOARDING.md](docs/OFFBOARDING.md) — complete pre-associated / associated offboarding flow.
 - [REMOVE-ASSOCIATION.md](docs/REMOVE-ASSOCIATION.md) — tenant-side Device Association removal.
