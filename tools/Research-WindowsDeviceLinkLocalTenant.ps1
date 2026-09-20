@@ -100,6 +100,11 @@ if (-not $jwtState -or -not $jwtState.Present) {
         FirmwareState         = ('{0}/4' -f (@($firmware | Where-Object Present).Count))
         Encoding              = $null
         Algorithm             = $null
+        HeaderKeyId           = $null
+        HeaderX5t             = $null
+        IssuedAtUtc           = $null
+        NotBeforeUtc          = $null
+        ExpiresUtc            = $null
         SourceVariable        = 'DeviceLinkJwtCompressed'
         SourceClaim           = $null
         TenantId              = $null
@@ -157,6 +162,12 @@ try {
         }
     }
 
+    function ConvertFrom-EpochClaim {
+        param($Value)
+        if ($null -eq $Value) { return $null }
+        try { return [DateTimeOffset]::FromUnixTimeSeconds([int64]$Value).UtcDateTime } catch { return $null }
+    }
+
     $tenantRelatedClaims = @(
         $payload.PSObject.Properties.Name |
             Where-Object { $_ -match '(?i)(tenant|directory|issuer|authority|domain|organization|org|tid)' } |
@@ -178,6 +189,11 @@ try {
         FirmwareState         = ('{0}/4' -f (@($firmware | Where-Object Present).Count))
         Encoding              = $decoded.Encoding
         Algorithm             = if ($header.PSObject.Properties.Name -contains 'alg') { [string]$header.alg } else { $null }
+        HeaderKeyId           = if ($header.PSObject.Properties.Name -contains 'kid') { [string]$header.kid } else { $null }
+        HeaderX5t             = if ($header.PSObject.Properties.Name -contains 'x5t') { [string]$header.x5t } else { $null }
+        IssuedAtUtc           = if ($payload.PSObject.Properties.Name -contains 'iat') { ConvertFrom-EpochClaim $payload.iat } else { $null }
+        NotBeforeUtc          = if ($payload.PSObject.Properties.Name -contains 'nbf') { ConvertFrom-EpochClaim $payload.nbf } else { $null }
+        ExpiresUtc            = if ($payload.PSObject.Properties.Name -contains 'exp') { ConvertFrom-EpochClaim $payload.exp } else { $null }
         SourceVariable        = 'DeviceLinkJwtCompressed'
         SourceClaim           = $candidateTenantClaim
         TenantId              = $candidateTenantId
