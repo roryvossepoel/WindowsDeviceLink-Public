@@ -33,10 +33,10 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 
 | Method | Best fit | Credentials on device | Required input |
 |---|---|---:|---|
-| `DeviceCode` | Interactive admin/test workflow | No persistent secret | `TenantId` |
-| `Interactive` | Interactive Graph SDK workflow | No persistent secret | `TenantId` |
+| `DeviceCode` | Interactive admin/test workflow | No persistent secret | Optional `TenantId`, optional `ClientId` |
+| `Interactive` | Interactive Graph SDK workflow | No persistent secret | Optional `TenantId`, optional `ClientId` |
 | `ClientSecret` | Unattended direct Graph call | Yes | `TenantId`, `ClientId`, `ClientSecret` |
-| `AccessToken` | Caller already has a Graph token | Token in memory | `TenantId`, `AccessToken` |
+| `AccessToken` | Caller already has a Graph token | Token in memory | `AccessToken`; optional `TenantId` |
 | `Certificate` | Unattended Graph SDK call | Certificate/private key | `TenantId`, `ClientId`, `Certificate` |
 | `CertificateThumbprint` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateThumbprint` |
 | `CertificateSubjectName` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateSubjectName` |
@@ -45,6 +45,17 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 | `Webhook` | Registration through an automation endpoint | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
 
 `Webhook` applies to `Register-WindowsDeviceLink`. Association lookup/removal and online diagnostics are direct tenant-side Graph operations. `Initialize-WindowsDeviceLink` intentionally excludes Webhook because it must read and verify tenant-side state as part of its idempotent workflow.
+
+## Tenant selection
+
+For delegated authentication (`Interactive` and `DeviceCode`) and caller-supplied `AccessToken` authentication, `-TenantId` is optional.
+
+When delegated authentication is used without `-TenantId`, the sign-in context determines the tenant. Native `DeviceCode` uses the Microsoft identity platform `organizations` authority. For `DeviceCode` and `AccessToken`, WindowsDeviceLink resolves the token `tid` claim on a best-effort basis for result metadata and tenant-side correlation.
+
+Specify `-TenantId` when you intentionally need to target a particular tenant, especially in multitenant or guest-account scenarios. App-only client-credential and certificate authentication remain tenant-specific because their token authority must identify the target tenant.
+
+WindowsDeviceLink does not prescribe one delegated authentication method. Use the method compatible with the runtime and the tenant's access policies.
+
 
 ## DeviceCode client ID
 
