@@ -126,6 +126,41 @@ For a fully associated device, a complete decommissioning or tenant-move workflo
 
 Keep these operations separate unless the caller intentionally combines them.
 
+
+
+## Local tenant discovery
+
+Use:
+
+```powershell
+Get-WindowsDeviceLinkLocalAssociation
+```
+
+This read-only command correlates two local tenant-identification sources:
+
+```text
+current DeviceLinkId
+-> HKLM\SOFTWARE\Microsoft\Provisioning\AutopilotSettings
+-> <DeviceLinkId>_TenantIdHint
+
+and, when associated:
+
+DeviceLinkJwtCompressed
+-> GZip JWT
+-> tenantId
+```
+
+Observed trust levels:
+
+- `CorrelatedLocalSources`: current-LinkId registry hint and JWT tenantId are both present and equal.
+- `LocalRegistryHint`: only the exact current-LinkId registry hint is present.
+- `StructurallyObservedJwtClaim`: only the JWT tenant claim is present.
+- `Conflict`: both are present but differ; no TenantId is selected.
+- `Unavailable`: no eligible current local source exists.
+
+Historical registry hints can survive local firmware reset. They are therefore ignored unless the property prefix exactly matches the current UEFI `DeviceLinkId`.
+
+The Association JWT signature is currently reported as `NotPerformed`. Live research did not locate a supported published signing-key discovery path for the observed `DeviceTag_<guid>` token issuer, so the module does not claim cryptographic verification.
 ## Validated lifecycle observations
 
 Testing on physical AMD64 hardware confirmed the following behavior.
@@ -145,6 +180,36 @@ DeviceLinkCreationTimeUtc
 
 The JWT variables were not present yet.
 
+
+
+### Tenant-hint lifecycle
+
+Physical-device validation established the following sequence:
+
+```text
+0/4
+-> no current DeviceLinkId
+-> historical registry hints may remain
+-> no tenant selected
+
+Get-WindowsDeviceLink
+-> new 2/4 base identity
+-> no matching current-LinkId TenantIdHint yet
+
+Graph preassociation
+-> still 2/4
+-> no local TenantIdHint yet
+
+Test-WindowsDeviceLinkDiscovery
+-> still 2/4
+-> writes <current LinkId>_TenantIdHint and _DiscoveryUrl
+-> tenant becomes locally discoverable
+
+native completion
+-> 4/4
+-> DeviceLinkJwtCompressed appears
+-> JWT tenantId can be correlated with registry TenantIdHint
+```
 ### Preassociation
 
 Creating the server-side preassociation did not add the JWT variables. Local state remained the DeviceLink identity state above.
