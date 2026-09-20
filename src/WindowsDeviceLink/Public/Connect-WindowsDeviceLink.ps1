@@ -2,7 +2,7 @@ function Connect-WindowsDeviceLink {
     [CmdletBinding(DefaultParameterSetName = 'Interactive')]
     param(
         [Parameter(ParameterSetName = 'Interactive')]
-        [Parameter(Mandatory, ParameterSetName = 'DeviceCode')]
+        [Parameter(ParameterSetName = 'DeviceCode')]
         [Parameter(Mandatory, ParameterSetName = 'Certificate')]
         [Parameter(Mandatory, ParameterSetName = 'CertificateThumbprint')]
         [Parameter(Mandatory, ParameterSetName = 'CertificateSubjectName')]
@@ -45,7 +45,7 @@ function Connect-WindowsDeviceLink {
             if($ClientId){$parameters.ClientId=$ClientId}
             if(Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT'){Write-Warning 'Interactive browser authentication may not be available in WinPE. Use another supported authentication method if necessary.'}
         }
-        'DeviceCode' {$parameters.TenantId=$TenantId;$parameters.Scopes=$Scopes;$parameters.ContextScope='Process';$parameters.UseDeviceCode=$true}
+        'DeviceCode' {if($TenantId){$parameters.TenantId=$TenantId};$parameters.Scopes=$Scopes;$parameters.ContextScope='Process';$parameters.UseDeviceCode=$true}
         'AccessToken' {$parameters.AccessToken=$AccessToken}
         'Certificate' {$parameters.TenantId=$TenantId;$parameters.ClientId=$ClientId;$parameters.Certificate=$Certificate;$parameters.SendCertificateChain=$SendCertificateChain;$parameters.ContextScope='Process'}
         'CertificateThumbprint' {$parameters.TenantId=$TenantId;$parameters.ClientId=$ClientId;$parameters.CertificateThumbprint=$CertificateThumbprint;$parameters.SendCertificateChain=$SendCertificateChain;$parameters.ContextScope='Process'}
