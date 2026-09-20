@@ -53,11 +53,10 @@ Delete Device Association record -> Done
 With WindowsDeviceLink:
 
 ```powershell
-Remove-WindowsDeviceLinkAssociation `
-    -SerialNumber '<serial-number>'
+Remove-WindowsDeviceLinkAssociation -Method Interactive
 ```
 
-For normal single-tenant use, no tenant ID is required in the example. Specify `-TenantId` only when the authentication context does not uniquely identify the intended tenant, such as an explicit multitenant workflow.
+When no `-SerialNumber` or `-AssociationId` is supplied, the cmdlet uses the serial number of the local machine. `Interactive` authentication can use the tenant selected by the sign-in context. Specify `-TenantId` when an explicit tenant must be targeted, such as a multitenant workflow.
 
 The same operation can also be performed from:
 
@@ -127,8 +126,7 @@ Firmware: 0/4
 After local association information has been cleared:
 
 ```powershell
-Remove-WindowsDeviceLinkAssociation `
-    -SerialNumber '<serial-number>'
+Remove-WindowsDeviceLinkAssociation -Method Interactive
 ```
 
 Or delete the device from:
