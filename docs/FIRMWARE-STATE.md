@@ -104,7 +104,7 @@ Reset-WindowsDeviceLinkFirmwareState -WhatIf
 ```
 
 > [!IMPORTANT]
-> A reset does not mean that every DeviceLink variable remains permanently absent. Testing confirmed that Windows can create a **new** `DeviceLinkId` and `DeviceLinkCreationTimeUtc` after reboot. The old identity was not restored: SHA-256 fingerprints of the DeviceLinkId differed before and after reset/reboot, and the creation time changed.
+> A reset does not mean that every DeviceLink variable remains permanently absent. Current testing shows that a reboot alone can leave the device at **0/4**. A later DeviceLink identity retrieval (for example, `Get-WindowsDeviceLink`) can materialize a **new** `DeviceLinkId` and `DeviceLinkCreationTimeUtc`, returning the device to the base **2/4** state. The old identity is not restored.
 
 ## Server-side removal is separate
 
@@ -168,22 +168,20 @@ Deleting the `tenantAssociatedDevices` record did not remove the local firmware 
 
 Removing all four variables succeeded in both full Windows and AMD64 WinPE and was verified immediately afterward. All four returned `Present = False` and Win32 error `203`.
 
-### New identity after reboot
+### New identity after reset
 
-A controlled test established the complete reset behavior:
+Controlled testing established the reset behavior more precisely:
 
 1. the server-side Device Association record was removed;
 2. Intune showed no Device Association record for the device;
-3. a SHA-256 fingerprint of the current `DeviceLinkId` and the creation-time bytes was recorded;
-4. all four local DeviceLink UEFI variables were reset and immediately verified absent;
-5. the device was rebooted into full Windows;
-6. no `Get-WindowsDeviceLink` command was run before the post-boot firmware check;
-7. `DeviceLinkId` and `DeviceLinkCreationTimeUtc` were present again, while both JWT variables remained absent;
-8. the post-boot `DeviceLinkId` SHA-256 fingerprint differed from the pre-reset fingerprint and the creation time also changed;
-9. `Get-WindowsDeviceLink` returned the new identity;
-10. that new identity was successfully pre-associated again and Intune showed a new `Pre-associated` record for the same physical device.
+3. all four local DeviceLink UEFI variables were reset and immediately verified absent;
+4. the device was rebooted into full Windows;
+5. a post-boot firmware check still showed **0/4**;
+6. `Get-WindowsDeviceLink` was then invoked;
+7. immediately afterward, `DeviceLinkId` and `DeviceLinkCreationTimeUtc` were present again, while both JWT variables remained absent;
+8. the resulting state was therefore the base **2/4** identity state.
 
-This demonstrates on the tested device that reset removes the old local DeviceLink identity. Windows subsequently creates a **new** base DeviceLink identity during/after boot. The presence of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` alone must therefore not be interpreted as restoration of the old identity or proof of an active tenant association.
+This demonstrates that reset removes the old local DeviceLink identity. A reboot alone does not necessarily recreate the base identity. A later DeviceLink identity retrieval can materialize a **new** base identity. The presence of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` alone must not be interpreted as restoration of the old identity or proof of an active tenant association.
 
 In the validated fully associated state, the two JWT-related variables were also present. Their exact semantics should not be inferred beyond the observed lifecycle behavior without additional Microsoft documentation or testing.
 
@@ -213,4 +211,4 @@ Firmware access requires `SeSystemEnvironmentPrivilege`. WindowsDeviceLink enabl
 - Use `-WhatIf` / confirmation behavior for destructive operations where appropriate.
 - Treat server-side removal and local firmware reset as separate lifecycle operations.
 - Do not treat `DeviceLinkId` or `DeviceLinkCreationTimeUtc` alone as evidence of an active tenant association.
-- Expect Windows to create a new base DeviceLink identity after reset/reboot on the validated hardware.
+- Expect a new base DeviceLink identity to be materialized when DeviceLink identity retrieval is invoked after reset; reboot alone may leave the device at 0/4.
