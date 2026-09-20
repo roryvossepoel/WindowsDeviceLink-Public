@@ -1,7 +1,7 @@
 function Get-WindowsDeviceLinkDeviceCodeToken {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$TenantId,
+        [ValidateNotNullOrEmpty()][string]$TenantId = 'organizations',
         [ValidateNotNullOrEmpty()][string]$ClientId = '14d82eec-204b-4c2f-b7e8-296a70dab67e',
         [ValidateNotNullOrEmpty()][string]$Scope = 'https://graph.microsoft.com/DeviceManagementServiceConfig.ReadWrite.All offline_access openid profile',
         [scriptblock]$RequestScript,
@@ -47,7 +47,20 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
 
             if ($tokenResponse.access_token) {
                 Write-Information -InformationAction Continue -MessageData 'Device code authentication succeeded.'
-                return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$TenantId }
+                $effectiveTenantId = $TenantId
+                try {
+                    $segments = ([string]$tokenResponse.access_token).Split('.')
+                    if ($segments.Count -ge 2) {
+                        $payload = $segments[1].Replace('-','+').Replace('_','/')
+                        switch ($payload.Length % 4) { 2 { $payload += '==' }; 3 { $payload += '=' } }
+                        $claims = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
+                        if ($claims.tid) { $effectiveTenantId = [string]$claims.tid }
+                    }
+                }
+                catch {
+                    # Tenant resolution is best-effort. Authentication itself already succeeded.
+                }
+                return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$effectiveTenantId }
             }
         }
         catch {
