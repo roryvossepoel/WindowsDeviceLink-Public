@@ -239,7 +239,7 @@ Reset-WindowsDeviceLinkFirmwareState -Confirm:$false -PassThru
 
 Immediately after a successful reset, all four known DeviceLink firmware variables should be absent (`0/4`).
 
-After a reboot, Windows can generate a **new** local DeviceLink base identity, typically returning to `2/4`.
+After reset, a reboot alone can leave the device at `0/4`. A later DeviceLink identity retrieval, such as `Get-WindowsDeviceLink`, can materialize a **new** local base identity and return the device to `2/4`.
 
 This operation does **not** delete the tenant-side Device Association.
 
@@ -465,9 +465,11 @@ Use `-WhatIf` when validating intended transitions before modifying state.
 
 ## Does reset restore the previous DeviceLink identity after reboot?
 
-No. Live testing showed that reset removes the old local DeviceLink identity. After reboot, Windows can generate a **new** identity.
+No. Live testing showed that reset removes the old local DeviceLink identity.
 
-The reappearance of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` after reboot is expected regeneration, not restoration of the removed identity.
+A reboot alone can leave the device at `0/4`. When DeviceLink identity retrieval is invoked later, for example with `Get-WindowsDeviceLink`, Windows can materialize a **new** base identity and return the device to `2/4`.
+
+The reappearance of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` is new identity materialization, not restoration of the removed identity.
 
 ## Can the module be used in WinPE?
 
