@@ -84,8 +84,7 @@ Use:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 for the server-side Intune/Graph record.
