@@ -70,25 +70,25 @@ Diagnostics / orchestration
 
 The normal lifecycle is:
 
-```text
-LocalOnly -> Preassociated -> Associated -> Offboarded
+```mermaid
+flowchart LR
+    A["LocalOnly<br/>Local DeviceLink identity"]
+    B["Pre-associated<br/>Tenant record created"]
+    C["Associated<br/>Tenant affinity stored in UEFI"]
+    D["Offboarded<br/>Association removed"]
+
+    A -->|"Register"| B
+    B -->|"Complete association"| C
+    B -->|"Remove cloud record"| D
+    C -->|"Offboard"| D
 ```
 
 ### Offboarding
 
 The required cleanup depends on the current association state:
 
-```text
-Pre-associated
-    -> delete the tenant-side Device Association record
-    -> done
-
-Associated
-    -> ensure the device is no longer enrolled with MDM
-    -> clear the local Device Link UEFI state
-    -> delete the tenant-side Device Association record
-    -> done
-```
+- **Pre-associated**: delete the tenant-side Device Association record.
+- **Associated**: end MDM enrollment, clear the local Device Link UEFI state, then delete the tenant-side Device Association record.
 
 For an **Associated** device, deleting only the Device Association record from Intune is not a complete offboarding operation. The trusted tenant affinity remains in UEFI until the local Device Link state is cleared.
 
