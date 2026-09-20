@@ -94,7 +94,8 @@ The deployment creates:
 - webhook API-key secret;
 - Graph credential secret;
 - inline `Register-WindowsDeviceLink` HTTP function;
-- inline `Lookup-WindowsDeviceLink` multitenant search function.
+- inline `Lookup-WindowsDeviceLink` multitenant search function;
+- inline `Reconcile-WindowsDeviceLink` New / Move / Update function.
 
 The template intentionally does **not** create the multitenant Entra application or grant admin consent in other tenants. Those are identity-governance actions and remain explicit administrator steps.
 
@@ -177,3 +178,20 @@ The endpoint searches the configured allowed tenants and reports where the seria
 This is intentionally a backend/operator API and does not require WindowsDeviceLink to be installed on the lookup client.
 
 See [MULTITENANT-LOOKUP.md](MULTITENANT-LOOKUP.md).
+
+
+## Multitenant reconciliation
+
+For provisioning workflows that already determine a likely source tenant and desired target tenant, the reference backends also support a controlled reconciliation model.
+
+```text
+New     -> no current association; create in target
+Move    -> association exists in another tenant; remove exact source, verify, create target
+Update  -> association is already in target; no tenant move required
+```
+
+The caller's source lookup is not trusted blindly. The backend repeats the lookup immediately before any mutation and fails closed on inconsistent or ambiguous state.
+
+There is intentionally **no public/raw delete endpoint** in the reference Function or Automation backend. Association removal is only reachable as an internal step of a verified Move.
+
+See [RECONCILE-SCHEMA-v1.md](RECONCILE-SCHEMA-v1.md).
