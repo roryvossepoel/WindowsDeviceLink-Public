@@ -66,6 +66,34 @@ Diagnostics / orchestration
 
 `Get-WindowsDeviceLink` is always local. It does not authenticate to Microsoft Graph and does not create tenant-side state.
 
+## Device Association lifecycle
+
+The normal lifecycle is:
+
+```text
+LocalOnly -> Preassociated -> Associated -> Offboarded
+```
+
+### Offboarding
+
+The required cleanup depends on the current association state:
+
+```text
+Pre-associated
+    -> delete the tenant-side Device Association record
+    -> done
+
+Associated
+    -> ensure the device is no longer enrolled with MDM
+    -> clear the local Device Link UEFI state
+    -> delete the tenant-side Device Association record
+    -> done
+```
+
+For an **Associated** device, deleting only the Device Association record from Intune is not a complete offboarding operation. The trusted tenant affinity remains in UEFI until the local Device Link state is cleared.
+
+See [OFFBOARDING.md](docs/OFFBOARDING.md) for the complete operator flow.
+
 ## Installation
 
 ### Windows 11
@@ -296,6 +324,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 - [SECURITY-HARDENING.md](docs/SECURITY-HARDENING.md) — reference-deployment security boundary and optional hardening.
 - [FIRMWARE-STATE.md](docs/FIRMWARE-STATE.md) — UEFI state and reset lifecycle.
 - [DISCOVER-LINK-RESEARCH.md](docs/DISCOVER-LINK-RESEARCH.md) — validated DeviceLinkManager research/evidence.
+- [OFFBOARDING.md](docs/OFFBOARDING.md) — complete pre-associated / associated offboarding flow.
 - [REMOVE-ASSOCIATION.md](docs/REMOVE-ASSOCIATION.md) — tenant-side Device Association removal.
 - [CODE-SIGNING.md](docs/CODE-SIGNING.md) — code-signing policy and release provenance.
 - [PRIVACY.md](PRIVACY.md) — privacy policy and administrator-initiated network transfers.
