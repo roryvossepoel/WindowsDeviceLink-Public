@@ -147,9 +147,9 @@ while ($true) {
     switch ($choice) {
         '1' { Invoke-Test 'Support + local generation' { Test-WindowsDeviceLinkSupport | Format-List *; Get-WindowsDeviceLink | Format-List Environment,SerialNumber,Manufacturer,Model,LinkId,DllSource,ActivationMode,DllVersion } }
         '2' { Invoke-Test 'CSV export regression' { Get-WindowsDeviceLink -OutputDirectory $ExportRoot | Out-Host } }
-        '3' { Invoke-Test 'Device code + CSV + online registration' { Get-WindowsDeviceLink -OutputDirectory $ExportRoot -Online -TenantId $TenantId -UseDeviceCode | Format-List } }
-        '4' { Invoke-Test 'Client secret' { $secret = Get-ClientSecret; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -ClientSecret $secret | Format-List } }
-        '5' { Invoke-Test 'Access token' { $token = Get-AppOnlyAccessToken; Get-WindowsDeviceLink -Online -TenantId $TenantId -AccessToken $token | Format-List } }
+        '3' { Invoke-Test 'Device code + CSV + online registration' { $deviceLink = Get-WindowsDeviceLink -OutputDirectory $ExportRoot; $deviceLink | Register-WindowsDeviceLink -Method DeviceCode | Format-List } }
+        '4' { Invoke-Test 'Client secret' { $secret = Get-ClientSecret; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method ClientSecret -TenantId $TenantId -ClientId $ClientId -ClientSecret $secret | Format-List } }
+        '5' { Invoke-Test 'Access token' { $token = Get-AppOnlyAccessToken; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method AccessToken -TenantId $TenantId -AccessToken $token | Format-List } }
         '6' { Invoke-Test 'Environment variables' {
             $secret = Get-ClientSecret
             $plainSecret = ConvertFrom-SecureStringPlainText -SecureString $secret
@@ -157,16 +157,16 @@ while ($true) {
                 $env:AZURE_TENANT_ID = $TenantId
                 $env:AZURE_CLIENT_ID = $ClientId
                 $env:AZURE_CLIENT_SECRET = $plainSecret
-                Get-WindowsDeviceLink -Online -EnvironmentVariable | Format-List
+                Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method EnvironmentVariable | Format-List
             }
             finally {
                 Remove-Item Env:AZURE_TENANT_ID,Env:AZURE_CLIENT_ID,Env:AZURE_CLIENT_SECRET -ErrorAction SilentlyContinue
                 $plainSecret = $null
             }
         } }
-        '7' { Invoke-Test 'Certificate object' { $cert = Get-TestCertificate; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -Certificate $cert | Format-List } }
-        '8' { Invoke-Test 'Certificate thumbprint' { $cert = Install-TestCertificate; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -CertificateThumbprint $cert.Thumbprint | Format-List } }
-        '9' { Invoke-Test 'Certificate subject name' { $cert = Install-TestCertificate; Get-WindowsDeviceLink -Online -TenantId $TenantId -ClientId $ClientId -CertificateSubjectName $cert.Subject | Format-List } }
+        '7' { Invoke-Test 'Certificate object' { $cert = Get-TestCertificate; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method Certificate -TenantId $TenantId -ClientId $ClientId -Certificate $cert | Format-List } }
+        '8' { Invoke-Test 'Certificate thumbprint' { $cert = Install-TestCertificate; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method CertificateThumbprint -TenantId $TenantId -ClientId $ClientId -CertificateThumbprint $cert.Thumbprint | Format-List } }
+        '9' { Invoke-Test 'Certificate subject name' { $cert = Install-TestCertificate; Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method CertificateSubjectName -TenantId $TenantId -ClientId $ClientId -CertificateSubjectName $cert.Subject | Format-List } }
         'Q' { break }
         default { Write-Host 'Unknown selection.' }
     }
