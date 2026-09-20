@@ -50,6 +50,95 @@ function Get-WindowsDeviceLinkLocalAssociation {
         default { 'IncompleteFirmwareState' }
     }
 
+    $registryPath = 'HKLM:\SOFTWARE\Microsoft\Provisioning\AutopilotSettings'
+    $historicalHintCount = 0
+    if (Test-Path -LiteralPath $registryPath) {
+        try {
+            $registryBaseline = Get-ItemProperty -LiteralPath $registryPath -ErrorAction Stop
+            $historicalHintCount = @(
+                $registryBaseline.PSObject.Properties |
+                    Where-Object { $_.Name -match '(?i)_TenantIdHint
+        return [pscustomobject]@{
+            PSTypeName='Windows.DeviceLink.LocalAssociation'; LocalAssociationState=$localState; FirmwareState=$firmwareState;
+            LinkId=$null; TenantId=$null; DiscoveryUrl=$null; RegistryHintPresent=$false; RegistryTenantIdHint=$null;
+            RegistryDiscoveryUrl=$null; HistoricalTenantHintCount=$historicalHintCount; JwtPresent=$false; JwtParseState='Absent';
+            JwtEncoding=$null; JwtTenantId=$null; JwtTenantClaim=$null; JwtDiscoveryUrl=$null; TenantSourcesMatch=$null;
+            Source='Unavailable'; TrustLevel='Unavailable'; SignatureValidation='NotPerformed'; ConflictDetected=$false;
+            CloudChecked=$false; Conclusion='The current DeviceLinkId is unavailable, so local tenant correlation cannot be performed.'
+        }
+    }
+
+    try {
+        $linkId = ConvertFrom-WindowsDeviceLinkIdBytes -Bytes $linkRaw.Bytes
+        if (-not $linkId) { throw 'The current DeviceLinkId firmware value could not be safely decoded as a GUID.' }
+
+        $registryTenant = $null
+        $registryDiscoveryUrl = $null
+        $registryHintPresent = $false
+
+        if (Test-Path -LiteralPath $registryPath) {
+            $registry = Get-ItemProperty -LiteralPath $registryPath -ErrorAction Stop
+            $tenantPropertyName = "$($linkId)_TenantIdHint"
+            $discoveryPropertyName = "$($linkId)_DiscoveryUrl"
+
+            $historicalHintCount = @($registry.PSObject.Properties | Where-Object { $_.Name -match '(?i)_TenantIdHint$' }).Count
+
+            if ($registry.PSObject.Properties.Name -contains $tenantPropertyName) {
+                $value = [string]$registry.$tenantPropertyName
+                if (-not [string]::IsNullOrWhiteSpace($value)) {
+                    $registryTenant = $value.Trim().Trim('{','}')
+                    $registryHintPresent = $true
+                }
+            }
+
+            if ($registry.PSObject.Properties.Name -contains $discoveryPropertyName) {
+                $value = [string]$registry.$discoveryPropertyName
+                if (-not [string]::IsNullOrWhiteSpace($value)) { $registryDiscoveryUrl = $value }
+            }
+        }
+
+        $jwt = Get-WindowsDeviceLinkLocalAssociationJwtMetadata
+        $correlation = Resolve-WindowsDeviceLinkLocalTenantCorrelation -RegistryTenantId $registryTenant -JwtTenantId $jwt.TenantId
+
+        $discoveryUrl = if (-not [string]::IsNullOrWhiteSpace($jwt.DiscoveryUrl)) { $jwt.DiscoveryUrl } else { $registryDiscoveryUrl }
+
+        [pscustomobject]@{
+            PSTypeName='Windows.DeviceLink.LocalAssociation'
+            LocalAssociationState=$localState
+            FirmwareState=$firmwareState
+            LinkId=$linkId
+            TenantId=$correlation.TenantId
+            DiscoveryUrl=$discoveryUrl
+            RegistryHintPresent=$registryHintPresent
+            RegistryTenantIdHint=$registryTenant
+            RegistryDiscoveryUrl=$registryDiscoveryUrl
+            HistoricalTenantHintCount=$historicalHintCount
+            JwtPresent=[bool]$jwt.Present
+            JwtParseState=$jwt.ParseState
+            JwtEncoding=$jwt.Encoding
+            JwtTenantId=$jwt.TenantId
+            JwtTenantClaim=$jwt.TenantClaim
+            JwtDiscoveryUrl=$jwt.DiscoveryUrl
+            TenantSourcesMatch=$correlation.SourcesMatch
+            Source=$correlation.Source
+            TrustLevel=$correlation.TrustLevel
+            SignatureValidation=$jwt.SignatureValidation
+            ConflictDetected=$correlation.Conflict
+            CloudChecked=$false
+            Conclusion=$correlation.Conclusion
+        }
+    }
+    finally {
+        if ($linkRaw -and $linkRaw.Bytes) { [Array]::Clear($linkRaw.Bytes,0,$linkRaw.Bytes.Length) }
+        $linkRaw = $null
+    }
+}
+ }
+            ).Count
+        }
+        catch {}
+    }
+
     $linkRaw = Get-WindowsDeviceLinkFirmwareVariableBytes -Name DeviceLinkId
     if (-not $linkRaw.Present -or -not $linkRaw.Bytes) {
         return [pscustomobject]@{
