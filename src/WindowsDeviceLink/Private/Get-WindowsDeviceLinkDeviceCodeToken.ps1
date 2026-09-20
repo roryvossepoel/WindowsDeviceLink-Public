@@ -53,7 +53,7 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
                     if ($segments.Count -ge 2) {
                         $payload = $segments[1].Replace('-','+').Replace('_','/')
                         switch ($payload.Length % 4) { 2 { $payload += '==' }; 3 { $payload += '=' } }
-                        $claims = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
+                        $claims = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
                         if ($claims.tid) { $effectiveTenantId = [string]$claims.tid }
                     }
                 }
