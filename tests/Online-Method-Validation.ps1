@@ -63,10 +63,6 @@ Assert-Throws -Name 'Register Webhook rejects ClientSecret' -ExpectedMessage 'no
     $fakeDeviceLink | Register-WindowsDeviceLink -Method Webhook -WebhookUri 'https://example.invalid/' -ClientSecret $testSecret
 }
 
-Assert-Throws -Name 'Register DeviceCode requires TenantId' -ExpectedMessage '-TenantId is required for -Method DeviceCode' -ScriptBlock {
-    $fakeDeviceLink | Register-WindowsDeviceLink -Method DeviceCode
-}
-
 Assert-Throws -Name 'Association lookup requires selector' -ExpectedMessage 'Specify exactly one of -AssociationId or -SerialNumber' -ScriptBlock {
     Get-WindowsDeviceLinkAssociation -Method DeviceCode -TenantId '00000000-0000-0000-0000-000000000000'
 }
@@ -75,13 +71,22 @@ Assert-Throws -Name 'Association lookup rejects two selectors' -ExpectedMessage 
     Get-WindowsDeviceLinkAssociation -AssociationId 'test-id' -SerialNumber 'TEST-SERIAL' -Method DeviceCode -TenantId '00000000-0000-0000-0000-000000000000'
 }
 
-Assert-Throws -Name 'Association DeviceCode requires TenantId' -ExpectedMessage '-TenantId is required for -Method DeviceCode' -ScriptBlock {
-    Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method DeviceCode
-}
-
 Assert-Throws -Name 'Association ClientSecret requires all inputs' -ExpectedMessage '-TenantId, -ClientId, and -ClientSecret are required' -ScriptBlock {
     Get-WindowsDeviceLinkAssociation -SerialNumber 'TEST-SERIAL' -Method ClientSecret -TenantId '00000000-0000-0000-0000-000000000000'
 }
+
+$module = Get-Module WindowsDeviceLink
+$deviceCodeSource = & $module { (Get-Command Get-WindowsDeviceLinkDeviceCodeToken).ScriptBlock.ToString() }
+if ($deviceCodeSource -notmatch "TenantId\\s*=\\s*'organizations'") {
+    throw 'FAIL: DeviceCode default authority is not organizations.'
+}
+foreach ($commandName in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAssociation','Remove-WindowsDeviceLinkAssociation','Initialize-WindowsDeviceLink')) {
+    $source = (Get-Command $commandName -Module WindowsDeviceLink).ScriptBlock.ToString()
+    if ($source -match '-TenantId is required for -Method DeviceCode') {
+        throw "FAIL: $commandName still requires TenantId for DeviceCode."
+    }
+}
+Write-Host 'PASS: DeviceCode supports omitted TenantId and defaults to organizations authority.'
 
 Write-Host ''
 Write-Host 'Cloud-operation parameter validation regression set passed.'
