@@ -36,7 +36,7 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 | `DeviceCode` | Interactive admin/test workflow | No persistent secret | Optional `TenantId`, optional `ClientId` |
 | `Interactive` | Interactive Graph SDK workflow | No persistent secret | Optional `TenantId`, optional `ClientId` |
 | `ClientSecret` | Unattended direct Graph call | Yes | `TenantId`, `ClientId`, `ClientSecret` |
-| `AccessToken` | Caller already has a Graph token | Token in memory | `TenantId`, `AccessToken` |
+| `AccessToken` | Caller already has a Graph token | Token in memory | `AccessToken`; optional `TenantId` |
 | `Certificate` | Unattended Graph SDK call | Certificate/private key | `TenantId`, `ClientId`, `Certificate` |
 | `CertificateThumbprint` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateThumbprint` |
 | `CertificateSubjectName` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateSubjectName` |
@@ -48,15 +48,15 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 
 ## Tenant selection
 
-For delegated authentication (`DeviceCode` and `Interactive`), `-TenantId` is optional.
+For delegated authentication (`Interactive` and `DeviceCode`) and caller-supplied `AccessToken` authentication, `-TenantId` is optional.
 
-When `DeviceCode` is used without `-TenantId`, WindowsDeviceLink authenticates through the Microsoft identity platform `organizations` authority. After sign-in, the tenant ID from the issued access token is used for operation results and tenant-side correlation.
+When delegated authentication is used without `-TenantId`, WindowsDeviceLink lets the sign-in context determine the tenant. Native `DeviceCode` uses the Microsoft identity platform `organizations` authority. For `DeviceCode` and `AccessToken`, WindowsDeviceLink resolves the `tid` claim from the issued token on a best-effort basis for result metadata and tenant-side correlation.
 
-This is the recommended default for normal single-tenant use:
+A simple delegated example is:
 
 ```powershell
 Get-WindowsDeviceLink |
-    Register-WindowsDeviceLink -Method DeviceCode
+    Register-WindowsDeviceLink -Method Interactive
 ```
 
 Specify `-TenantId` when you intentionally need to target a particular tenant, especially in multi-tenant or guest-account scenarios:
@@ -64,11 +64,15 @@ Specify `-TenantId` when you intentionally need to target a particular tenant, e
 ```powershell
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
-        -Method DeviceCode `
+        -Method Interactive `
         -TenantId '<target-tenant-id>'
 ```
 
-App-only authentication remains tenant-specific. `ClientSecret`, certificate methods, and caller-supplied access-token flows continue to require an explicit tenant context unless the method obtains it from its own environment or managed identity.
+App-only client-credential authentication remains tenant-specific. `ClientSecret` and certificate methods require an explicit tenant because their token authority must identify the target tenant. `EnvironmentVariable` obtains that tenant from `AZURE_TENANT_ID`; Managed Identity obtains its tenant from the hosting identity.
+
+## Authentication method choice
+
+WindowsDeviceLink does not prescribe one delegated authentication method. Use the method that is compatible with the runtime and the tenant's access policies. `Interactive` is a natural fit on full Windows with a browser-capable session. `DeviceCode` remains available for environments where that flow is permitted and useful, including constrained interactive environments.
 
 ## DeviceCode client ID
 
