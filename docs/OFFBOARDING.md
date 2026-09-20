@@ -48,8 +48,7 @@ With WindowsDeviceLink:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 The same operation can also be performed from:
@@ -122,8 +121,7 @@ After local association information has been cleared:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 Or delete the device from:
