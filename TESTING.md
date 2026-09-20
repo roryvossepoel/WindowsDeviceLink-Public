@@ -151,6 +151,27 @@ The parameter regression suite passed, including validation that:
 
 Validated authentication methods continue to cover DeviceCode, Interactive, ClientSecret, AccessToken, Certificate, CertificateThumbprint, CertificateSubjectName, EnvironmentVariable and ManagedIdentity where applicable. Webhook registration remains an explicit `Register-WindowsDeviceLink -Method Webhook` operation.
 
+
+
+## Local tenant discovery validation
+
+Validated on a physical Microsoft Surface Laptop 3 running AMD64 Windows 11.
+
+The public `Get-WindowsDeviceLinkLocalAssociation` command was exercised across the lifecycle and confirmed to remain fully local (`CloudChecked=False`).
+
+Observed sequence:
+
+- associated `4/4`: current-LinkId registry `TenantIdHint` and JWT `tenantId` both present and equal -> `CorrelatedLocalSources`;
+- cloud Device Association deleted while UEFI remained `4/4`: local tenant ID remained readable;
+- UEFI reset to `0/4`: old registry hints remained but no tenant was selected because no current LinkId existed;
+- new base identity materialized to `2/4`: no matching current-LinkId TenantIdHint existed and local tenant remained unavailable;
+- Graph preassociation alone: still no current-LinkId TenantIdHint;
+- read-only native discovery: wrote the current-LinkId `TenantIdHint` and `DiscoveryUrl` while firmware remained `2/4`;
+- full completion: JWT variables returned and the JWT `tenantId` again matched the registry hint.
+
+The hardware-independent `Local-Association-Validation.ps1` regression suite passed for matching sources, registry-only, JWT-only, conflict and unavailable states. The conflict path returns no selected TenantId.
+
+Independent online JWT validation research confirmed structural/time/device correlation but did not locate a published signing key for the observed `DeviceTag_<guid>` issuer; signature verification therefore remains `NotPerformed`.
 ## Firmware lifecycle validation
 
 Validated UEFI namespace:
@@ -272,7 +293,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.5.2-preview1` is the currently published PowerShell Gallery release. The repository validation described above includes additional unreleased `0.6.0-preview1` changes that have been validated locally on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
+`WindowsDeviceLink 0.6.0-preview1` is the currently published PowerShell Gallery release. The repository validation described above includes additional post-0.6.0 changes on `main`, including local tenant discovery, that have been validated locally on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
 
 ## Remaining validation / future work
 
