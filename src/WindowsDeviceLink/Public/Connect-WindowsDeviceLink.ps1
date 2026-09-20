@@ -1,7 +1,7 @@
 function Connect-WindowsDeviceLink {
     [CmdletBinding(DefaultParameterSetName = 'Interactive')]
     param(
-        [Parameter(Mandatory, ParameterSetName = 'Interactive')]
+        [Parameter(ParameterSetName = 'Interactive')]
         [Parameter(Mandatory, ParameterSetName = 'DeviceCode')]
         [Parameter(Mandatory, ParameterSetName = 'Certificate')]
         [Parameter(Mandatory, ParameterSetName = 'CertificateThumbprint')]
@@ -40,7 +40,8 @@ function Connect-WindowsDeviceLink {
     $parameters = @{ Environment = $Environment; ClientTimeout = $ClientTimeout; NoWelcome = $true }
     switch ($PSCmdlet.ParameterSetName) {
         'Interactive' {
-            $parameters.TenantId=$TenantId;$parameters.Scopes=$Scopes;$parameters.ContextScope='Process'
+            $parameters.Scopes=$Scopes;$parameters.ContextScope='Process'
+            if($TenantId){$parameters.TenantId=$TenantId}
             if($ClientId){$parameters.ClientId=$ClientId}
             if(Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT'){Write-Warning 'Interactive browser authentication may not be available in WinPE. Use another supported authentication method if necessary.'}
         }
