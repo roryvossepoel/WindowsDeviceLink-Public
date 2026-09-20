@@ -17,8 +17,7 @@ For normal use, identify the record by device serial number:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 The cmdlet resolves the matching Device Association record, obtains its association ID, and deletes that exact record.
@@ -32,8 +31,7 @@ If the Device Association record ID is already known, delete it directly:
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
     -AssociationId '<association-id>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 The association ID is the `Id` returned by the `tenantAssociatedDevice` object after a successful pre-association.
