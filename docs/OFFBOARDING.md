@@ -119,7 +119,7 @@ Firmware: 0/4
 ```
 
 > [!NOTE]
-> Windows can generate a new base Device Link identity after reboot. Seeing `DeviceLinkId` and `DeviceLinkCreationTimeUtc` return later does not mean the old tenant association was restored.
+> A reboot alone may leave the device at 0/4. A later Device Link identity retrieval, such as `Get-WindowsDeviceLink`, can materialize a new base identity (2/4). Seeing `DeviceLinkId` and `DeviceLinkCreationTimeUtc` return later does not mean the old tenant association was restored.
 
 ### 3. Delete the tenant-side Device Association record
 
@@ -186,8 +186,8 @@ flowchart LR
     B["End MDM<br/>enrollment"]
     C["Clear old Device Link<br/>UEFI state"]
     D["Remove old tenant<br/>Device Association"]
-    E["Reboot / new<br/>base identity"]
-    F["Pre-associate<br/>New tenant"]
+    E["Reboot / remain<br/>0/4 if unused"]
+    F["Retrieve / pre-associate<br/>new base identity"]
     G["Complete<br/>association"]
     H["Associated<br/>New tenant"]
 
