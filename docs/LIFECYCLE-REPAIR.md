@@ -11,7 +11,7 @@ The planner never registers, removes, resets, or reboots a device.
 For tenant-aware planning, collect combined status first:
 
 ```powershell
-Get-WindowsDeviceLinkStatus -Online -Method DeviceCode -TenantId '<tenant-id>' |
+Get-WindowsDeviceLinkStatus -Online -Method DeviceCode |
     Test-WindowsDeviceLinkHealth |
     Get-WindowsDeviceLinkRepairPlan |
     Format-List *
