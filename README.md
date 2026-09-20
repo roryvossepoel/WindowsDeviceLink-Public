@@ -29,9 +29,9 @@ WindowsDeviceLink can:
 
 ## Current version
 
-The current preview release line is `0.5.2-preview1`.
+The current preview release line is `0.6.0-preview1`.
 
-This release adds the read-only `Test-WindowsDeviceLinkRuntime` diagnostic, documents the validated WinPE pre-association -> Windows 11 OOBE flow, and clarifies the native discovery/completion boundary in WinPE.
+This release adds explicit offboarding guidance, simpler tenant-aware authentication, local-device removal targeting, hardened Microsoft Graph response handling, and safe multitenant New / Move / Update reconciliation in the reference Azure backends.
 
 ## Mental model
 
@@ -167,9 +167,7 @@ Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 
 ```powershell
 Get-WindowsDeviceLink |
-    Register-WindowsDeviceLink `
-        -Method DeviceCode `
-        -TenantId '<tenant-id>'
+    Register-WindowsDeviceLink -Method Interactive
 ```
 
 ### Query combined local/cloud status
@@ -177,8 +175,7 @@ Get-WindowsDeviceLink |
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>' |
+    -Method Interactive |
     Format-List *
 ```
 
@@ -187,17 +184,14 @@ Get-WindowsDeviceLinkStatus `
 Pre-association only:
 
 ```powershell
-Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+Initialize-WindowsDeviceLink -Method Interactive
 ```
 
 Pre-association plus explicit device-side completion:
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>' `
+    -Method Interactive `
     -CompleteAssociation
 ```
 
@@ -333,7 +327,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Scope
 
-Preview release line: `0.5.2-preview1`.
+Preview release line: `0.6.0-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure reference backends.
 
