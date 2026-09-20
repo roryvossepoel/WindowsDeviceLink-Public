@@ -168,8 +168,7 @@ Get-WindowsDeviceLink -OutputDirectory 'C:\DeviceLink'
 ```powershell
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
-        -Method DeviceCode `
-        -TenantId '<tenant-id>'
+        -Method DeviceCode
 ```
 
 ### Query combined local/cloud status
@@ -177,8 +176,7 @@ Get-WindowsDeviceLink |
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>' |
+    -Method DeviceCode |
     Format-List *
 ```
 
@@ -188,8 +186,7 @@ Pre-association only:
 
 ```powershell
 Initialize-WindowsDeviceLink `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -Method DeviceCode
 ```
 
 Pre-association plus explicit device-side completion:
@@ -197,7 +194,6 @@ Pre-association plus explicit device-side completion:
 ```powershell
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
-    -TenantId '<tenant-id>' `
     -CompleteAssociation
 ```
 
