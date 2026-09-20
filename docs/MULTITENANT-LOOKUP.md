@@ -153,3 +153,12 @@ The lookup endpoint:
 - [AZURE-BACKEND.md](AZURE-BACKEND.md)
 - [APP-REGISTRATION.md](APP-REGISTRATION.md)
 - [MULTITENANT-CONSENT.md](MULTITENANT-CONSENT.md)
+
+
+## Using lookup before reconcile
+
+A UI or provisioning workflow can use this endpoint to pre-populate the current/source tenant before submitting a reconcile request.
+
+That earlier lookup is advisory only. `POST /api/devicelink/reconcile` performs its own fresh lookup before any state-changing operation so stale form data cannot directly trigger deletion from the wrong tenant.
+
+See [RECONCILE-SCHEMA-v1.md](RECONCILE-SCHEMA-v1.md).
