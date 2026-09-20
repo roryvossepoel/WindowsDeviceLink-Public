@@ -1,6 +1,6 @@
 # WindowsDeviceLink validation matrix
 
-Last updated: 2026-09-15
+Last updated: 2026-09-20
 
 The primary Windows Autopilot Device Preparation Device Association workflow has been validated on physical AMD64 hardware across Windows 11 and AMD64 Windows PE.
 
@@ -41,8 +41,8 @@ The primary Windows Autopilot Device Preparation Device Association workflow has
 | Firmware reset operation | Pass | Pass |
 | Firmware reset `-WhatIf` | Pass | Pass |
 | Post-reset firmware verification | Pass | Pass |
-| New identity after reset/reboot | Pass | Pass (reset), rebooted to Windows |
-| Re-preassociation with new identity | Pass | Pass (identity created after WinPE reset) |
+| Post-reset reboot remains 0/4 until DeviceLink identity retrieval | Pass | Not repeated |
+| New base identity materialized by DeviceLink retrieval after reset | Pass | Pass (identity created after WinPE reset) |
 | Published PSGallery package import (0.4.4-preview1) | Pass | Pass |
 | Published package support probe (0.4.4-preview1) | Pass | Pass with user-supplied DLL |
 | Published package firmware read (0.4.4-preview1) | Pass | Pass |
@@ -145,7 +145,7 @@ The parameter regression suite passed, including validation that:
 
 - `Get-WindowsDeviceLink` no longer accepts `-Online`;
 - webhook registration requires `WebhookUri` and rejects cloud-only authentication inputs;
-- DeviceCode operations require a tenant ID;
+- delegated `Interactive` and `DeviceCode` authentication can omit `TenantId`; `DeviceCode` defaults to the `organizations` authority;
 - Device Association lookup requires exactly one selector;
 - ClientSecret operations require the complete credential input set.
 
@@ -205,23 +205,19 @@ Validated in WinPE:
 6. reset local DeviceLink firmware variables;
 7. verify all four variables absent afterward.
 
-### Full Windows reset and identity regeneration
+### Full Windows reset and identity materialization
 
-A controlled end-to-end test established that the reset removes the old identity rather than temporarily hiding it:
+A controlled end-to-end offboarding test established the post-reset behavior more precisely:
 
-1. Intune contained no Device Association record for the test device;
-2. the current `DeviceLinkId` was fingerprinted with SHA-256 and creation-time bytes were recorded without publishing the raw ID;
-3. all four UEFI variables were removed and immediately verified absent with Win32 error `203`;
-4. the device was restarted normally;
-5. no `Get-WindowsDeviceLink` command was run before the post-boot firmware check;
-6. Windows had recreated `DeviceLinkId` and `DeviceLinkCreationTimeUtc`; both JWT variables remained absent;
-7. the post-boot DeviceLinkId SHA-256 fingerprint differed from the pre-reset fingerprint and the creation time changed;
-8. `Get-WindowsDeviceLink` returned the new identity;
-9. the new identity was successfully pre-associated;
-10. Intune showed a new `Pre-associated` record for the same physical device;
-11. after the subsequent Windows restart, Intune reported the new Device Association as `Associated` and all four known DeviceLink firmware variables were present again.
+1. the device started fully associated with all four known UEFI variables present;
+2. all four UEFI variables were removed and immediately verified absent with Win32 error `203`;
+3. the tenant-side Device Association record was removed successfully by local serial-number autodetection;
+4. a follow-up tenant lookup confirmed that no Device Association record remained;
+5. after reboot, the firmware state still showed **0/4**;
+6. `Get-WindowsDeviceLink` was then invoked;
+7. immediately afterward, `DeviceLinkId` and `DeviceLinkCreationTimeUtc` were present again while both JWT variables remained absent, producing the expected base **2/4** state.
 
-Conclusion: the reset removes the old local DeviceLink identity. Windows can generate a **new** base identity after reboot. The reappearance of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` is therefore expected regeneration, not restoration of the removed identity or tenant association.
+Conclusion: reset removes the old local DeviceLink identity. A reboot alone does not necessarily recreate the base identity. A later DeviceLink identity retrieval can materialize a **new** base identity. Reappearance of the base variables does not mean the old tenant association was restored.
 
 ## Device Association removal validation
 
@@ -276,7 +272,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.4.4-preview1` is the currently published PowerShell Gallery release. The GitHub release/tag and published Gallery package have been validated on physical AMD64 Windows 11 OOBE and AMD64 WinPE hardware.
+`WindowsDeviceLink 0.5.2-preview1` is the currently published PowerShell Gallery release. The repository validation described above includes additional unreleased `0.6.0-preview1` changes that have been validated locally on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
 
 ## Remaining validation / future work
 
