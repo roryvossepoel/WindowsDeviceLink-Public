@@ -1,5 +1,38 @@
 # Multitenant Device Association lookup
 
+> [!IMPORTANT]
+> Tenant-wide lookup is now a **fallback and verification path**, not the preferred way to discover the source tenant on the local device. When WindowsDeviceLink can read local DeviceLink association metadata, use `Get-WindowsDeviceLinkLocalAssociation` first.
+
+## Preferred source-tenant discovery
+
+On a physical device, first try:
+
+```powershell
+Get-WindowsDeviceLinkLocalAssociation
+```
+
+This command is cloud-independent and can identify the source tenant from local DeviceLink metadata:
+
+- after successful native discovery, the exact current-LinkId registry value `<LinkId>_TenantIdHint`;
+- after full association, the `tenantId` claim in `DeviceLinkJwtCompressed`;
+- when both are present, WindowsDeviceLink correlates them and fails closed if they disagree.
+
+Recommended decision path:
+
+```text
+local DeviceLink tenant available
+  -> use local TenantId as expected source context
+  -> authenticate only when cloud verification or mutation is required
+
+local tenant unavailable
+  -> fall back to multitenant backend lookup
+```
+
+Historical registry hints can survive a firmware reset, so only a hint whose prefix exactly matches the **current** UEFI `DeviceLinkId` is eligible.
+
+See [LOCAL-TENANT-DISCOVERY.md](LOCAL-TENANT-DISCOVERY.md).
+
+
 The Azure Function backend can search the configured managed tenants for a Device Association by serial number.
 
 This is useful when the operator does not know which tenant currently owns or has pre-associated a physical device.
