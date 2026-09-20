@@ -71,6 +71,10 @@ Intune admin center
 
 ## Associated device
 
+> [!NOTE]
+> Removing the tenant-side Device Association does not immediately remove local tenant-identifying metadata. Live validation showed that a `4/4` device retained both the Association JWT `tenantId` and the current-LinkId registry `TenantIdHint` after cloud deletion. Use `Get-WindowsDeviceLinkLocalAssociation` to inspect this local state.
+
+
 An **Associated** device has completed Device Association. Trusted tenant affinity is stored locally in UEFI and survives Windows reset, reinstall, and enrollment removal.
 
 Typical state:
@@ -155,6 +159,9 @@ flowchart LR
 ```
 
 ## What the firmware reset does not remove
+
+Historical `HKLM:\SOFTWARE\Microsoft\Provisioning\AutopilotSettings\<LinkId>_TenantIdHint` and `_DiscoveryUrl` entries can also remain after the UEFI DeviceLink variables are reset. These stale entries are not active tenant affinity by themselves. WindowsDeviceLink only considers a registry hint when its LinkId prefix exactly matches the **current** UEFI `DeviceLinkId`.
+
 
 Clearing Device Link UEFI state does not by itself remove:
 
