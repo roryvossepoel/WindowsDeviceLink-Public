@@ -518,3 +518,28 @@ See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md) and [INSTALLATION.md](INSTALLATION.md
 - [DISCOVER-LINK-RESEARCH.md](DISCOVER-LINK-RESEARCH.md)
 - [INSTALLATION.md](INSTALLATION.md)
 - [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md)
+
+
+## Can WindowsDeviceLink determine the tenant locally?
+
+Yes, when local DeviceLink association metadata is available.
+
+Use:
+
+```powershell
+Get-WindowsDeviceLinkLocalAssociation | Format-List *
+```
+
+The command is read-only and performs no Microsoft Graph lookup. It correlates the current UEFI `DeviceLinkId` with the exact matching `<LinkId>_TenantIdHint` value under `HKLM:\SOFTWARE\Microsoft\Provisioning\AutopilotSettings` and, when present, the `tenantId` claim in `DeviceLinkJwtCompressed`.
+
+Historical registry hints are never selected unless their prefix matches the current `DeviceLinkId`. If the registry hint and JWT tenant claim disagree, the command fails closed: `ConflictDetected=True` and no `TenantId` is selected.
+
+Current trust levels are:
+
+- `CorrelatedLocalSources` — registry hint and Association JWT tenant claim are both present and agree.
+- `StructurallyObservedJwtClaim` — only the local Association JWT tenant claim is available.
+- `LocalRegistryHint` — only the current-LinkId registry hint is available.
+- `Conflict` — both are present but disagree.
+- `Unavailable` — no local tenant identifier is available.
+
+Association JWT signature verification is currently reported as `NotPerformed`; a supported signing-key discovery mechanism for the observed DeviceTag token has not yet been established.
