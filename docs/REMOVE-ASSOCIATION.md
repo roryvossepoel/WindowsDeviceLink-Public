@@ -50,7 +50,7 @@ The removal cmdlet supports the same direct authentication families used by the 
 - `EnvironmentVariable`
 - `ManagedIdentity`
 
-`TenantId` remains explicit for methods such as DeviceCode and certificate authentication because the tenant is determined by the authentication context. `EnvironmentVariable` obtains the tenant from `AZURE_TENANT_ID`.
+`TenantId` is optional for delegated `DeviceCode` and `Interactive` authentication. Supply it when you need to target a specific tenant, especially in multi-tenant or guest-account scenarios. App-only methods such as certificate authentication remain tenant-specific. `EnvironmentVariable` obtains the tenant from `AZURE_TENANT_ID`.
 
 ## Result
 
