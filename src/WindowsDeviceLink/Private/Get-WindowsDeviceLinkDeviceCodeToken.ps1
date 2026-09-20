@@ -1,7 +1,7 @@
 function Get-WindowsDeviceLinkDeviceCodeToken {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$TenantId,
+        [ValidateNotNullOrEmpty()][string]$TenantId = 'organizations',
         [ValidateNotNullOrEmpty()][string]$ClientId = '14d82eec-204b-4c2f-b7e8-296a70dab67e',
         [ValidateNotNullOrEmpty()][string]$Scope = 'https://graph.microsoft.com/DeviceManagementServiceConfig.ReadWrite.All offline_access openid profile',
         [scriptblock]$RequestScript,
@@ -47,7 +47,9 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
 
             if ($tokenResponse.access_token) {
                 Write-Information -InformationAction Continue -MessageData 'Device code authentication succeeded.'
-                return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$TenantId }
+                $effectiveTenantId = Resolve-WindowsDeviceLinkAccessTokenTenantId -AccessToken ([string]$tokenResponse.access_token)
+                if (-not $effectiveTenantId) { $effectiveTenantId = $TenantId }
+                return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$effectiveTenantId }
             }
         }
         catch {
