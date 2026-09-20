@@ -203,18 +203,22 @@ if ($decision -eq 'Update') {
 if ($decision -eq 'New') {
     $targetLookup = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
     $targetToken = [string]$targetLookup.AccessToken
+    $createError = $null
     try {
-        $created = New-WindowsDeviceLinkBackendAssociation -DeviceLink $deviceLink -AccessToken $targetToken
+        $null = New-WindowsDeviceLinkBackendAssociation -DeviceLink $deviceLink -AccessToken $targetToken
     }
     catch {
-        Write-ReconcileError -StatusCode 502 -Error 'TargetCreateUncertain' -Message 'The target pre-association request failed or its commit state is uncertain. Re-run lookup before retrying.' -RequestId $requestId -TargetTenantId $targetTenantId -Decision 'New'
-        return
+        $createError = $_
     }
     finally {
         $targetToken = $null
     }
 
     $verify = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+    if ($createError -and @($verify.Matches).Count -eq 0) {
+        Write-ReconcileError -StatusCode 502 -Error 'TargetCreateUncertain' -Message 'The target pre-association request failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -TargetTenantId $targetTenantId -Decision 'New'
+        return
+    }
     $matches = @($verify.Matches)
     if ($matches.Count -ne 1) {
         Write-ReconcileError -StatusCode 502 -Error 'TargetVerificationFailed' -Message 'The target association could not be verified after creation.' -RequestId $requestId -TargetTenantId $targetTenantId -Decision 'New'
@@ -271,18 +275,22 @@ if (@($targetLookup.Matches).Count -gt 0) {
 }
 
 $targetToken = [string]$targetLookup.AccessToken
+$targetCreateError = $null
 try {
     $null = New-WindowsDeviceLinkBackendAssociation -DeviceLink $deviceLink -AccessToken $targetToken
 }
 catch {
-    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but target creation failed or is uncertain. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
-    return
+    $targetCreateError = $_
 }
 finally {
     $targetToken = $null
 }
 
 $verifyTarget = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+if ($targetCreateError -and @($verifyTarget.Matches).Count -eq 0) {
+    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but target creation failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+    return
+}
 $targetMatches = @($verifyTarget.Matches)
 if ($targetMatches.Count -ne 1) {
     Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but the target association could not be verified. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
