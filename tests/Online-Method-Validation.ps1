@@ -77,7 +77,7 @@ Assert-Throws -Name 'Association ClientSecret requires all inputs' -ExpectedMess
 
 $module = Get-Module WindowsDeviceLink
 $deviceCodeSource = & $module { (Get-Command Get-WindowsDeviceLinkDeviceCodeToken).ScriptBlock.ToString() }
-if ($deviceCodeSource -notmatch "TenantId\\s*=\\s*'organizations'") {
+if ($deviceCodeSource -notmatch "TenantId\s*=\s*'organizations'") {
     throw 'FAIL: DeviceCode default authority is not organizations.'
 }
 foreach ($commandName in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAssociation','Remove-WindowsDeviceLinkAssociation','Initialize-WindowsDeviceLink')) {
