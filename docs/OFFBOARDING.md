@@ -9,19 +9,26 @@ The required cleanup depends on whether the device is still **Pre-associated** o
 
 ## Decision flow
 
-```text
-Is the device only Pre-associated?
-    |
-    +-- Yes
-    |     -> Delete the tenant-side Device Association record
-    |     -> Done
-    |
-    +-- No, it is Associated
-          -> Ensure the device is no longer enrolled with MDM
-          -> Clear the local Device Link UEFI state
-          -> Verify the old local association state is gone
-          -> Delete the tenant-side Device Association record
-          -> Done
+```mermaid
+flowchart TD
+    A["Start offboarding"]
+    B{"Current Device Association state?"}
+    C["Delete tenant-side<br/>Device Association record"]
+    D["End / remove<br/>MDM enrollment"]
+    E["Clear local Device Link<br/>UEFI state"]
+    F["Verify old association<br/>state is cleared"]
+    G["Delete tenant-side<br/>Device Association record"]
+    H["Offboarded"]
+
+    A --> B
+    B -->|"Pre-associated"| C
+    C --> H
+
+    B -->|"Associated"| D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
 ```
 
 ## Pre-associated device
@@ -47,10 +54,10 @@ With WindowsDeviceLink:
 
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
-    -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -SerialNumber '<serial-number>'
 ```
+
+For normal single-tenant use, no tenant ID is required in the example. Specify `-TenantId` only when the authentication context does not uniquely identify the intended tenant, such as an explicit multitenant workflow.
 
 The same operation can also be performed from:
 
@@ -121,9 +128,7 @@ After local association information has been cleared:
 
 ```powershell
 Remove-WindowsDeviceLinkAssociation `
-    -SerialNumber '<serial-number>' `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>'
+    -SerialNumber '<serial-number>'
 ```
 
 Or delete the device from:
@@ -139,23 +144,16 @@ Intune admin center
 
 ## Associated-device flow
 
-```text
-Associated
-    |
-    v
-Remove / end MDM enrollment
-    |
-    v
-Reset-WindowsDeviceLinkFirmwareState
-    |
-    v
-Verify old UEFI association state is cleared
-    |
-    v
-Remove-WindowsDeviceLinkAssociation
-    |
-    v
-Offboarded
+```mermaid
+flowchart LR
+    A["Associated"]
+    B["End MDM<br/>enrollment"]
+    C["Clear Device Link<br/>UEFI state"]
+    D["Verify old local<br/>state is cleared"]
+    E["Delete tenant-side<br/>Device Association"]
+    F["Offboarded"]
+
+    A --> B --> C --> D --> E --> F
 ```
 
 ## What the firmware reset does not remove
@@ -184,15 +182,18 @@ Do not use an OS reset or reinstall as a substitute for Device Association offbo
 
 A tenant move uses the same cleanup boundary:
 
-```text
-Old tenant
-    -> end MDM enrollment
-    -> clear old local Device Link UEFI state
-    -> remove old tenant-side Device Association
-    -> reboot / allow a new base identity to materialize
-New tenant
-    -> pre-associate new Device Link identity
-    -> complete association
+```mermaid
+flowchart LR
+    A["Associated<br/>Old tenant"]
+    B["End MDM<br/>enrollment"]
+    C["Clear old Device Link<br/>UEFI state"]
+    D["Remove old tenant<br/>Device Association"]
+    E["Reboot / new<br/>base identity"]
+    F["Pre-associate<br/>New tenant"]
+    G["Complete<br/>association"]
+    H["Associated<br/>New tenant"]
+
+    A --> B --> C --> D --> E --> F --> G --> H
 ```
 
 See [FIRMWARE-STATE.md](FIRMWARE-STATE.md) for firmware behavior and [REMOVE-ASSOCIATION.md](REMOVE-ASSOCIATION.md) for tenant-side deletion details.
