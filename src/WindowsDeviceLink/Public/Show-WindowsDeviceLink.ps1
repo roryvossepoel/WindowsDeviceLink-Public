@@ -38,8 +38,8 @@ function Show-WindowsDeviceLink {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'WindowsDeviceLink'
     $form.StartPosition = 'CenterScreen'
-    $form.Size = New-Object System.Drawing.Size(1020,720)
-    $form.MinimumSize = New-Object System.Drawing.Size(980,680)
+    $form.Size = New-Object System.Drawing.Size(1020,900)
+    $form.MinimumSize = New-Object System.Drawing.Size(980,840)
     $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
 
     $title = New-Object System.Windows.Forms.Label
@@ -103,6 +103,18 @@ function Show-WindowsDeviceLink {
     $localGroup  = New-Group -Text 'Local association' -X 510 -Y 82 -Width 470 -Height 220
     $cloudGroup  = New-Group -Text 'Cloud association' -X 20 -Y 316 -Width 470 -Height 190
     $actionGroup = New-Group -Text 'Actions' -X 510 -Y 316 -Width 470 -Height 270
+    $consoleGroup = New-Group -Text 'Activity console' -X 20 -Y 600 -Width 960 -Height 230
+
+    $consoleBox = New-Object System.Windows.Forms.TextBox
+    $consoleBox.Location = New-Object System.Drawing.Point(14,26)
+    $consoleBox.Size = New-Object System.Drawing.Size(932,188)
+    $consoleBox.Multiline = $true
+    $consoleBox.ReadOnly = $true
+    $consoleBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
+    $consoleBox.WordWrap = $false
+    $consoleBox.Font = New-Object System.Drawing.Font('Consolas',9)
+    $consoleBox.BackColor = [System.Drawing.SystemColors]::Window
+    $consoleGroup.Controls.Add($consoleBox)
 
     $ui = @{}
     $ui.Manufacturer = New-ValueLabel -Parent $deviceGroup -Caption 'Manufacturer' -Y 28
@@ -185,8 +197,40 @@ function Show-WindowsDeviceLink {
         [System.Windows.Forms.Application]::DoEvents()
     }
 
+    function Write-GuiConsole {
+        param(
+            [Parameter(Mandatory)][string]$Message,
+            [switch]$Command,
+            [switch]$ErrorMessage
+        )
+
+        $timestamp = (Get-Date).ToString('HH:mm:ss')
+        $prefix = if ($Command) { '>' } elseif ($ErrorMessage) { '!' } else { '-' }
+        $line = "[$timestamp] $prefix $Message"
+
+        $consoleBox.AppendText($line + [Environment]::NewLine)
+        $consoleBox.SelectionStart = $consoleBox.TextLength
+        $consoleBox.ScrollToCaret()
+        [System.Windows.Forms.Application]::DoEvents()
+
+        Write-Host $line
+    }
+
+    function Write-GuiObject {
+        param($InputObject)
+
+        if ($null -eq $InputObject) { return }
+        $text = ($InputObject | Format-List * | Out-String).TrimEnd()
+        if (-not [string]::IsNullOrWhiteSpace($text)) {
+            foreach ($line in ($text -split "\r?\n")) {
+                Write-GuiConsole $line
+            }
+        }
+    }
+
     function Show-GuiError {
         param([string]$Message)
+        Write-GuiConsole -Message $Message -ErrorMessage
         [void][System.Windows.Forms.MessageBox]::Show(
             $form,
             $Message,
@@ -215,6 +259,7 @@ function Show-WindowsDeviceLink {
 
     function Refresh-LocalView {
         Set-GuiStatus 'Refreshing local state...'
+        Write-GuiConsole -Message 'Refresh local state' -Command
         try {
             $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
             $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
@@ -244,6 +289,7 @@ function Show-WindowsDeviceLink {
 
 
             Set-GuiStatus "Local state refreshed • $($local.FirmwareState) • $($local.TrustLevel)"
+            Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source), trust: $($local.TrustLevel)"
         }
         catch {
             Set-GuiStatus 'Local refresh failed'
@@ -267,7 +313,9 @@ function Show-WindowsDeviceLink {
     $btnIdentity.Add_Click({
         Set-GuiStatus 'Loading DeviceLink identity...'
         try {
+            Write-GuiConsole -Message 'Get-WindowsDeviceLink' -Command
             $identity = Get-WindowsDeviceLink
+            Write-GuiObject $identity
             Set-GuiStatus "DeviceLink identity loaded: $($identity.LinkId)"
             Refresh-LocalView
         }
@@ -284,7 +332,10 @@ function Show-WindowsDeviceLink {
             $tenant = Get-TenantOverride
             if ($tenant) { $parameters.TenantId = $tenant }
 
+            $displayTenant = if ($parameters.ContainsKey('TenantId')) { " -TenantId $($parameters.TenantId)" } else { '' }
+            Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method Interactive$displayTenant" -Command
             $cloud = Get-WindowsDeviceLinkStatus @parameters
+            Write-GuiObject $cloud
             $ui.CloudState.Text = [string]$cloud.AssociationState
             $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { '—' }
             $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { '—' }
@@ -305,7 +356,9 @@ function Show-WindowsDeviceLink {
 
         Set-GuiStatus 'Exporting DeviceLink CSV...'
         try {
+            Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$($dialog.SelectedPath)'" -Command
             $file = Get-WindowsDeviceLink -OutputDirectory $dialog.SelectedPath
+            Write-GuiObject $file
             Set-GuiStatus "CSV exported: $($file.FullName)"
             [void][System.Windows.Forms.MessageBox]::Show(
                 $form,
@@ -338,7 +391,10 @@ $($file.FullName)",
             $tenant = $tenantBox.Text.Trim()
             if ($tenant) { $parameters.TenantId = $tenant }
 
+            $displayTenant = if ($parameters.ContainsKey('TenantId')) { " -TenantId $($parameters.TenantId)" } else { '' }
+            Write-GuiConsole -Message "Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method Interactive$displayTenant" -Command
             $result = $identity | Register-WindowsDeviceLink @parameters
+            Write-GuiObject $result
             Set-GuiStatus "Pre-association completed: $($result.AssociationState)"
             Refresh-LocalView
         }
@@ -355,7 +411,9 @@ $($file.FullName)",
 
         Set-GuiStatus 'Completing DeviceLink association...'
         try {
+            Write-GuiConsole -Message 'Complete-WindowsDeviceLinkAssociation -Confirm:$false' -Command
             $result = Complete-WindowsDeviceLinkAssociation -Confirm:$false
+            Write-GuiObject $result
             Set-GuiStatus "Completion result: $($result.Result)"
             Refresh-LocalView
         }
@@ -376,7 +434,10 @@ $($file.FullName)",
             $tenant = Get-TenantOverride
             if ($tenant) { $parameters.TenantId = $tenant }
 
-            $null = Remove-WindowsDeviceLinkAssociation @parameters
+            $displayTenant = if ($parameters.ContainsKey('TenantId')) { " -TenantId $($parameters.TenantId)" } else { '' }
+            Write-GuiConsole -Message "Remove-WindowsDeviceLinkAssociation -Method Interactive$displayTenant -Confirm:`$false" -Command
+            $result = Remove-WindowsDeviceLinkAssociation @parameters
+            Write-GuiObject $result
             $ui.CloudState.Text = 'Not checked'
             $ui.CloudTenant.Text = '—'
             $ui.CloudId.Text = '—'
@@ -397,7 +458,9 @@ $($file.FullName)",
 
         Set-GuiStatus 'Resetting local DeviceLink firmware state...'
         try {
-            $null = Reset-WindowsDeviceLinkFirmwareState -Confirm:$false
+            Write-GuiConsole -Message 'Reset-WindowsDeviceLinkFirmwareState -Confirm:$false' -Command
+            $result = Reset-WindowsDeviceLinkFirmwareState -Confirm:$false
+            Write-GuiObject $result
             Set-GuiStatus 'Local DeviceLink firmware state reset'
             Refresh-LocalView
         }
@@ -412,6 +475,7 @@ $($file.FullName)",
     })
 
     $form.Add_Shown({
+        Write-GuiConsole -Message 'WindowsDeviceLink operator dashboard opened.'
         Refresh-LocalView
     })
 
