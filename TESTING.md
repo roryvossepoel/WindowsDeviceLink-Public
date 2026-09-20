@@ -145,7 +145,7 @@ The parameter regression suite passed, including validation that:
 
 - `Get-WindowsDeviceLink` no longer accepts `-Online`;
 - webhook registration requires `WebhookUri` and rejects cloud-only authentication inputs;
-- DeviceCode operations require a tenant ID;
+- DeviceCode operations can use the organizations authority when TenantId is omitted; explicit TenantId remains supported for tenant targeting;
 - Device Association lookup requires exactly one selector;
 - ClientSecret operations require the complete credential input set.
 
