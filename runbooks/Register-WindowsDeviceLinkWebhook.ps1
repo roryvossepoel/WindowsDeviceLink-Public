@@ -300,6 +300,7 @@ switch ([string]$request.requestType) {
         if (-not $serialNumber) { throw 'device.serialNumber is required for DeviceLinkReconcile.' }
 
         $fallbackTenant = Get-AutomationVariable -Name 'WindowsDeviceLinkDefaultTenantId' -ErrorAction SilentlyContinue
+        if (-not $fallbackTenant) { $fallbackTenant = $targetTenantId }
         $tenantIds = @(Get-ConfiguredTenantIds -ConfigurationDocument $configurationDocument -FallbackTenantId $fallbackTenant)
         if ($targetTenantId -notin $tenantIds) {
             throw "Target tenant '$targetTenantId' is not configured for this Automation backend."
@@ -371,14 +372,18 @@ switch ([string]$request.requestType) {
         }
 
         if ($decision -eq 'New') {
+            $targetCreateError = $null
             try {
                 $null = New-TenantAssociation -TenantId $targetTenantId -DeviceLink ([string]$request.device.deviceLink) -ConfigurationDocument $configurationDocument
             }
             catch {
-                throw "TargetCreateUncertain: target creation failed or its commit state is uncertain. Re-run lookup before retrying. $($_.Exception.Message)"
+                $targetCreateError = $_
             }
 
             $verify = Get-TenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ConfigurationDocument $configurationDocument
+            if ($targetCreateError -and @($verify.Matches).Count -eq 0) {
+                throw 'TargetCreateUncertain: target creation failed and target state could not be proven. Re-run lookup before retrying.'
+            }
             $matches = @($verify.Matches)
             if ($matches.Count -ne 1) {
                 throw 'TargetVerificationFailed: target association could not be verified after creation.'
@@ -424,14 +429,18 @@ switch ([string]$request.requestType) {
             throw 'TargetStateChanged: target tenant now contains an association. Source was removed; verify final state before another mutation.'
         }
 
+        $moveCreateError = $null
         try {
             $null = New-TenantAssociation -TenantId $targetTenantId -DeviceLink ([string]$request.device.deviceLink) -ConfigurationDocument $configurationDocument
         }
         catch {
-            throw 'MoveIncomplete: source association was removed, but target creation failed or is uncertain. Re-run lookup before retrying.'
+            $moveCreateError = $_
         }
 
         $verifyTarget = Get-TenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ConfigurationDocument $configurationDocument
+        if ($moveCreateError -and @($verifyTarget.Matches).Count -eq 0) {
+            throw 'MoveIncomplete: source association was removed, but target creation failed and target state could not be proven. Re-run lookup before retrying.'
+        }
         $targetMatches = @($verifyTarget.Matches)
         if ($targetMatches.Count -ne 1) {
             throw 'MoveIncomplete: source association was removed, but target association could not be verified. Re-run lookup before retrying.'
