@@ -64,6 +64,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Health-State-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate local tenant association correlation
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Local-Association-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate lifecycle repair planning safety
         shell: powershell
         run: |
