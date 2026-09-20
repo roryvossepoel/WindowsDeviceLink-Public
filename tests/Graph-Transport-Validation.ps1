@@ -66,6 +66,20 @@ Assert-True ($records.Count -eq 2) "three-page collection expected 2 records, go
 Assert-True ($records[0].id -eq 'one' -and $records[1].id -eq 'three') 'paged records were not returned in order.'
 Write-Host 'PASS: bounded paging follows multiple pages and tolerates an empty value array'
 
+# Invoke-MgGraphRequest can return dictionary-shaped responses in PowerShell 7.
+# The collection helper must support both PSCustomObject and IDictionary response shapes.
+$request={param($Uri,$SdkMode,$AccessToken)
+    [ordered]@{
+        '@odata.context'='synthetic'
+        value=@([pscustomobject]@{id='dictionary-record'})
+    }
+}
+$records=@(& $module {param($Request)Get-WindowsDeviceLinkGraphCollection -Uri 'https://graph.microsoft.com/beta/dictionary' -SdkMode -RequestScript $Request} $request)
+Assert-True ($records.Count -eq 1) "dictionary collection expected 1 record, got $($records.Count)."
+Assert-True ($records[0].id -eq 'dictionary-record') 'dictionary collection did not expose the value array.'
+Write-Host 'PASS: dictionary-shaped SDK collection response is supported'
+
+
 # A null response is indeterminate, never a confirmed empty collection.
 $request={param($Uri,$SdkMode,$AccessToken)$null}
 Assert-Throws -Name 'Null collection response is rejected' -ExpectedMessage 'empty response' -ScriptBlock {& $module {param($Request)Get-WindowsDeviceLinkGraphCollection -Uri 'https://graph.microsoft.com/beta/test' -AccessToken 'synthetic' -RequestScript $Request} $request}
