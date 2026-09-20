@@ -53,6 +53,9 @@ var functionConfigText = loadTextContent('../../function-app/Register-WindowsDev
 var lookupFunctionScript = loadTextContent('../../function-app/Lookup-WindowsDeviceLink/run.ps1')
 var lookupFunctionConfigText = loadTextContent('../../function-app/Lookup-WindowsDeviceLink/function.json')
 var backendAuthScript = loadTextContent('../../function-app/shared/BackendAuth.ps1')
+var associationOperationsScript = loadTextContent('../../function-app/shared/AssociationOperations.ps1')
+var reconcileFunctionScript = loadTextContent('../../function-app/Reconcile-WindowsDeviceLink/run.ps1')
+var reconcileFunctionConfigText = loadTextContent('../../function-app/Reconcile-WindowsDeviceLink/function.json')
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageName
@@ -238,6 +241,25 @@ resource preassociateFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
 
 
 
+resource reconcileFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
+  parent: functionApp
+  name: 'Reconcile-WindowsDeviceLink'
+  properties: {
+    language: 'powershell'
+    isDisabled: false
+    config: json(reconcileFunctionConfigText)
+    files: {
+      'function.json': reconcileFunctionConfigText
+      'run.ps1': reconcileFunctionScript
+      'BackendAuth.ps1': backendAuthScript
+      'AssociationOperations.ps1': associationOperationsScript
+    }
+  }
+  dependsOn: [
+    keyVaultSecretsUser
+  ]
+}
+
 resource lookupFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
   parent: functionApp
   name: 'Lookup-WindowsDeviceLink'
@@ -259,5 +281,6 @@ resource lookupFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
 output functionAppName string = functionApp.name
 output functionEndpoint string = 'https://${functionApp.properties.defaultHostName}/api/devicelink/preassociate'
 output lookupEndpoint string = 'https://${functionApp.properties.defaultHostName}/api/devicelink/lookup'
+output reconcileEndpoint string = 'https://${functionApp.properties.defaultHostName}/api/devicelink/reconcile'
 output keyVaultName string = keyVault.name
 output applicationInsightsName string = appInsights.name
