@@ -75,7 +75,7 @@ Assert-Throws -Name 'Graph registration redacts token and DeviceLink payload' -E
     } $registrationPayload $registrationRequest $registrationToken
 }
 
-Assert-Throws -Name 'Register AccessToken requires token' -ExpectedMessage '-TenantId and -AccessToken are required' -ScriptBlock {
+Assert-Throws -Name 'Register AccessToken requires token' -ExpectedMessage '-AccessToken is required' -ScriptBlock {
     & $module {
         $input=[pscustomobject]@{SerialNumber='TEST-SERIAL';DeviceLink='TEST-PAYLOAD'}
         $input.PSObject.TypeNames.Insert(0,'Windows.DeviceLink.Information')
