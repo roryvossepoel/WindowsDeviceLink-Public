@@ -94,3 +94,12 @@ The receiving backend is responsible for:
 - ensuring admin consent exists in that tenant.
 
 `tenantId` is routing metadata. It is not a credential.
+
+
+## Reconcile requests
+
+The reference backends also support a separate `DeviceLinkReconcile` request contract for New / Move / Update decisions.
+
+It uses schema version 1 but has different required routing fields (`sourceTenantId` / `targetTenantId`) and must not be treated as a normal `DeviceLinkPreassociation` request.
+
+See [RECONCILE-SCHEMA-v1.md](RECONCILE-SCHEMA-v1.md).
