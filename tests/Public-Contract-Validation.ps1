@@ -132,6 +132,33 @@ foreach ($item in $secureParameters) {
 }
 Write-Host 'PASS: access-token parameters remain SecureString'
 
+# Interactive authentication intentionally supports normal single-tenant use without
+# requiring callers to supply a tenant GUID. Explicit -TenantId remains available.
+$connectCommand = Get-Command Connect-WindowsDeviceLink
+$tenantParameter = $connectCommand.Parameters['TenantId']
+$interactiveAttribute = @($tenantParameter.Attributes | Where-Object {
+    $_ -is [System.Management.Automation.ParameterAttribute] -and $_.ParameterSetName -eq 'Interactive'
+}) | Select-Object -First 1
+Assert-True ($null -ne $interactiveAttribute) 'Connect-WindowsDeviceLink -TenantId is not available in the Interactive parameter set.'
+Assert-True (-not $interactiveAttribute.Mandatory) 'Connect-WindowsDeviceLink -TenantId must remain optional for Interactive authentication.'
+
+foreach ($name in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAssociation','Remove-WindowsDeviceLinkAssociation')) {
+    $scriptText = (Get-Command $name -Module WindowsDeviceLink).ScriptBlock.ToString()
+    Assert-True ($scriptText -notmatch [regex]::Escape('-TenantId is required for -Method Interactive.')) "$name unexpectedly requires -TenantId for Interactive authentication."
+}
+Write-Host 'PASS: Interactive authentication keeps TenantId optional'
+
+# Removal without an explicit selector intentionally targets the current physical
+# device by locally resolving the BIOS serial number. Explicit selectors still win.
+$removeCommand = Get-Command Remove-WindowsDeviceLinkAssociation -Module WindowsDeviceLink
+Assert-True (-not $removeCommand.Parameters['SerialNumber'].Attributes.Mandatory) 'Remove-WindowsDeviceLinkAssociation -SerialNumber must remain optional.'
+Assert-True (-not $removeCommand.Parameters['AssociationId'].Attributes.Mandatory) 'Remove-WindowsDeviceLinkAssociation -AssociationId must remain optional.'
+$removeScript = $removeCommand.ScriptBlock.ToString()
+Assert-True ($removeScript -match 'Win32_BIOS') 'Removal command no longer contains the local BIOS serial-number fallback.'
+Assert-True ($removeScript -match 'No target specified\. Using local device serial number') 'Removal command no longer reports its automatically selected local serial number.'
+Write-Host 'PASS: association removal keeps local-device serial fallback'
+
+
 $moduleData = Import-PowerShellDataFile -Path $resolvedModulePath
 Assert-True ([string]$moduleData.PrivateData.PSData.ProjectUri -eq 'https://github.com/roryvossepoel/WindowsDeviceLink-Public') 'ProjectUri does not point to the canonical public repository.'
 Assert-True ([string]$moduleData.PrivateData.PSData.LicenseUri -like 'https://github.com/roryvossepoel/WindowsDeviceLink-Public/*') 'LicenseUri does not point to the canonical public repository.'
