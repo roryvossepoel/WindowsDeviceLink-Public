@@ -72,9 +72,11 @@ Show-WindowsDeviceLink `
     -WindowsManagementServicePath 'X:\Runtime\Windows.Management.Service.dll'
 ```
 
-`Interactive` remains the default authentication method in both Windows 11 and Windows PE. `DeviceCode` remains available as an explicit alternative.
+On Windows 11, `Interactive` is the default GUI authentication method. In Windows PE, the GUI defaults to `DeviceCode` because interactive browser authentication is unavailable.
 
 Windows PE supports local inspection, online lookup, CSV export, pre-association and offboarding actions when their prerequisites are available. **Full associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-associate the device and let Windows complete Device Association during OOBE.
+
+For the complete GUI parameter reference, tenant JSON examples and Windows 11 / Windows PE comparison, see [GUI.md](GUI.md).
 
 ## Start here: what state is the device in?
 
