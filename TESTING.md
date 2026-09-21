@@ -339,7 +339,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.7.0-preview1` is the currently published PowerShell Gallery release. The repository validation described above now covers the `0.8.0-preview1` candidate on `main`, including the operator GUI validated on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
+`WindowsDeviceLink 0.8.0-preview1` is the previous preview release. The repository validation described above now covers the `0.9.0-preview1` candidate, including the operator GUI validated on physical AMD64 Windows 11 and AMD64 Windows PE hardware. The GUI lifecycle tests cover pre-association, full association, idempotency, cloud/local/full offboarding, stale local/cloud combinations, tenant-source correlation, DeviceCode token reuse and WinPE CSV export. The multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
 
 ## Remaining validation / future work
 
