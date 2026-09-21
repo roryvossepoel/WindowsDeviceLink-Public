@@ -153,6 +153,32 @@ Validated authentication methods continue to cover DeviceCode, Interactive, Clie
 
 
 
+## Operator GUI validation
+
+`Show-WindowsDeviceLink` was exercised on physical AMD64 Windows 11 hardware.
+
+Validated GUI behavior includes:
+
+- startup on full Windows without materializing a new DeviceLink identity implicitly;
+- module version and Preview status in the window title;
+- Windows 11 environment display;
+- local firmware / tenant-correlation display;
+- tenant selector with friendly names supplied through `-Tenants`;
+- default `Interactive` authentication and alternate `-Method` contract;
+- online cloud-state refresh;
+- CSV export;
+- pre-association;
+- full association with live Information-stream progress;
+- cloud-only offboarding;
+- local-only firmware reset;
+- fail-safe full offboarding that verifies cloud state before local reset;
+- consistent disabled action state while operations are running;
+- activity logging and clear action;
+- compact full-Windows layout with conditional outer scrolling;
+- native Windows confirmation dialogs.
+
+The hardware-independent `Gui-Contract-Validation.ps1` suite validates export, authentication defaults, tenant-selector contract, WinPE guardrails and delegation to existing public cmdlets.
+
 ## Local tenant discovery validation
 
 Validated on a physical Microsoft Surface Laptop 3 running AMD64 Windows 11.
@@ -293,7 +319,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.6.0-preview1` is the currently published PowerShell Gallery release. The repository validation described above covers the `0.7.0-preview1` candidate on `main`, including local tenant discovery validated on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
+`WindowsDeviceLink 0.7.0-preview1` is the currently published PowerShell Gallery release. The repository validation described above now covers the `0.8.0-preview1` candidate on `main`, including the operator GUI validated on physical AMD64 Windows 11 hardware. The new multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
 
 ## Remaining validation / future work
 
