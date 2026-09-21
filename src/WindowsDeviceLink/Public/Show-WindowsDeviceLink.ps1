@@ -186,14 +186,65 @@ function Show-WindowsDeviceLink {
     $statusStrip = New-Object System.Windows.Forms.StatusStrip
     $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
     $statusLabel.Text = 'Ready'
+    $statusLabel.Spring = $true
+    $statusLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+
+    $statusProgress = New-Object System.Windows.Forms.ToolStripProgressBar
+    $statusProgress.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+    $statusProgress.MarqueeAnimationSpeed = 30
+    $statusProgress.Size = New-Object System.Drawing.Size(150,16)
+    $statusProgress.Visible = $false
+
     [void]$statusStrip.Items.Add($statusLabel)
+    [void]$statusStrip.Items.Add($statusProgress)
     $form.Controls.Add($statusStrip)
 
     $script:WdlGuiLocalAssociation = $null
+    $script:WdlGuiBusy = $false
 
     function Set-GuiStatus {
         param([string]$Text)
         $statusLabel.Text = $Text
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+
+    $actionControls = @(
+        $btnRefresh,
+        $btnIdentity,
+        $btnOnline,
+        $btnExport,
+        $btnRegister,
+        $btnComplete,
+        $btnRemove,
+        $btnReset,
+        $btnClose,
+        $tenantBox
+    )
+
+    function Set-GuiBusy {
+        param(
+            [Parameter(Mandatory)][bool]$Busy,
+            [string]$StatusText
+        )
+
+        $script:WdlGuiBusy = $Busy
+
+        foreach ($control in $actionControls) {
+            $control.Enabled = -not $Busy
+        }
+
+        $statusProgress.Visible = $Busy
+        $form.UseWaitCursor = $Busy
+
+        if ($Busy) {
+            if (-not [string]::IsNullOrWhiteSpace($StatusText)) {
+                Set-GuiStatus $StatusText
+            }
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($StatusText)) {
+            Set-GuiStatus $StatusText
+        }
+
         [System.Windows.Forms.Application]::DoEvents()
     }
 
@@ -312,11 +363,19 @@ function Show-WindowsDeviceLink {
     }
 
     $btnRefresh.Add_Click({
-        Refresh-LocalView
+        if ($script:WdlGuiBusy) { return }
+        Set-GuiBusy -Busy $true -StatusText 'Refreshing local state...'
+        try {
+            Refresh-LocalView
+        }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnIdentity.Add_Click({
-        Set-GuiStatus 'Loading DeviceLink identity...'
+        if ($script:WdlGuiBusy) { return }
+        Set-GuiBusy -Busy $true -StatusText 'Loading DeviceLink identity...'
         try {
             Write-GuiConsole -Message 'Get-WindowsDeviceLink' -Command
             $identity = Get-WindowsDeviceLink
@@ -328,10 +387,14 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus 'Identity load failed'
             Show-GuiError $_.Exception.Message
         }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnOnline.Add_Click({
-        Set-GuiStatus 'Checking tenant-side Device Association...'
+        if ($script:WdlGuiBusy) { return }
+        Set-GuiBusy -Busy $true -StatusText 'Checking tenant-side Device Association...'
         try {
             $parameters = @{ Online = $true; Method = 'Interactive' }
             $tenant = Get-TenantOverride
@@ -352,14 +415,25 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus 'Cloud lookup failed'
             Show-GuiError $_.Exception.Message
         }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnExport.Add_Click({
         $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
         $dialog.Description = 'Choose a folder for the DeviceLink CSV'
-        if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+            $dialog.Dispose()
+            return
+        }
 
-        Set-GuiStatus 'Exporting DeviceLink CSV...'
+        if ($script:WdlGuiBusy) {
+            $dialog.Dispose()
+            return
+        }
+
+        Set-GuiBusy -Busy $true -StatusText 'Exporting DeviceLink CSV...'
         try {
             Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$($dialog.SelectedPath)'" -Command
             $file = Get-WindowsDeviceLink -OutputDirectory $dialog.SelectedPath
@@ -381,15 +455,17 @@ $($file.FullName)",
         }
         finally {
             $dialog.Dispose()
+            Set-GuiBusy -Busy $false
         }
     })
 
     $btnRegister.Add_Click({
+        if ($script:WdlGuiBusy) { return }
         if (-not (Confirm-GuiAction -Title 'Create pre-association' -Message 'Create or attempt a tenant-side Device Association pre-association for this device?')) {
             return
         }
 
-        Set-GuiStatus 'Creating tenant-side pre-association...'
+        Set-GuiBusy -Busy $true -StatusText 'Creating tenant-side pre-association...'
         try {
             $identity = Get-WindowsDeviceLink
             $parameters = @{ Method = 'Interactive'; Confirm = $false }
@@ -407,14 +483,18 @@ $($file.FullName)",
             Set-GuiStatus 'Pre-association failed'
             Show-GuiError $_.Exception.Message
         }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnComplete.Add_Click({
+        if ($script:WdlGuiBusy) { return }
         if (-not (Confirm-GuiAction -Title 'Complete association' -Message 'Run native DeviceLink association completion now? This can take one or more minutes and changes local DeviceLink state.')) {
             return
         }
 
-        Set-GuiStatus 'Completing DeviceLink association...'
+        Set-GuiBusy -Busy $true -StatusText 'Completing DeviceLink association...'
         try {
             Write-GuiConsole -Message 'Complete-WindowsDeviceLinkAssociation -Confirm:$false' -Command
 
@@ -453,14 +533,18 @@ $($file.FullName)",
             Set-GuiStatus 'Association completion failed'
             Show-GuiError $_.Exception.Message
         }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnRemove.Add_Click({
+        if ($script:WdlGuiBusy) { return }
         if (-not (Confirm-GuiAction -Title 'Remove cloud association' -Message 'Delete the tenant-side Device Association record for this device? Local DeviceLink firmware state will not be reset.')) {
             return
         }
 
-        Set-GuiStatus 'Removing tenant-side Device Association...'
+        Set-GuiBusy -Busy $true -StatusText 'Removing tenant-side Device Association...'
         try {
             $parameters = @{ Method = 'Interactive'; Confirm = $false }
             $tenant = Get-TenantOverride
@@ -481,14 +565,18 @@ $($file.FullName)",
             Set-GuiStatus 'Cloud removal failed'
             Show-GuiError $_.Exception.Message
         }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnReset.Add_Click({
+        if ($script:WdlGuiBusy) { return }
         if (-not (Confirm-GuiAction -Title 'Reset local DeviceLink state' -Message 'Remove all known local DeviceLink UEFI variables? This is destructive local cleanup and does not delete the cloud Device Association record.')) {
             return
         }
 
-        Set-GuiStatus 'Resetting local DeviceLink firmware state...'
+        Set-GuiBusy -Busy $true -StatusText 'Resetting local DeviceLink firmware state...'
         try {
             Write-GuiConsole -Message 'Reset-WindowsDeviceLinkFirmwareState -Confirm:$false' -Command
             $result = Reset-WindowsDeviceLinkFirmwareState -Confirm:$false
@@ -500,15 +588,34 @@ $($file.FullName)",
             Set-GuiStatus 'Local reset failed'
             Show-GuiError $_.Exception.Message
         }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     $btnClose.Add_Click({
+        if ($script:WdlGuiBusy) { return }
         $form.Close()
+    })
+
+    $form.Add_FormClosing({
+        param($sender,$eventArgs)
+
+        if ($script:WdlGuiBusy) {
+            $eventArgs.Cancel = $true
+            Write-GuiConsole -Message 'Close request ignored because an operation is still running.'
+        }
     })
 
     $form.Add_Shown({
         Write-GuiConsole -Message 'WindowsDeviceLink operator dashboard opened.'
-        Refresh-LocalView
+        Set-GuiBusy -Busy $true -StatusText 'Loading local state...'
+        try {
+            Refresh-LocalView
+        }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     })
 
     try {
@@ -517,5 +624,6 @@ $($file.FullName)",
     finally {
         $form.Dispose()
         Remove-Variable WdlGuiLocalAssociation -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable WdlGuiBusy -Scope Script -ErrorAction SilentlyContinue
     }
 }
