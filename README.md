@@ -18,7 +18,7 @@ WindowsDeviceLink can:
 - send pre-association requests to optional Azure Function or Azure Automation backends.
 
 > [!IMPORTANT]
-> WindowsDeviceLink is preview / proof-of-concept software. The WinPE implementation and native DeviceLink association completion use undocumented Windows Runtime interfaces, and Device Association cloud operations use Microsoft Graph beta endpoints. These can change without notice.
+> WindowsDeviceLink is preview / proof-of-concept software. The WinPE implementation and native DeviceLink full association use undocumented Windows Runtime interfaces, and Device Association cloud operations use Microsoft Graph beta endpoints. These can change without notice.
 
 ## Start here
 
@@ -80,7 +80,7 @@ flowchart LR
     D["Offboarded<br/>Association removed"]
 
     A -->|"Register"| B
-    B -->|"Complete association"| C
+    B -->|"Full association"| C
     B -->|"Remove cloud record"| D
     C -->|"Offboard"| D
 ```
@@ -233,7 +233,7 @@ Pre-association plus explicit device-side completion:
 ```powershell
 Initialize-WindowsDeviceLink `
     -Method Interactive `
-    -CompleteAssociation
+    -FullAssociation
 ```
 
 Expected lifecycle:
@@ -335,7 +335,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 | `Get-WindowsDeviceLinkLocalAssociation` | Correlate the current local DeviceLink identity with registry and Association JWT tenant hints without cloud access. |
 | `Get-WindowsDeviceLinkRepairPlan` | Return a non-destructive repair recommendation for observed lifecycle state. |
 | `Get-WindowsDeviceLinkStatus` | Combine runtime, local identity, firmware and optional tenant-side association diagnostics. |
-| `Initialize-WindowsDeviceLink` | Safely initialize pre-association and optionally complete association with explicit `-CompleteAssociation`. |
+| `Initialize-WindowsDeviceLink` | Safely initialize pre-association and optionally full association with explicit `-FullAssociation`. |
 | `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association directly or through a webhook. |
 | `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
