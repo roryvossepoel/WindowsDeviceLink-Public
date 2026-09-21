@@ -106,17 +106,17 @@ Guarded state-changing completion command. It:
 - performs no reset, cleanup, cloud deletion, or reboot;
 - verifies firmware `4/4` and a valid identity-matching association JWT after completion.
 
-### `Initialize-WindowsDeviceLink -CompleteAssociation`
+### `Initialize-WindowsDeviceLink -FullAssociation`
 
 The initializer keeps its previous safe default behavior: create/verify tenant-side preassociation only when appropriate.
 
-Device-side association completion is opt-in through `-CompleteAssociation`.
+Device-side association completion is opt-in through `-FullAssociation`.
 
 With that switch, the supported path is:
 
 `LocalOnly -> Register -> Preassociated -> Complete -> Associated`
 
-Already-associated devices remain idempotent and report `CompletionResult = AlreadyAssociated` without invoking configure again.
+Already-associated devices remain idempotent and report `FullAssociationResult = AlreadyAssociated` without invoking configure again.
 
 ## Firmware state model
 
