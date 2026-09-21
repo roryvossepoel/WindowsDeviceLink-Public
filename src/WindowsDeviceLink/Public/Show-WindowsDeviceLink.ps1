@@ -104,9 +104,6 @@ function Show-WindowsDeviceLink {
     $content.BackColor = $form.BackColor
     $form.Controls.Add($content)
 
-    $accentColor = [System.Drawing.SystemColors]::Highlight
-    $softAccent = [System.Drawing.Color]::FromArgb(240,247,255)
-    $softDanger = [System.Drawing.Color]::FromArgb(255,246,246)
 
     function New-Card {
         param(
@@ -114,8 +111,7 @@ function Show-WindowsDeviceLink {
             [int]$X,
             [int]$Y,
             [int]$Width,
-            [int]$Height,
-            [switch]$UseAccent
+            [int]$Height
         )
 
         $panel = New-Object System.Windows.Forms.Panel
@@ -125,18 +121,10 @@ function Show-WindowsDeviceLink {
         $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::None
         $content.Controls.Add($panel)
 
-        if ($UseAccent) {
-            $bar = New-Object System.Windows.Forms.Panel
-            $bar.BackColor = $accentColor
-            $bar.Location = [System.Drawing.Point]::new(0,0)
-            $bar.Size = [System.Drawing.Size]::new(3,$Height)
-            $panel.Controls.Add($bar)
-        }
-
         if ($Title) {
             $label = New-Object System.Windows.Forms.Label
             $label.Text = $Title
-            $label.Font = New-Object System.Drawing.Font('Segoe UI',9.5,[System.Drawing.FontStyle]::Bold)
+            $label.Font = New-Object System.Drawing.Font('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
             $label.Location = [System.Drawing.Point]::new(14,9)
             $label.AutoSize = $true
             $panel.Controls.Add($label)
@@ -155,15 +143,15 @@ function Show-WindowsDeviceLink {
 
         $captionLabel = New-Object System.Windows.Forms.Label
         $captionLabel.Text = $Caption
-        $captionLabel.Font = New-Object System.Drawing.Font('Segoe UI',7.8)
+        $captionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
         $captionLabel.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
         $captionLabel.Location = [System.Drawing.Point]::new(14,$Y)
-        $captionLabel.Size = [System.Drawing.Size]::new($CaptionWidth,18)
+        $captionLabel.Size = [System.Drawing.Size]::new($CaptionWidth,20)
         $Parent.Controls.Add($captionLabel)
 
         $valueLabel = New-Object System.Windows.Forms.Label
         $valueLabel.Text = '-'
-        $valueLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.3,[System.Drawing.FontStyle]::Bold)
+        $valueLabel.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
         $valueLabel.Location = [System.Drawing.Point]::new(($CaptionWidth + 20),($Y - 1))
         $valueLabel.Size = [System.Drawing.Size]::new(350,22)
         $valueLabel.AutoEllipsis = $true
@@ -178,15 +166,13 @@ function Show-WindowsDeviceLink {
             [string]$Title,
             [string]$Description,
             [int]$Y,
-            [string[]]$Buttons,
-            [ValidateSet('Normal','Onboard','Offboard')]
-            [string]$Kind = 'Normal'
+            [string[]]$Buttons
         )
 
         $row = New-Object System.Windows.Forms.Panel
         $row.Location = [System.Drawing.Point]::new(0,$Y)
         $row.Size = [System.Drawing.Size]::new(900,46)
-        $row.BackColor = if ($Kind -eq 'Onboard') { $softAccent } elseif ($Kind -eq 'Offboard') { $softDanger } else { [System.Drawing.Color]::White }
+        $row.BackColor = [System.Drawing.Color]::White
         $Parent.Controls.Add($row)
 
         $titleLabel = New-Object System.Windows.Forms.Label
@@ -198,7 +184,7 @@ function Show-WindowsDeviceLink {
 
         $descriptionLabel = New-Object System.Windows.Forms.Label
         $descriptionLabel.Text = $Description
-        $descriptionLabel.Font = New-Object System.Drawing.Font('Segoe UI',7.6)
+        $descriptionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.2)
         $descriptionLabel.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
         $descriptionLabel.Location = [System.Drawing.Point]::new(14,23)
         $descriptionLabel.AutoSize = $true
@@ -213,7 +199,7 @@ function Show-WindowsDeviceLink {
         for ($i = $count - 1; $i -ge 0; $i--) {
             $button = New-Object System.Windows.Forms.Button
             $button.Text = $Buttons[$i]
-            $button.Font = New-Object System.Drawing.Font('Segoe UI',8)
+            $button.Font = New-Object System.Drawing.Font('Segoe UI',8.6)
             $button.Size = [System.Drawing.Size]::new($buttonWidth,28)
             $right -= $buttonWidth
             $button.Location = [System.Drawing.Point]::new($right,9)
@@ -298,7 +284,7 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiLocalAssociation = $null
     $script:WdlGuiCloudStatus = $null
 
-    $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126 -UseAccent
+    $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126
     $associationCard = New-Card -Title 'Association' -X 536 -Y 12 -Width 508 -Height 126 -Accent
 
     $ui.DeviceName = New-ValuePair -Parent $deviceCard -Caption 'Device' -Y 34
@@ -320,7 +306,7 @@ function Show-WindowsDeviceLink {
     $cloudIdCaption.Font = New-Object System.Drawing.Font('Segoe UI',7.8)
     $cloudIdCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
     $cloudIdCaption.Location = [System.Drawing.Point]::new(500,34)
-    $cloudIdCaption.Size = [System.Drawing.Size]::new(96,18)
+    $cloudIdCaption.Size = [System.Drawing.Size]::new(96,20)
     $cloudCard.Controls.Add($cloudIdCaption)
 
     $ui.CloudId = New-Object System.Windows.Forms.Label
@@ -352,7 +338,7 @@ function Show-WindowsDeviceLink {
 
     $actionsTitle = New-Object System.Windows.Forms.Label
     $actionsTitle.Text = 'Actions'
-    $actionsTitle.Font = New-Object System.Drawing.Font('Segoe UI',11,[System.Drawing.FontStyle]::Bold)
+    $actionsTitle.Font = New-Object System.Drawing.Font('Segoe UI',11.5,[System.Drawing.FontStyle]::Bold)
     $actionsTitle.Location = [System.Drawing.Point]::new(16,246)
     $actionsTitle.AutoSize = $true
     $content.Controls.Add($actionsTitle)
@@ -361,8 +347,8 @@ function Show-WindowsDeviceLink {
     $rowRefresh = New-ActionRow -Parent $actionsPanel -Title 'Refresh' -Description 'Refresh local DeviceLink and firmware information.' -Y 0 -Buttons @('Refresh')
     $rowOnline  = New-ActionRow -Parent $actionsPanel -Title 'Check online' -Description 'Query the tenant-side Device Association using the selected tenant context.' -Y 46 -Buttons @('Check online')
     $rowExport  = New-ActionRow -Parent $actionsPanel -Title 'Export DeviceLink CSV' -Description 'Export the Microsoft-generated .devicelink.csv.' -Y 92 -Buttons @('Export CSV')
-    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the complete onboarding flow.' -Y 138 -Buttons @('Pre-associate','Full associate') -Kind Onboard
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full') -Kind Offboard
+    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the complete onboarding flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full')
 
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
@@ -476,16 +462,32 @@ function Show-WindowsDeviceLink {
         $tenantSelector
     )
 
+    function Get-GuiButtons {
+        param([System.Windows.Forms.Control]$Parent)
+
+        $buttons = New-Object System.Collections.Generic.List[object]
+        foreach ($control in $Parent.Controls) {
+            if ($control -is [System.Windows.Forms.Button]) {
+                $buttons.Add($control)
+            }
+            if ($control.HasChildren) {
+                foreach ($childButton in @(Get-GuiButtons -Parent $control)) {
+                    $buttons.Add($childButton)
+                }
+            }
+        }
+        $buttons.ToArray()
+    }
+
     function Set-GuiBusy {
         param([Parameter(Mandatory)][bool]$Busy,[string]$StatusText)
 
         $script:WdlGuiBusy = $Busy
 
-        foreach ($control in $actionControls) {
-            $control.Enabled = -not $Busy
+        foreach ($button in @(Get-GuiButtons -Parent $actionsPanel)) {
+            $button.Enabled = -not $Busy
         }
 
-        $actionsPanel.Enabled = -not $Busy
         $tenantSelector.Enabled = -not $Busy
 
         $statusProgress.Visible = $Busy
@@ -889,8 +891,8 @@ function Show-WindowsDeviceLink {
                 ForEach-Object { $_.Width = [Math]::Max(480,$fullWidth - 28) }
         }
 
-        $requiredHeight = $activityY + 188
-        $availableHeight = [Math]::Max(0,$content.ClientSize.Height - 4)
+        $requiredHeight = $activityCard.Bottom + 6
+        $availableHeight = [Math]::Max(0,$content.ClientSize.Height - 2)
 
         if ($requiredHeight -gt $availableHeight) {
             $content.AutoScroll = $true
@@ -901,6 +903,7 @@ function Show-WindowsDeviceLink {
         else {
             $content.AutoScrollMinSize = [System.Drawing.Size]::Empty
             $content.AutoScroll = $false
+            $content.VerticalScroll.Value = 0
         }
     }
 
