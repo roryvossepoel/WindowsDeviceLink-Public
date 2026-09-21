@@ -86,7 +86,7 @@ foreach ($required in @(
     'Reset-WindowsDeviceLinkFirmwareState',
     'CompleteAssociation',
     'Full DeviceLink offboarding',
-    'No cloud association found - no change required'
+    'No cloud association was found. Nothing was removed.'
 )) {
     if ($source -notmatch [regex]::Escape($required)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI/delegation contract '$required'."
