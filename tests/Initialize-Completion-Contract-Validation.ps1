@@ -1,9 +1,9 @@
 <#
-Validates the Initialize-WindowsDeviceLink full association opt-in contract.
+Validates the Initialize-WindowsDeviceLink full-association opt-in contract.
 
 This test is hardware-independent. It does not invoke DeviceLink, Graph, firmware, or native
-association operations. It parses the public cmdlet source and verifies that association
-full association remains explicit opt-in behavior.
+association operations. It parses the public cmdlet source and verifies that full association
+remains explicit opt-in behavior.
 #>
 [CmdletBinding()]
 param()
@@ -33,15 +33,16 @@ Assert-True ($parameterNames -contains 'FullAssociation') 'Initialize-WindowsDev
 $source=[IO.File]::ReadAllText($path)
 Assert-True ($source -match '\[switch\]\$FullAssociation') '-FullAssociation must remain an explicit switch parameter.'
 Assert-True ($source -match 'if\s*\(\s*\$FullAssociation\s+-and\s+\$afterHealth\.State\s+-eq\s+''Preassociated''\s*\)') 'Full association must be gated by -FullAssociation and verified Preassociated state.'
-Assert-True ($source -match 'Complete-WindowsDeviceLinkAssociation\s+@completeParameters') 'Initializer must delegate device-side full association to Complete-WindowsDeviceLinkAssociation.'
+Assert-True ($source -match 'Complete-WindowsDeviceLinkAssociation\s+@completeParameters') 'Initializer must delegate the device-side operation to Complete-WindowsDeviceLinkAssociation.'
 Assert-True ($source -match 'FullAssociationRequested=\[bool\]\$FullAssociation') 'Initialization result must expose whether full association was requested.'
-Assert-True ($source -match 'FullAssociationResult=\$full association') 'Initialization result must expose the full association result.'
+Assert-True ($source -match 'FullAssociationResult=\$fullAssociationResult') 'Initialization result must expose the full-association result.'
+Assert-True ($source -match 'FullAssociationDetails=\$completion') 'Initialization result must expose the low-level full-association details.'
 
-$full associationCalls=@($functionAst.FindAll({param($n)
+$fullAssociationCalls=@($functionAst.FindAll({param($n)
     $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Complete-WindowsDeviceLinkAssociation'
 },$true))
-Assert-True ($full associationCalls.Count -eq 1) 'Initialize-WindowsDeviceLink must contain exactly one full association command invocation.'
+Assert-True ($fullAssociationCalls.Count -eq 1) 'Initialize-WindowsDeviceLink must contain exactly one full-association command invocation.'
 
 Write-Host 'PASS: Initialize-WindowsDeviceLink full association remains explicit opt-in behavior.'
-Write-Host 'PASS: full association delegates to the guarded public full association cmdlet exactly once.'
-Write-Host 'PASS: initialization result exposes full association request/result state.'
+Write-Host 'PASS: Full association delegates to the guarded Complete-WindowsDeviceLinkAssociation cmdlet exactly once.'
+Write-Host 'PASS: Initialization result exposes full-association request/result/details state.'
