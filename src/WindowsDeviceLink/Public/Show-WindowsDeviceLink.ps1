@@ -104,6 +104,12 @@ function Show-WindowsDeviceLink {
     $content.BackColor = $form.BackColor
     $form.Controls.Add($content)
 
+    $toolTip = New-Object System.Windows.Forms.ToolTip
+    $toolTip.AutoPopDelay = 10000
+    $toolTip.InitialDelay = 400
+    $toolTip.ReshowDelay = 200
+    $toolTip.ShowAlways = $true
+
 
     function New-Card {
         param(
@@ -311,7 +317,7 @@ function Show-WindowsDeviceLink {
     $cloudCard.Controls.Add($cloudIdCaption)
 
     $ui.CloudId = New-Object System.Windows.Forms.Label
-    $ui.CloudId.Text = '-'
+    $ui.CloudId.Text = 'Unavailable'
     $ui.CloudId.Font = New-Object System.Drawing.Font('Segoe UI',8.3,[System.Drawing.FontStyle]::Bold)
     $ui.CloudId.Location = [System.Drawing.Point]::new(600,33)
     $ui.CloudId.Size = [System.Drawing.Size]::new(380,22)
@@ -395,6 +401,13 @@ function Show-WindowsDeviceLink {
     $activityTitle.Location = [System.Drawing.Point]::new(16,518)
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
+
+    $btnClearActivity = New-Object System.Windows.Forms.Button
+    $btnClearActivity.Text = 'Clear'
+    $btnClearActivity.Font = New-Object System.Drawing.Font('Segoe UI',8.3)
+    $btnClearActivity.Size = [System.Drawing.Size]::new(72,26)
+    $btnClearActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+    $content.Controls.Add($btnClearActivity)
 
     $activityCard = New-Card -Title '' -X 14 -Y 544 -Width 1030 -Height 118
 
@@ -557,6 +570,7 @@ function Show-WindowsDeviceLink {
         foreach ($button in $allActionButtons) {
             $button.Enabled = $enabled
         }
+        $btnClearActivity.Enabled = $enabled
 
         # Also disable the complete action surface as a hard interaction guard.
         # The individual button state above ensures every button paints as disabled.
@@ -622,7 +636,21 @@ function Show-WindowsDeviceLink {
         $ui.Firmware.Text = [string]$local.FirmwareState
         $ui.LocalState.Text = [string]$local.LocalAssociationState
         $ui.TenantId.Text = if ($local.TenantId) { [string]$local.TenantId } else { 'Unavailable' }
-        $ui.Source.Text = "$($local.TrustLevel) | $($local.Source)"
+        if ([string]$local.TrustLevel -eq 'Unavailable' -and [string]$local.Source -eq 'Unavailable') {
+            $ui.Source.Text = 'Unavailable'
+        }
+        elseif ([string]::IsNullOrWhiteSpace([string]$local.TrustLevel)) {
+            $ui.Source.Text = [string]$local.Source
+        }
+        elseif ([string]::IsNullOrWhiteSpace([string]$local.Source)) {
+            $ui.Source.Text = [string]$local.TrustLevel
+        }
+        else {
+            $ui.Source.Text = "$($local.TrustLevel) | $($local.Source)"
+        }
+
+        $toolTip.SetToolTip($ui.TenantId, [string]$ui.TenantId.Text)
+        $toolTip.SetToolTip($ui.Source, [string]$ui.Source.Text)
 
         Set-GuiStatus "Local state refreshed | $($local.FirmwareState)"
         Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source)"
@@ -651,8 +679,11 @@ function Show-WindowsDeviceLink {
             Write-GuiObject $cloud
 
             $ui.CloudState.Text = [string]$cloud.AssociationState
-            $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { '-' }
-            $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { '-' }
+            $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
+            $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
+
+            $toolTip.SetToolTip($ui.CloudTenant, [string]$ui.CloudTenant.Text)
+            $toolTip.SetToolTip($ui.CloudId, [string]$ui.CloudId.Text)
 
             Set-GuiStatus 'Cloud lookup completed'
         }
@@ -792,8 +823,8 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = '-'
-            $ui.CloudId.Text = '-'
+            $ui.CloudTenant.Text = 'Unavailable'
+            $ui.CloudId.Text = 'Unavailable'
 
             Refresh-LocalView
             Set-GuiStatus 'Cloud offboarding completed'
@@ -882,8 +913,8 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = '-'
-            $ui.CloudId.Text = '-'
+            $ui.CloudTenant.Text = 'Unavailable'
+            $ui.CloudId.Text = 'Unavailable'
 
             Refresh-LocalView
             Set-GuiStatus 'Full offboarding completed'
@@ -909,6 +940,11 @@ function Show-WindowsDeviceLink {
             $selectedTenant = Get-SelectedTenantId
             $ui.Auth.Text = if ($selectedTenant) { "$Method | $selectedTenant" } else { $Method }
         }
+    })
+
+    $btnClearActivity.Add_Click({
+        $consoleBox.Clear()
+        Write-GuiConsole -Message 'Activity log cleared.'
     })
 
     $form.Add_FormClosing({
@@ -958,6 +994,7 @@ function Show-WindowsDeviceLink {
 
         $activityY = $actionsY + 270
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
+        $btnClearActivity.Location = [System.Drawing.Point]::new(($fullWidth - 58),($activityY - 2))
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 24
@@ -1003,6 +1040,7 @@ function Show-WindowsDeviceLink {
         [void]$form.ShowDialog()
     }
     finally {
+        $toolTip.Dispose()
         $form.Dispose()
         Remove-Variable WdlGuiLocalAssociation -Scope Script -ErrorAction SilentlyContinue
         Remove-Variable WdlGuiCloudStatus -Scope Script -ErrorAction SilentlyContinue
