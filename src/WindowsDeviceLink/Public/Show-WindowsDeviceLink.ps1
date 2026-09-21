@@ -1046,7 +1046,12 @@ function Show-WindowsDeviceLink {
         $activityY = $actionsY + 270
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
 
-        $clearX = $btnFullOffboard.Right - $btnClearActivity.Width
+        $fullAnchorScreen = $btnFullOffboard.Parent.PointToScreen(
+            [System.Drawing.Point]::new($btnFullOffboard.Right,$btnFullOffboard.Top)
+        )
+        $fullAnchorClient = $content.PointToClient($fullAnchorScreen)
+
+        $clearX = $fullAnchorClient.X - $btnClearActivity.Width
         $clearY = $activityY - 5
         $btnClearActivity.Location = [System.Drawing.Point]::new($clearX,$clearY)
 
