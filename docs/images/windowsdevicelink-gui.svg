@@ -4,7 +4,7 @@
     .t{font-family:'Segoe UI',Arial,sans-serif;fill:#1f1f1f}.h{font-size:20px;font-weight:700}.sh{font-size:15px;font-weight:700}.l{font-size:14px;fill:#666}.v{font-size:14px;font-weight:600}.d{font-size:13px;fill:#6b6b6b}.b{font-size:14px}.m{font-family:Consolas,'Courier New',monospace;font-size:13px;fill:#222}
     .card{fill:white}.line{stroke:#e7e7e7;stroke-width:1}.btn{fill:#fff;stroke:#c8c8c8;stroke-width:1}.input{fill:#fff;stroke:#c8c8c8;stroke-width:1}
   </style>
-  <text x="42" y="34" class="t l">WindowsDeviceLink 0.8.0-preview1 (Preview)</text>
+  <text x="42" y="34" class="t l">WindowsDeviceLink (Preview)</text>
 
   <rect x="20" y="58" width="690" height="170" class="card"/>
   <text x="42" y="90" class="t h">Device</text>
