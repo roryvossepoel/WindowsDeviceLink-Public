@@ -5,6 +5,41 @@ This FAQ is intended as a practical operator guide: **what should I run to achie
 > [!IMPORTANT]
 > WindowsDeviceLink manages the local DeviceLink identity and Windows Autopilot device preparation **Device Association**. It does **not** remove classic Windows Autopilot registrations.
 
+## Is there a GUI?
+
+Yes. On full Windows, run:
+
+```powershell
+Show-WindowsDeviceLink
+```
+
+The GUI provides:
+
+- local DeviceLink and firmware state;
+- optional tenant-side cloud state;
+- tenant selection by friendly name when `-Tenants` is supplied;
+- CSV export;
+- pre-association and full association;
+- cloud-only, local-only and full DeviceLink offboarding;
+- live activity output.
+
+Interactive authentication is the default. For example:
+
+```powershell
+Show-WindowsDeviceLink -Method DeviceCode
+```
+
+Provide friendly tenant choices with:
+
+```powershell
+Show-WindowsDeviceLink -Tenants @{
+    'Management' = '11111111-1111-1111-1111-111111111111'
+    'Contoso'    = '22222222-2222-2222-2222-222222222222'
+}
+```
+
+The GUI delegates operations to the existing WindowsDeviceLink cmdlets. It is currently a full-Windows feature; WinPE remains command-line only.
+
 ## Start here: what state is the device in?
 
 For local state only:
