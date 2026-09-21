@@ -607,6 +607,31 @@ function Show-WindowsDeviceLink {
         Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source)"
     }
 
+    function Refresh-CloudView {
+        param(
+            [switch]$WriteCommand
+        )
+
+        $parameters = Get-GuiAuthParameters
+        $parameters.Online = $true
+
+        if ($WriteCommand) {
+            Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
+        }
+
+        $cloud = Get-WindowsDeviceLinkStatus @parameters
+        $script:WdlGuiCloudStatus = $cloud
+
+        $ui.CloudState.Text = [string]$cloud.AssociationState
+        $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
+        $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
+
+        $toolTip.SetToolTip($ui.CloudTenant, [string]$ui.CloudTenant.Text)
+        $toolTip.SetToolTip($ui.CloudId, [string]$ui.CloudId.Text)
+
+        return $cloud
+    }
+
     function Invoke-GuiRefresh {
         if ($script:WdlGuiBusy) { return }
 
@@ -621,20 +646,8 @@ function Show-WindowsDeviceLink {
 
         Set-GuiBusy -Busy $true -StatusText 'Checking tenant-side Device Association...'
         try {
-            $parameters = Get-GuiAuthParameters
-            $parameters.Online = $true
-
-            Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
-            $cloud = Get-WindowsDeviceLinkStatus @parameters
-            $script:WdlGuiCloudStatus = $cloud
+            $cloud = Refresh-CloudView -WriteCommand
             Write-GuiObject $cloud
-
-            $ui.CloudState.Text = [string]$cloud.AssociationState
-            $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
-            $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
-
-            $toolTip.SetToolTip($ui.CloudTenant, [string]$ui.CloudTenant.Text)
-            $toolTip.SetToolTip($ui.CloudId, [string]$ui.CloudId.Text)
 
             Set-GuiStatus 'Cloud lookup completed'
         }
@@ -704,6 +717,8 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
+            $verifiedCloud = Refresh-CloudView -WriteCommand
+            Write-GuiObject $verifiedCloud
             Set-GuiStatus 'Pre-association completed'
         }
         catch {
@@ -747,6 +762,8 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
+            $verifiedCloud = Refresh-CloudView -WriteCommand
+            Write-GuiObject $verifiedCloud
             Set-GuiStatus 'Full association completed'
         }
         catch {
