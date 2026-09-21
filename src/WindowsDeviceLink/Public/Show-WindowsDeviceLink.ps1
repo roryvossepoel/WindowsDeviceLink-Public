@@ -13,7 +13,7 @@ function Show-WindowsDeviceLink {
 
     Use -Tenants to provide friendly tenant names for the tenant selector:
 
-    @{'Management'='11111111-1111-1111-1111-111111111111'; 'Contoso'='22222222-2222-2222-2222-222222222222'}
+    @{'Management'='11111111-1111-1111-1111-111111111111'; 'Customer A'='22222222-2222-2222-2222-222222222222'}
 
     Use -TenantsUri to load the same friendly-name-to-tenant-ID mapping from a trusted HTTPS JSON endpoint.
     Use -TenantsPath to load the same JSON format from a local file.
@@ -28,11 +28,11 @@ function Show-WindowsDeviceLink {
     .EXAMPLE
     Show-WindowsDeviceLink -Tenants @{
         'Management' = '11111111-1111-1111-1111-111111111111'
-        'Contoso' = '22222222-2222-2222-2222-222222222222'
+        'Customer A' = '22222222-2222-2222-2222-222222222222'
     }
 
     .EXAMPLE
-    Show-WindowsDeviceLink -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
+    Show-WindowsDeviceLink -TenantsUri 'https://config.example.com/windowsdevicelink/tenants.json'
 
     .EXAMPLE
     Show-WindowsDeviceLink -TenantsPath 'E:\Config\tenants.json'
