@@ -223,7 +223,8 @@ function Show-WindowsDeviceLink {
         $text = ($InputObject | Format-List * | Out-String).TrimEnd()
         if (-not [string]::IsNullOrWhiteSpace($text)) {
             foreach ($line in ($text -split "\r?\n")) {
-                Write-GuiConsole $line
+                if ([string]::IsNullOrWhiteSpace($line)) { continue }
+                Write-GuiConsole -Message $line
             }
         }
     }
