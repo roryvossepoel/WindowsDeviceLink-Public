@@ -24,6 +24,28 @@ if ($command.Parameters.ContainsKey('WhatIf') -or $command.Parameters.ContainsKe
     throw 'FAIL: Show-WindowsDeviceLink itself must not expose mutation controls; state-changing actions are delegated to guarded cmdlets after explicit GUI confirmation.'
 }
 
+if (-not $command.Parameters.ContainsKey('Method')) {
+    throw 'FAIL: Show-WindowsDeviceLink must expose -Method.'
+}
+if (-not $command.Parameters.ContainsKey('Tenants')) {
+    throw 'FAIL: Show-WindowsDeviceLink must expose -Tenants.'
+}
+if ($command.Parameters['Tenants'].ParameterType -ne [hashtable]) {
+    throw 'FAIL: Show-WindowsDeviceLink -Tenants must remain a hashtable.'
+}
+
+$methodParameter = $command.Parameters['Method']
+$validateSet = @($methodParameter.Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] } | Select-Object -First 1)
+if (-not $validateSet -or 'Interactive' -notin $validateSet.ValidValues) {
+    throw 'FAIL: Show-WindowsDeviceLink -Method must continue to support Interactive.'
+}
+
+$paramBlockText = $command.ScriptBlock.Ast.ParamBlock.Extent.Text
+if ($paramBlockText -notmatch "\[string\]\$Method\s*=\s*'Interactive'") {
+    throw 'FAIL: Show-WindowsDeviceLink must keep Interactive as the default authentication method.'
+}
+
+
 foreach ($required in @(
     'System.Windows.Forms',
     'ShowDialog',
