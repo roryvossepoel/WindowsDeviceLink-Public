@@ -30,9 +30,9 @@ WindowsDeviceLink can:
 
 ## Current version
 
-The current preview release line is `0.7.0-preview1`.
+The current preview release line is `0.8.0-preview1`.
 
-This release adds local source-tenant discovery with `Get-WindowsDeviceLinkLocalAssociation`, correlates current-LinkId registry hints with Association JWT tenant claims, documents the validated tenant-hint lifecycle, and simplifies multitenant intent construction while preserving fresh backend verification before mutation.
+This release adds `Show-WindowsDeviceLink`, a compact Windows operator GUI for local/cloud inspection, tenant selection, CSV export, pre-association, full association, cloud/local/full offboarding, and live activity logging. Interactive authentication is the default and alternative supported methods can be selected through command parameters.
 
 ## Mental model
 
@@ -174,6 +174,26 @@ Get-WindowsDeviceLink |
 
 
 
+### Open the operator GUI
+
+```powershell
+Show-WindowsDeviceLink
+```
+
+The GUI is currently supported on full Windows and uses `Interactive` authentication by default for online actions. It delegates lifecycle operations to the existing public cmdlets rather than implementing separate Graph or firmware logic.
+
+Optional tenant selector:
+
+```powershell
+Show-WindowsDeviceLink `
+    -Tenants @{
+        'Management' = '11111111-1111-1111-1111-111111111111'
+        'Contoso'    = '22222222-2222-2222-2222-222222222222'
+    }
+```
+
+Alternative authentication methods can be selected with `-Method` and the matching credential parameters.
+
 ### Identify the source tenant locally
 
 ```powershell
@@ -312,6 +332,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 | `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association directly or through a webhook. |
 | `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
+| `Show-WindowsDeviceLink` | Open the full-Windows operator GUI for status, tenant selection, onboarding, offboarding, CSV export and activity output. |
 | `Test-WindowsDeviceLinkAssociationJwt` | Validate local association JWT structure/time/identity correlation without exposing the raw JWT. |
 | `Test-WindowsDeviceLinkDiscovery` | Perform read-only native DeviceLink association discovery. |
 | `Test-WindowsDeviceLinkHealth` | Non-destructively classify status into machine-readable lifecycle/health states. |
@@ -343,9 +364,9 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Scope
 
-Preview release line: `0.7.0-preview1`.
+Preview release line: `0.8.0-preview1`.
 
-In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, multiple authentication methods, webhook transport and optional Azure reference backends.
+In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, the optional full-Windows operator GUI, multiple authentication methods, webhook transport and optional Azure reference backends.
 
 Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot v1 management, automatic destructive repair, cryptographic association-JWT signature verification, or production support guarantees.
 
