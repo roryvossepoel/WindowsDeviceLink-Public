@@ -50,42 +50,39 @@ Before publishing a new version:
 9. verify the public command surface with `Test-ModuleManifest` / `Get-Command`;
 10. commit all release content to `main` before starting either release workflow.
 
-## Publish to PowerShell Gallery
+## Create the GitHub release and immutable tag
 
-Use GitHub Actions -> **Publish PowerShell Gallery** -> **Run workflow**.
+Use GitHub Actions -> **Create GitHub Release** -> **Run workflow**.
 
 The optional `expected_version` input is a safety check. For example:
 
 ```text
-0.4.4-preview1
+0.9.0-preview1
 ```
 
-If supplied, the workflow fails unless it exactly matches the version derived from the manifest.
+The workflow derives `v<version>` from the manifest, verifies that the source is the current GitHub-Verified `main` commit, and creates the prerelease/tag without moving an existing tag.
 
-The workflow:
+The immutable tag is required before Gallery publication.
 
-1. checks out the selected commit;
-2. builds the Gallery package;
-3. validates the manifest;
-4. derives the complete Gallery version from `ModuleVersion` plus `Prerelease`;
-5. verifies that the Microsoft runtime DLL is not bundled;
-6. publishes with the `PSGALLERY_API_KEY` repository secret.
+## Publish to PowerShell Gallery
 
-A normal push to `main` does not invoke publication.
-
-## Create the GitHub release and immutable tag
-
-After the Gallery publication and smoke test succeed, use GitHub Actions -> **Create GitHub Release** -> **Run workflow**.
-
-Optionally enter the same `expected_version` value. The workflow derives the tag from the manifest, for example:
+After the GitHub release/tag exists, use GitHub Actions -> **Publish PowerShell Gallery** -> **Run workflow** and provide the exact release version, for example:
 
 ```text
-v0.4.3-preview1
+0.9.0-preview1
 ```
 
-It refuses to continue if that tag or release already exists. It then creates a GitHub release targeted at the exact commit on which the workflow runs and uses GitHub-generated release notes. Preview versions are marked as prereleases.
+The Gallery workflow:
 
-This gives the Gallery version a stable source-code reference.
+1. checks out the exact immutable `v<version>` tag;
+2. verifies that HEAD matches that exact tag;
+3. builds the staged Gallery package;
+4. validates the manifest and public command surface;
+5. runs hardware-independent regression checks against the staged artifact;
+6. verifies that no Microsoft runtime DLL is bundled;
+7. publishes with the `PSGALLERY_API_KEY` repository secret.
+
+A normal push to `main` never publishes a Gallery package.
 
 ## Recommended order
 
@@ -99,19 +96,25 @@ validate Windows / WinPE
 final public-repository audit
         |
         v
-Publish PowerShell Gallery workflow
+merge release-prep PR through GitHub
         |
         v
-install the actual Gallery package and smoke-test it
+GitHub Verified main commit
         |
         v
 Create GitHub Release workflow
         |
         v
 immutable vX.Y.Z[-prerelease] source tag
+        |
+        v
+Publish PowerShell Gallery workflow
+        |
+        v
+install the actual Gallery package and smoke-test it
 ```
 
-The GitHub release is intentionally created after the Gallery smoke test so a tag is only frozen once the published artifact has been verified.
+The GitHub release/tag is intentionally created before Gallery publication because the Gallery workflow publishes only from an immutable release tag.
 
 ## Signing roadmap
 
