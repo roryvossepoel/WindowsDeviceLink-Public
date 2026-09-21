@@ -341,7 +341,7 @@ function Show-WindowsDeviceLink {
 
     $tenantChoiceLookup = @{}
     $tenantChoices = New-Object System.Collections.Generic.List[string]
-    $autoLabel = if ($outerBoundParameters.ContainsKey('TenantId')) { 'Default tenant parameter' } else { 'Automatic / local context' }
+    $autoLabel = if ($outerBoundParameters.ContainsKey('TenantId')) { 'Default tenant parameter' } else { 'Automatic / detected tenant' }
     $tenantChoiceLookup[$autoLabel] = $null
     $tenantChoices.Add($autoLabel)
 
