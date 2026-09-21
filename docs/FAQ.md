@@ -45,6 +45,13 @@ Show-WindowsDeviceLink `
     -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
 ```
 
+Or from a local JSON file:
+
+```powershell
+Show-WindowsDeviceLink `
+    -TenantsPath 'E:\Config\tenants.json'
+```
+
 The JSON format is intentionally simple:
 
 ```json
@@ -54,7 +61,7 @@ The JSON format is intentionally simple:
 }
 ```
 
-`-TenantsUri` accepts only an absolute HTTPS URI. Tenant values must be valid GUIDs. The file should contain tenant display names and tenant IDs only; do not place credentials or secrets in it. When `-Tenants` and `-TenantsUri` are both supplied, the local `-Tenants` values override remote entries with the same name.
+`-TenantsUri` accepts only an absolute HTTPS URI. `-TenantsPath` reads the same JSON schema from a local file. Tenant values must be valid GUIDs. The file should contain tenant display names and tenant IDs only; do not place credentials or secrets in it. When multiple sources are supplied, precedence is `TenantsUri` -> `TenantsPath` -> explicit `-Tenants`.
 
 The GUI delegates operations to the existing WindowsDeviceLink cmdlets and is available on Windows 11 and compatible Windows PE environments.
 
