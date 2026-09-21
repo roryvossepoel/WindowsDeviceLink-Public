@@ -4,7 +4,7 @@ function Show-WindowsDeviceLink {
     Opens the WindowsDeviceLink operator dashboard.
 
     .DESCRIPTION
-    Opens a compact Windows 11 Settings-inspired WinForms dashboard on full Windows.
+    Opens a compact Windows 11 Settings-inspired WinForms dashboard on Windows 11 and supported Windows PE environments.
 
     The GUI focuses on inspecting Device Association state, onboarding, and offboarding.
     Lifecycle actions delegate to existing WindowsDeviceLink public cmdlets.
@@ -62,12 +62,11 @@ function Show-WindowsDeviceLink {
         [string]$Environment = 'Global',
 
         [ValidateRange(1,600)]
-        [double]$ClientTimeout = 100
-    )
+        [double]$ClientTimeout = 100,
 
-    if (Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT') {
-        throw 'Show-WindowsDeviceLink is not supported in Windows PE yet. Use the WindowsDeviceLink command-line cmdlets instead.'
-    }
+        [ValidateNotNullOrEmpty()]
+        [string]$WindowsManagementServicePath
+    )
 
     $outerBoundParameters = @{}
     foreach ($key in $PSBoundParameters.Keys) {
@@ -286,10 +285,20 @@ function Show-WindowsDeviceLink {
         $parameters
     }
 
+
+    function Get-GuiRuntimeParameters {
+        $parameters = @{}
+        if ($outerBoundParameters.ContainsKey('WindowsManagementServicePath')) {
+            $parameters.WindowsManagementServicePath = $WindowsManagementServicePath
+        }
+        $parameters
+    }
+
     $ui = @{}
     $script:WdlGuiBusy = $false
     $script:WdlGuiLocalAssociation = $null
     $script:WdlGuiCloudStatus = $null
+    $script:WdlGuiSupport = $null
 
     $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126
     $associationCard = New-Card -Title 'Association' -X 536 -Y 12 -Width 508 -Height 126
@@ -571,6 +580,44 @@ function Show-WindowsDeviceLink {
         return ($result -eq [System.Windows.Forms.DialogResult]::Yes)
     }
 
+    function Set-GuiCapabilities {
+        $support = $script:WdlGuiSupport
+        $runtimeReady = $support -and [bool]$support.Supported
+        $canCompleteAssociation = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'
+
+        $btnRefresh.Enabled = $true
+        $btnOnline.Enabled = $runtimeReady
+        $btnExport.Enabled = $runtimeReady
+        $btnPreassociate.Enabled = $runtimeReady
+        $btnFullAssociate.Enabled = $canCompleteAssociation
+        $btnCloudOffboard.Enabled = $true
+        $btnLocalOffboard.Enabled = $true
+        $btnFullOffboard.Enabled = $runtimeReady
+
+        if ($support -and [string]$support.Environment -eq 'WindowsPE') {
+            $toolTip.SetToolTip(
+                $btnFullAssociate,
+                'Full association is not currently supported in Windows PE. Pre-associate the device and let Windows complete Device Association during OOBE.'
+            )
+        }
+        else {
+            $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and complete Device Association on this device.')
+        }
+
+        if (-not $runtimeReady -and $support) {
+            $runtimeReason = if ([string]::IsNullOrWhiteSpace([string]$support.Reason)) {
+                'The local DeviceLink runtime is unavailable.'
+            }
+            else {
+                [string]$support.Reason
+            }
+
+            foreach ($button in @($btnOnline,$btnExport,$btnPreassociate,$btnFullOffboard)) {
+                $toolTip.SetToolTip($button,$runtimeReason)
+            }
+        }
+    }
+
     function Set-GuiBusy {
         param(
             [Parameter(Mandatory)][bool]$Busy,
@@ -578,18 +625,21 @@ function Show-WindowsDeviceLink {
         )
 
         $script:WdlGuiBusy = $Busy
-        $enabled = -not $Busy
 
-        foreach ($button in $allActionButtons) {
-            $button.Enabled = $enabled
+        if ($Busy) {
+            foreach ($button in $allActionButtons) {
+                $button.Enabled = $false
+            }
+            $actionsPanel.Enabled = $false
+            $tenantSelector.Enabled = $false
         }
-        $btnClearActivity.Enabled = $enabled
+        else {
+            $actionsPanel.Enabled = $true
+            $tenantSelector.Enabled = $true
+            Set-GuiCapabilities
+        }
 
-        # Also disable the complete action surface as a hard interaction guard.
-        # The individual button state above ensures every button paints as disabled.
-        $actionsPanel.Enabled = $enabled
-        $tenantSelector.Enabled = $enabled
-
+        $btnClearActivity.Enabled = -not $Busy
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
 
@@ -616,9 +666,11 @@ function Show-WindowsDeviceLink {
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
         $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
         $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
-        $support = Test-WindowsDeviceLinkSupport
+        $runtimeParameters = Get-GuiRuntimeParameters
+        $support = Test-WindowsDeviceLinkSupport @runtimeParameters
         $local = Get-WindowsDeviceLinkLocalAssociation
 
+        $script:WdlGuiSupport = $support
         $script:WdlGuiLocalAssociation = $local
 
         $ui.DeviceName.Text = "$($cs.Manufacturer) $($cs.Model)".Trim()
@@ -637,11 +689,26 @@ function Show-WindowsDeviceLink {
             $environmentText = [string]$support.Environment
         }
 
-        if (-not $support.Supported) {
-            $environmentText += " (unsupported: $($support.Reason))"
-        }
-
         $ui.Environment.Text = $environmentText
+
+        $environmentToolTip = if ($support.Supported) {
+            @(
+                $environmentText
+                "Activation: $($support.ActivationMode)"
+                "Runtime: $($support.DllVersion)"
+            ) -join [Environment]::NewLine
+        }
+        else {
+            @(
+                $environmentText
+                "Runtime unavailable: $($support.Reason)"
+            ) -join [Environment]::NewLine
+        }
+        $toolTip.SetToolTip($ui.Environment,$environmentToolTip)
+
+        if (-not $support.Supported) {
+            Write-GuiConsole -Message "DeviceLink runtime unavailable: $($support.Reason)"
+        }
 
         $selectedTenant = Get-SelectedTenantId
         $ui.Auth.Text = if ($selectedTenant) { "$Method | $selectedTenant" } else { $Method }
@@ -686,6 +753,7 @@ function Show-WindowsDeviceLink {
         $toolTip.SetToolTip($ui.TenantId, [string]$ui.TenantId.Text)
         $toolTip.SetToolTip($ui.Source, $technicalSource)
 
+        Set-GuiCapabilities
         Set-GuiStatus "Local state refreshed | $($local.FirmwareState)"
         Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source)"
     }
@@ -696,6 +764,10 @@ function Show-WindowsDeviceLink {
         )
 
         $parameters = Get-GuiAuthParameters
+        $runtimeParameters = Get-GuiRuntimeParameters
+        foreach ($key in $runtimeParameters.Keys) {
+            $parameters[$key] = $runtimeParameters[$key]
+        }
         $parameters.Online = $true
 
         if ($WriteCommand) {
@@ -758,7 +830,9 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus 'Exporting DeviceLink CSV...'
             Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$($dialog.SelectedPath)'" -Command
 
-            $file = Get-WindowsDeviceLink -OutputDirectory $dialog.SelectedPath
+            $deviceLinkParameters = Get-GuiRuntimeParameters
+            $deviceLinkParameters.OutputDirectory = $dialog.SelectedPath
+            $file = Get-WindowsDeviceLink @deviceLinkParameters
             Write-GuiObject $file
 
             [void][System.Windows.Forms.MessageBox]::Show(
@@ -788,7 +862,8 @@ function Show-WindowsDeviceLink {
         Set-GuiBusy -Busy $true -StatusText 'Creating pre-association...'
         try {
             Write-GuiConsole -Message 'Get-WindowsDeviceLink' -Command
-            $identity = Get-WindowsDeviceLink
+            $identityParameters = Get-GuiRuntimeParameters
+            $identity = Get-WindowsDeviceLink @identityParameters
 
             $parameters = Get-GuiAuthParameters
             $parameters.InputObject = $identity
@@ -821,6 +896,10 @@ function Show-WindowsDeviceLink {
         Set-GuiBusy -Busy $true -StatusText 'Completing onboarding...'
         try {
             $parameters = Get-GuiAuthParameters
+            $runtimeParameters = Get-GuiRuntimeParameters
+            foreach ($key in $runtimeParameters.Keys) {
+                $parameters[$key] = $runtimeParameters[$key]
+            }
             $parameters.CompleteAssociation = $true
             $parameters.Confirm = $false
 
@@ -935,6 +1014,10 @@ function Show-WindowsDeviceLink {
             $auth = Get-GuiAuthParameters
             $statusParameters = @{}
             foreach ($key in $auth.Keys) { $statusParameters[$key] = $auth[$key] }
+            $runtimeParameters = Get-GuiRuntimeParameters
+            foreach ($key in $runtimeParameters.Keys) {
+                $statusParameters[$key] = $runtimeParameters[$key]
+            }
             $statusParameters.Online = $true
 
             Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
@@ -1008,7 +1091,8 @@ function Show-WindowsDeviceLink {
     })
 
     $form.Add_Shown({
-        Write-GuiConsole -Message "WindowsDeviceLink dashboard opened. Authentication method: $Method."
+        $environmentName = if (Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT') { 'Windows PE' } else { 'Windows' }
+        Write-GuiConsole -Message "WindowsDeviceLink dashboard opened in $environmentName. Authentication method: $Method."
         Set-GuiBusy -Busy $true -StatusText 'Loading local state...'
         try { Refresh-LocalView }
         catch { Show-GuiError $_.Exception.Message }
@@ -1102,5 +1186,6 @@ function Show-WindowsDeviceLink {
         Remove-Variable WdlGuiLocalAssociation -Scope Script -ErrorAction SilentlyContinue
         Remove-Variable WdlGuiCloudStatus -Scope Script -ErrorAction SilentlyContinue
         Remove-Variable WdlGuiBusy -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable WdlGuiSupport -Scope Script -ErrorAction SilentlyContinue
     }
 }

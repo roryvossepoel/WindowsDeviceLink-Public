@@ -155,7 +155,7 @@ Validated authentication methods continue to cover DeviceCode, Interactive, Clie
 
 ## Operator GUI validation
 
-`Show-WindowsDeviceLink` was exercised on physical AMD64 Windows 11 hardware.
+`Show-WindowsDeviceLink` has been exercised on physical AMD64 Windows 11 hardware. Windows PE GUI support is implemented and requires dedicated live validation on the existing AMD64 WinPE test environment before RC1.
 
 Validated GUI behavior includes:
 
@@ -178,6 +178,26 @@ Validated GUI behavior includes:
 - native Windows confirmation dialogs.
 
 The hardware-independent `Gui-Contract-Validation.ps1` suite validates export, authentication defaults, tenant-selector contract, WinPE guardrails and delegation to existing public cmdlets.
+
+### Windows PE GUI validation matrix
+
+Before RC1, validate on physical AMD64 Windows PE:
+
+- GUI startup with WinForms available;
+- automatic runtime discovery where configured;
+- explicit `-WindowsManagementServicePath`;
+- default `Interactive` authentication;
+- explicit `DeviceCode` authentication;
+- local refresh;
+- online Device Association lookup;
+- DeviceLink CSV export;
+- pre-association;
+- `Full associate` visible but disabled;
+- cloud-only offboarding;
+- local firmware reset;
+- fail-closed full offboarding.
+
+The GUI must remain usable when the DeviceLink runtime is unavailable: runtime-dependent actions are disabled and the blocking reason is surfaced through Activity/tooltips rather than terminating the dashboard.
 
 ## Local tenant discovery validation
 

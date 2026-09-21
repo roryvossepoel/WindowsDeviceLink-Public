@@ -180,7 +180,7 @@ Get-WindowsDeviceLink |
 Show-WindowsDeviceLink
 ```
 
-The GUI is currently supported on full Windows and uses `Interactive` authentication by default for online actions. It delegates lifecycle operations to the existing public cmdlets rather than implementing separate Graph or firmware logic.
+The GUI is supported on Windows 11 and compatible Windows PE environments. `Interactive` authentication remains the default for online actions in both environments, with `DeviceCode` available as an explicit alternative. In Windows PE, supply a compatible `Windows.Management.Service.dll` through `-WindowsManagementServicePath` or the documented module runtime location. Native full association remains unavailable in Windows PE; use pre-association and let Windows complete Device Association during OOBE.
 
 Optional tenant selector:
 
@@ -190,6 +190,13 @@ Show-WindowsDeviceLink `
         'Management' = '11111111-1111-1111-1111-111111111111'
         'Contoso'    = '22222222-2222-2222-2222-222222222222'
     }
+```
+
+Windows PE with an explicitly supplied runtime:
+
+```powershell
+Show-WindowsDeviceLink `
+    -WindowsManagementServicePath 'X:\Runtime\Windows.Management.Service.dll'
 ```
 
 Alternative authentication methods can be selected with `-Method` and the matching credential parameters.
@@ -332,7 +339,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 | `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association directly or through a webhook. |
 | `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
-| `Show-WindowsDeviceLink` | Open the full-Windows operator GUI for status, tenant selection, onboarding, offboarding, CSV export and activity output. |
+| `Show-WindowsDeviceLink` | Open the Windows 11 / Windows PE operator GUI for status, tenant selection, onboarding, offboarding, CSV export and activity output. Full native association remains disabled in Windows PE. |
 | `Test-WindowsDeviceLinkAssociationJwt` | Validate local association JWT structure/time/identity correlation without exposing the raw JWT. |
 | `Test-WindowsDeviceLinkDiscovery` | Perform read-only native DeviceLink association discovery. |
 | `Test-WindowsDeviceLinkHealth` | Non-destructively classify status into machine-readable lifecycle/health states. |

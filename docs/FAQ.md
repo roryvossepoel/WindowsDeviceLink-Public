@@ -38,7 +38,18 @@ Show-WindowsDeviceLink -Tenants @{
 }
 ```
 
-The GUI delegates operations to the existing WindowsDeviceLink cmdlets. It is currently a full-Windows feature; WinPE remains command-line only.
+The GUI delegates operations to the existing WindowsDeviceLink cmdlets and is available on Windows 11 and compatible Windows PE environments.
+
+In Windows PE, provide the DeviceLink runtime when it is not available from the module runtime location:
+
+```powershell
+Show-WindowsDeviceLink `
+    -WindowsManagementServicePath 'X:\Runtime\Windows.Management.Service.dll'
+```
+
+`Interactive` remains the default authentication method in both Windows 11 and Windows PE. `DeviceCode` remains available as an explicit alternative.
+
+Windows PE supports local inspection, online lookup, CSV export, pre-association and offboarding actions when their prerequisites are available. **Full associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-associate the device and let Windows complete Device Association during OOBE.
 
 ## Start here: what state is the device in?
 
