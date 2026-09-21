@@ -199,7 +199,14 @@ Show-WindowsDeviceLink `
     -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
 ```
 
-The JSON is a simple object that maps friendly names to tenant GUIDs. If both `-Tenants` and `-TenantsUri` are used, local `-Tenants` values take precedence for duplicate names.
+Or from a local JSON file:
+
+```powershell
+Show-WindowsDeviceLink `
+    -TenantsPath 'E:\Config\tenants.json'
+```
+
+The JSON is a simple object that maps friendly names to tenant GUIDs. When multiple sources are used, precedence is `TenantsUri` -> `TenantsPath` -> explicit `-Tenants` values.
 
 Windows PE with an explicitly supplied runtime:
 
