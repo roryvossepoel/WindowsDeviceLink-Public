@@ -182,7 +182,7 @@ Use:
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -CompleteAssociation |
+    -FullAssociation |
     Format-List *
 ```
 
@@ -196,7 +196,7 @@ If the device is already associated, the command is idempotent and does not run 
 
 ## I only want a preassociation, not full completion
 
-Use the initializer **without** `-CompleteAssociation`:
+Use the initializer **without** `-FullAssociation`:
 
 ```powershell
 Initialize-WindowsDeviceLink `
@@ -303,7 +303,7 @@ Recommended controlled sequence:
 5. Reboot
 6. Verify Windows generated a new local identity (normally 2/4)
 7. Register / initialize again
-8. Complete association if required
+8. Perform full association if required
 ```
 
 Example:
@@ -327,7 +327,7 @@ Get-WindowsDeviceLinkStatus
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -CompleteAssociation
+    -FullAssociation
 ```
 
 Do not combine destructive cleanup steps blindly. Verify the state between operations, especially on production devices.
@@ -503,7 +503,7 @@ Complete-WindowsDeviceLinkAssociation -WhatIf
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -CompleteAssociation `
+    -FullAssociation `
     -WhatIf
 ```
 
@@ -549,8 +549,8 @@ See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md) and [INSTALLATION.md](INSTALLATION.md
 | Read local identity | `Get-WindowsDeviceLink` | Read / Windows may materialize base identity | No change | No change |
 | Inspect firmware | `Get-WindowsDeviceLinkFirmwareState` | Read only | No change | No change |
 | Create preassociation | `Register-WindowsDeviceLink` | No destructive change | Creates / preassociates | No change |
-| Complete association | `Complete-WindowsDeviceLinkAssociation` | `2/4 -> 4/4` on success | Becomes associated | No change |
-| Safe full initialization | `Initialize-WindowsDeviceLink -CompleteAssociation` | May complete to `4/4` | May create + associate | No change |
+| Full association | `Complete-WindowsDeviceLinkAssociation` | `2/4 -> 4/4` on success | Becomes associated | No change |
+| Full association via initializer | `Initialize-WindowsDeviceLink -FullAssociation` | May complete to `4/4` | May create + associate | No change |
 | Remove Device Association | `Remove-WindowsDeviceLinkAssociation` | No change | Deletes record | No change |
 | Reset local DeviceLink | `Reset-WindowsDeviceLinkFirmwareState` | Removes known DeviceLink variables | No change | No change |
 | Remove classic Autopilot registration | Not provided by this module | No change | No change | Use supported Autopilot administration tooling |
