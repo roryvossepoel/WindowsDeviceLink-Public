@@ -561,6 +561,31 @@ function Show-WindowsDeviceLink {
         }
     }
 
+    function Invoke-GuiInformationCommand {
+        param(
+            [Parameter(Mandatory)]
+            [scriptblock]$ScriptBlock
+        )
+
+        $resultObjects = New-Object System.Collections.Generic.List[object]
+
+        & $ScriptBlock 6>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.InformationRecord]) {
+                $message = [string]$_.MessageData
+                if (-not [string]::IsNullOrWhiteSpace($message)) {
+                    Write-GuiConsole -Message $message
+                }
+            }
+            else {
+                $resultObjects.Add($_)
+            }
+
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+
+        return @($resultObjects.ToArray())
+    }
+
     function Show-GuiError {
         param([string]$Message)
 
@@ -787,7 +812,10 @@ function Show-WindowsDeviceLink {
             Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
         }
 
-        $cloud = Get-WindowsDeviceLinkStatus @parameters
+        $cloudResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+            Get-WindowsDeviceLinkStatus @parameters
+        })
+        $cloud = $cloudResults | Select-Object -Last 1
         $script:WdlGuiCloudStatus = $cloud
 
         $ui.CloudState.Text = [string]$cloud.AssociationState
@@ -883,7 +911,10 @@ function Show-WindowsDeviceLink {
             $parameters.Confirm = $false
 
             Write-GuiConsole -Message "Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method $Method" -Command
-            $result = Register-WindowsDeviceLink @parameters
+            $registrationResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                Register-WindowsDeviceLink @parameters
+            })
+            $result = $registrationResults | Select-Object -Last 1
             Write-GuiObject $result
 
             $script:WdlGuiCloudStatus = $null
@@ -966,7 +997,10 @@ function Show-WindowsDeviceLink {
             $parameters.Confirm = $false
 
             Write-GuiConsole -Message "Remove-WindowsDeviceLinkAssociation -Method $Method" -Command
-            $result = Remove-WindowsDeviceLinkAssociation @parameters
+            $removalResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                Remove-WindowsDeviceLinkAssociation @parameters
+            })
+            $result = $removalResults | Select-Object -Last 1
             Write-GuiObject $result
 
             $script:WdlGuiCloudStatus = $null
@@ -1039,7 +1073,10 @@ function Show-WindowsDeviceLink {
             $statusParameters.Online = $true
 
             Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
-            $cloud = Get-WindowsDeviceLinkStatus @statusParameters
+            $cloudResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                Get-WindowsDeviceLinkStatus @statusParameters
+            })
+            $cloud = $cloudResults | Select-Object -Last 1
             Write-GuiObject $cloud
 
             if ($null -eq $cloud.AssociationPresent -or [string]$cloud.AssociationState -eq 'Unknown') {
@@ -1052,7 +1089,10 @@ function Show-WindowsDeviceLink {
                 $removeParameters.Confirm = $false
 
                 Write-GuiConsole -Message "Remove-WindowsDeviceLinkAssociation -Method $Method" -Command
-                $removed = Remove-WindowsDeviceLinkAssociation @removeParameters
+                $removeResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                    Remove-WindowsDeviceLinkAssociation @removeParameters
+                })
+                $removed = $removeResults | Select-Object -Last 1
                 Write-GuiObject $removed
             }
             else {
