@@ -357,6 +357,15 @@ function Show-WindowsDeviceLink {
     $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the complete onboarding flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
     $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full')
 
+    $offboardSeparator = @(
+        $rowOffboard.Panel.Controls |
+            Where-Object { $_ -is [System.Windows.Forms.Panel] -and $_.Height -eq 1 }
+    ) | Select-Object -First 1
+    if ($offboardSeparator) {
+        $rowOffboard.Panel.Controls.Remove($offboardSeparator)
+        $offboardSeparator.Dispose()
+    }
+
     function Get-ActionButtonByText {
         param(
             [Parameter(Mandatory)][System.Windows.Forms.Control]$Row,
@@ -1036,7 +1045,7 @@ function Show-WindowsDeviceLink {
 
         $activityY = $actionsY + 270
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
-        $btnClearActivity.Location = [System.Drawing.Point]::new(($fullWidth - 50),($activityY - 1))
+        $btnClearActivity.Location = [System.Drawing.Point]::new(($fullWidth - 52),($activityY + 1))
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 24
