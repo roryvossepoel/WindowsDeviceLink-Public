@@ -351,6 +351,44 @@ function Show-WindowsDeviceLink {
     $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the complete onboarding flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
     $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full')
 
+    function Get-ActionButtonByText {
+        param(
+            [Parameter(Mandatory)][System.Windows.Forms.Control]$Row,
+            [Parameter(Mandatory)][string]$Text
+        )
+
+        $button = @(
+            $Row.Controls |
+                Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq $Text }
+        ) | Select-Object -First 1
+
+        if (-not $button) {
+            throw "GUI action button '$Text' could not be resolved."
+        }
+
+        $button
+    }
+
+    $btnRefresh = Get-ActionButtonByText -Row $rowRefresh.Panel -Text 'Refresh'
+    $btnOnline = Get-ActionButtonByText -Row $rowOnline.Panel -Text 'Check online'
+    $btnExport = Get-ActionButtonByText -Row $rowExport.Panel -Text 'Export CSV'
+    $btnPreassociate = Get-ActionButtonByText -Row $rowOnboard.Panel -Text 'Pre-associate'
+    $btnFullAssociate = Get-ActionButtonByText -Row $rowOnboard.Panel -Text 'Full associate'
+    $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Cloud'
+    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Local'
+    $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Full'
+
+    $allActionButtons = @(
+        $btnRefresh,
+        $btnOnline,
+        $btnExport,
+        $btnPreassociate,
+        $btnFullAssociate,
+        $btnCloudOffboard,
+        $btnLocalOffboard,
+        $btnFullOffboard
+    )
+
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
     $activityTitle.Font = New-Object System.Drawing.Font('Segoe UI',11,[System.Drawing.FontStyle]::Bold)
@@ -516,18 +554,15 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiBusy = $Busy
         $enabled = -not $Busy
 
-        # Keep every action button in the native Windows visual style at all times.
-        # Only Enabled changes, so rounded/themed button rendering is preserved while busy.
-        $rowRefresh.Buttons[0].Enabled = $enabled
-        $rowOnline.Buttons[0].Enabled = $enabled
-        $rowExport.Buttons[0].Enabled = $enabled
-        $rowOnboard.Buttons[0].Enabled = $enabled
-        $rowOnboard.Buttons[1].Enabled = $enabled
-        $rowOffboard.Buttons[0].Enabled = $enabled
-        $rowOffboard.Buttons[1].Enabled = $enabled
-        $rowOffboard.Buttons[2].Enabled = $enabled
+        foreach ($button in $allActionButtons) {
+            $button.Enabled = $enabled
+        }
 
+        # Also disable the complete action surface as a hard interaction guard.
+        # The individual button state above ensures every button paints as disabled.
+        $actionsPanel.Enabled = $enabled
         $tenantSelector.Enabled = $enabled
+
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
 
@@ -535,15 +570,15 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus $StatusText
         }
 
-        $rowRefresh.Buttons[0].Refresh()
-        $rowOnline.Buttons[0].Refresh()
-        $rowExport.Buttons[0].Refresh()
-        $rowOnboard.Buttons[0].Refresh()
-        $rowOnboard.Buttons[1].Refresh()
-        $rowOffboard.Buttons[0].Refresh()
-        $rowOffboard.Buttons[1].Refresh()
-        $rowOffboard.Buttons[2].Refresh()
-        $tenantSelector.Refresh()
+        foreach ($button in $allActionButtons) {
+            $button.Invalidate()
+            $button.Update()
+        }
+
+        $actionsPanel.Invalidate($true)
+        $actionsPanel.Update()
+        $tenantSelector.Invalidate()
+        $tenantSelector.Update()
         [System.Windows.Forms.Application]::DoEvents()
     }
 
@@ -860,14 +895,14 @@ function Show-WindowsDeviceLink {
         finally { Set-GuiBusy -Busy $false }
     }
 
-    $rowRefresh.Buttons[0].Add_Click({ Invoke-GuiRefresh })
-    $rowOnline.Buttons[0].Add_Click({ Invoke-GuiOnline })
-    $rowExport.Buttons[0].Add_Click({ Invoke-GuiExport })
-    $rowOnboard.Buttons[0].Add_Click({ Invoke-GuiPreassociate })
-    $rowOnboard.Buttons[1].Add_Click({ Invoke-GuiFullAssociate })
-    $rowOffboard.Buttons[0].Add_Click({ Invoke-GuiCloudOffboard })
-    $rowOffboard.Buttons[1].Add_Click({ Invoke-GuiLocalOffboard })
-    $rowOffboard.Buttons[2].Add_Click({ Invoke-GuiFullOffboard })
+    $btnRefresh.Add_Click({ Invoke-GuiRefresh })
+    $btnOnline.Add_Click({ Invoke-GuiOnline })
+    $btnExport.Add_Click({ Invoke-GuiExport })
+    $btnPreassociate.Add_Click({ Invoke-GuiPreassociate })
+    $btnFullAssociate.Add_Click({ Invoke-GuiFullAssociate })
+    $btnCloudOffboard.Add_Click({ Invoke-GuiCloudOffboard })
+    $btnLocalOffboard.Add_Click({ Invoke-GuiLocalOffboard })
+    $btnFullOffboard.Add_Click({ Invoke-GuiFullOffboard })
 
     $tenantSelector.Add_SelectedIndexChanged({
         if (-not $script:WdlGuiBusy) {
