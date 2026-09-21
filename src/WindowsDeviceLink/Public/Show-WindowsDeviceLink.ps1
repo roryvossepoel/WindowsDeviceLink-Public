@@ -796,6 +796,22 @@ function Show-WindowsDeviceLink {
         Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source)"
     }
 
+    function Get-GuiCloudStateText {
+        param([AllowNull()][object]$State)
+
+        switch (([string]$State).Trim().ToLowerInvariant()) {
+            'associated'    { return 'Associated' }
+            'preassociated' { return 'Pre-associated' }
+            'notassociated' { return 'Not associated' }
+            default {
+                if ([string]::IsNullOrWhiteSpace([string]$State)) {
+                    return 'Not checked'
+                }
+                return [string]$State
+            }
+        }
+    }
+
     function Refresh-CloudView {
         param(
             [switch]$WriteCommand
@@ -818,7 +834,7 @@ function Show-WindowsDeviceLink {
         $cloud = $cloudResults | Select-Object -Last 1
         $script:WdlGuiCloudStatus = $cloud
 
-        $ui.CloudState.Text = [string]$cloud.AssociationState
+        $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
         $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
         $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
 
@@ -1143,7 +1159,7 @@ function Show-WindowsDeviceLink {
                 $noChangeMessage = 'No cloud association was found. Nothing was removed.'
                 Write-GuiConsole -Message $noChangeMessage
                 $script:WdlGuiCloudStatus = $null
-                $ui.CloudState.Text = 'NotAssociated'
+                $ui.CloudState.Text = 'Not associated'
                 $ui.CloudTenant.Text = 'Unavailable'
                 $ui.CloudId.Text = 'Unavailable'
                 Refresh-LocalView
