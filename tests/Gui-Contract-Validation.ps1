@@ -30,11 +30,17 @@ if (-not $command.Parameters.ContainsKey('Method')) {
 if (-not $command.Parameters.ContainsKey('Tenants')) {
     throw 'FAIL: Show-WindowsDeviceLink must expose -Tenants.'
 }
+if (-not $command.Parameters.ContainsKey('TenantsUri')) {
+    throw 'FAIL: Show-WindowsDeviceLink must expose -TenantsUri.'
+}
 if (-not $command.Parameters.ContainsKey('WindowsManagementServicePath')) {
     throw 'FAIL: Show-WindowsDeviceLink must expose -WindowsManagementServicePath for Windows PE runtime selection.'
 }
 if ($command.Parameters['Tenants'].ParameterType -ne [hashtable]) {
     throw 'FAIL: Show-WindowsDeviceLink -Tenants must remain a hashtable.'
+}
+if ($command.Parameters['TenantsUri'].ParameterType -ne [uri]) {
+    throw 'FAIL: Show-WindowsDeviceLink -TenantsUri must remain a URI.'
 }
 
 $methodParameter = $command.Parameters['Method']
@@ -75,6 +81,9 @@ foreach ($required in @(
     'MiniNT',
     'Get-GuiRuntimeParameters',
     'Set-GuiCapabilities',
+    'TenantsUri',
+    'Invoke-RestMethod',
+    'must be an absolute HTTPS URI',
     'WindowsManagementServicePath',
     'Windows PE',
     'Full association is not currently supported in Windows PE',
