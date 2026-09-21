@@ -34,7 +34,7 @@ Provide friendly tenant choices directly:
 ```powershell
 Show-WindowsDeviceLink -Tenants @{
     'Management' = '11111111-1111-1111-1111-111111111111'
-    'Contoso'    = '22222222-2222-2222-2222-222222222222'
+    'Customer A' = '22222222-2222-2222-2222-222222222222'
 }
 ```
 
@@ -42,7 +42,7 @@ Or load the selector from a centrally maintained HTTPS JSON file:
 
 ```powershell
 Show-WindowsDeviceLink `
-    -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
+    -TenantsUri 'https://config.example.com/windowsdevicelink/tenants.json'
 ```
 
 Or from a local JSON file:
@@ -57,7 +57,7 @@ The JSON format is intentionally simple:
 ```json
 {
   "Management": "11111111-1111-1111-1111-111111111111",
-  "Contoso": "22222222-2222-2222-2222-222222222222"
+  "Customer A": "22222222-2222-2222-2222-222222222222"
 }
 ```
 
