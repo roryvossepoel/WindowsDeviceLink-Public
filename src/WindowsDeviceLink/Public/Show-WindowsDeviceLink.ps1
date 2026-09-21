@@ -1045,7 +1045,11 @@ function Show-WindowsDeviceLink {
 
         $activityY = $actionsY + 270
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
-        $btnClearActivity.Location = [System.Drawing.Point]::new(($fullWidth - 52),($activityY + 1))
+        $rightButtonMargin = 24
+        $btnClearActivity.Location = [System.Drawing.Point]::new(
+            ($fullWidth - $btnClearActivity.Width - $rightButtonMargin),
+            ($activityY - 2)
+        )
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 24
