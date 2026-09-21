@@ -505,12 +505,12 @@ function Show-WindowsDeviceLink {
         $dialog.MaximizeBox = $false
         $dialog.MinimizeBox = $false
         $dialog.ShowInTaskbar = $false
-        $dialog.ClientSize = [System.Drawing.Size]::new(600,185)
+        $dialog.ClientSize = [System.Drawing.Size]::new(520,145)
         $dialog.BackColor = [System.Drawing.Color]::White
 
         $iconBox = New-Object System.Windows.Forms.PictureBox
-        $iconBox.Location = [System.Drawing.Point]::new(24,28)
-        $iconBox.Size = [System.Drawing.Size]::new(40,40)
+        $iconBox.Location = [System.Drawing.Point]::new(20,24)
+        $iconBox.Size = [System.Drawing.Size]::new(34,34)
         $iconBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::StretchImage
         $iconBox.Image = [System.Drawing.SystemIcons]::Warning.ToBitmap()
         $dialog.Controls.Add($iconBox)
@@ -518,30 +518,30 @@ function Show-WindowsDeviceLink {
         $messageLabel = New-Object System.Windows.Forms.Label
         $messageLabel.Text = $Message
         $messageLabel.Font = New-Object System.Drawing.Font('Segoe UI',9)
-        $messageLabel.Location = [System.Drawing.Point]::new(82,24)
-        $messageLabel.Size = [System.Drawing.Size]::new(490,95)
+        $messageLabel.Location = [System.Drawing.Point]::new(68,20)
+        $messageLabel.Size = [System.Drawing.Size]::new(430,66)
         $messageLabel.AutoEllipsis = $false
         $dialog.Controls.Add($messageLabel)
 
         $buttonPanel = New-Object System.Windows.Forms.Panel
         $buttonPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
-        $buttonPanel.Height = 54
+        $buttonPanel.Height = 48
         $buttonPanel.BackColor = [System.Drawing.Color]::FromArgb(246,246,246)
         $dialog.Controls.Add($buttonPanel)
 
         $yesButton = New-Object System.Windows.Forms.Button
         $yesButton.Text = 'Yes'
         $yesButton.DialogResult = [System.Windows.Forms.DialogResult]::Yes
-        $yesButton.Size = [System.Drawing.Size]::new(108,32)
-        $yesButton.Location = [System.Drawing.Point]::new(356,11)
+        $yesButton.Size = [System.Drawing.Size]::new(96,30)
+        $yesButton.Location = [System.Drawing.Point]::new(312,9)
         $yesButton.Font = New-Object System.Drawing.Font('Segoe UI',9)
         $buttonPanel.Controls.Add($yesButton)
 
         $noButton = New-Object System.Windows.Forms.Button
         $noButton.Text = 'No'
         $noButton.DialogResult = [System.Windows.Forms.DialogResult]::No
-        $noButton.Size = [System.Drawing.Size]::new(108,32)
-        $noButton.Location = [System.Drawing.Point]::new(476,11)
+        $noButton.Size = [System.Drawing.Size]::new(96,30)
+        $noButton.Location = [System.Drawing.Point]::new(414,9)
         $noButton.Font = New-Object System.Drawing.Font('Segoe UI',9)
         $buttonPanel.Controls.Add($noButton)
 
