@@ -160,6 +160,15 @@ Assert-True ($removeScript -match 'Win32_BIOS') 'Removal command no longer conta
 Assert-True ($removeScript -match 'No target specified\. Using local device serial number') 'Removal command no longer reports its automatically selected local serial number.'
 Write-Host 'PASS: association removal keeps local-device serial fallback'
 
+# Online status must still be able to query Device Association state when the
+# DeviceLink identity object is unavailable/incomplete but the physical BIOS
+# serial is readable (important in WinPE and after local firmware reset).
+$statusCommand = Get-Command Get-WindowsDeviceLinkStatus -Module WindowsDeviceLink
+$statusScript = $statusCommand.ScriptBlock.ToString()
+Assert-True ($statusScript -match 'Win32_BIOS') 'Get-WindowsDeviceLinkStatus no longer contains the local BIOS serial-number fallback.'
+Assert-True ($statusScript -match 'lookupSerialNumber') 'Get-WindowsDeviceLinkStatus no longer keeps a separate resolved lookup serial number.'
+Write-Host 'PASS: online status keeps BIOS serial fallback for cloud lookup'
+
 
 $moduleData = Import-PowerShellDataFile -Path $resolvedModulePath
 Assert-True ([string]$moduleData.PrivateData.PSData.ProjectUri -eq 'https://github.com/roryvossepoel/WindowsDeviceLink-Public') 'ProjectUri does not point to the canonical public repository.'
