@@ -203,7 +203,12 @@ function Show-WindowsDeviceLink {
             $button.Size = [System.Drawing.Size]::new($buttonWidth,28)
             $right -= $buttonWidth
             $button.Location = [System.Drawing.Point]::new($right,9)
-            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+            $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(190,190,190)
+            $button.FlatAppearance.BorderSize = 1
+            $button.BackColor = [System.Drawing.Color]::White
+            $button.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
+            $button.UseVisualStyleBackColor = $false
             $row.Controls.Add($button)
             $buttonList.Insert(0,$button)
             $right -= $gap
@@ -519,14 +524,14 @@ function Show-WindowsDeviceLink {
             [System.Drawing.Color]::FromArgb(145,145,145)
         }
         else {
-            [System.Drawing.SystemColors]::ControlText
+            [System.Drawing.Color]::FromArgb(32,32,32)
         }
 
         $buttonBackColor = if ($Busy) {
             [System.Drawing.Color]::FromArgb(236,236,236)
         }
         else {
-            [System.Drawing.SystemColors]::Control
+            [System.Drawing.Color]::White
         }
 
         # Keep this list deliberately explicit. These are every actionable button
