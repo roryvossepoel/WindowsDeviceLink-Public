@@ -896,38 +896,47 @@ function Show-WindowsDeviceLink {
     function Invoke-GuiPreassociate {
         if ($script:WdlGuiBusy) { return }
 
-        if (-not (Confirm-GuiAction -Title 'Create pre-association' -Message 'Create or attempt the tenant-side Device Association pre-association for this device?')) {
+        if (-not (Confirm-GuiAction -Title 'Create pre-association' -Message 'Ensure the tenant-side Device Association pre-association exists for this device?')) {
             return
         }
 
         Set-GuiBusy -Busy $true -StatusText 'Creating pre-association...'
         try {
-            Write-GuiConsole -Message 'Get-WindowsDeviceLink' -Command
-            $identityParameters = Get-GuiRuntimeParameters
-            $identity = Get-WindowsDeviceLink @identityParameters
-
             $parameters = Get-GuiAuthParameters
-            $parameters.InputObject = $identity
+            $runtimeParameters = Get-GuiRuntimeParameters
+            foreach ($key in $runtimeParameters.Keys) {
+                $parameters[$key] = $runtimeParameters[$key]
+            }
             $parameters.Confirm = $false
 
-            Write-GuiConsole -Message "Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method $Method" -Command
-            $registrationResults = @(Invoke-GuiInformationCommand -ScriptBlock {
-                Register-WindowsDeviceLink @parameters
+            Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method" -Command
+
+            $resultObjects = @(Invoke-GuiInformationCommand -ScriptBlock {
+                Initialize-WindowsDeviceLink @parameters
             })
-            $result = $registrationResults | Select-Object -Last 1
+            $result = $resultObjects | Select-Object -Last 1
             Write-GuiObject $result
 
             $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
-            $verifiedCloud = Refresh-CloudView -WriteCommand
-            Write-GuiObject $verifiedCloud
+
+            if ($result -and $result.PSObject.Properties.Name -contains 'AfterStatus' -and $result.AfterStatus) {
+                $cloud = $result.AfterStatus
+                $script:WdlGuiCloudStatus = $cloud
+                $ui.CloudState.Text = [string]$cloud.AssociationState
+                $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
+                $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
+            }
+
             Set-GuiStatus 'Pre-association completed'
         }
         catch {
             Set-GuiStatus 'Pre-association failed'
             Show-GuiError $_.Exception.Message
         }
-        finally { Set-GuiBusy -Busy $false }
+        finally {
+            Set-GuiBusy -Busy $false
+        }
     }
 
     function Invoke-GuiFullAssociate {
