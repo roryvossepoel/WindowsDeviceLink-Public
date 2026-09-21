@@ -135,4 +135,19 @@ if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=\s*\$canFullAssociatio
     throw 'FAIL: Full associate button must use the Windows PE-aware full-association capability.'
 }
 
+foreach ($requiredPolish in @(
+    'cloudAlreadyPresent',
+    'cloudKnownAbsent',
+    'alreadyFullyAssociated',
+    'Registry + JWT',
+    "'RegistrationResult'",
+    "'BeforeStatus'",
+    "'AfterStatus'",
+    "'FullAssociationDetails'"
+)) {
+    if ($source -notmatch [regex]::Escape($requiredPolish)) {
+        throw "FAIL: Show-WindowsDeviceLink is missing expected GUI polish contract '$requiredPolish'."
+    }
+}
+
 Write-Host 'PASS: Show-WindowsDeviceLink is exported, WinPE-aware, WinForms-based, runtime-path capable, and delegates lifecycle actions to existing cmdlets.'
