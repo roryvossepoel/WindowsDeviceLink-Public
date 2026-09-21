@@ -516,34 +516,16 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiBusy = $Busy
         $enabled = -not $Busy
 
-        $buttons = @(
-            $rowRefresh.Buttons[0],
-            $rowOnline.Buttons[0],
-            $rowExport.Buttons[0],
-            $rowOnboard.Buttons[0],
-            $rowOnboard.Buttons[1],
-            $rowOffboard.Buttons[0],
-            $rowOffboard.Buttons[1],
-            $rowOffboard.Buttons[2]
-        )
-
-        foreach ($button in $buttons) {
-            if ($Busy) {
-                $button.UseVisualStyleBackColor = $false
-                $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-                $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(205,205,205)
-                $button.FlatAppearance.BorderSize = 1
-                $button.BackColor = [System.Drawing.Color]::FromArgb(238,238,238)
-                $button.ForeColor = [System.Drawing.Color]::FromArgb(145,145,145)
-                $button.Enabled = $false
-            }
-            else {
-                $button.Enabled = $true
-                $button.FlatStyle = [System.Windows.Forms.FlatStyle]::System
-                $button.UseVisualStyleBackColor = $true
-                $button.ForeColor = [System.Drawing.SystemColors]::ControlText
-            }
-        }
+        # Keep every action button in the native Windows visual style at all times.
+        # Only Enabled changes, so rounded/themed button rendering is preserved while busy.
+        $rowRefresh.Buttons[0].Enabled = $enabled
+        $rowOnline.Buttons[0].Enabled = $enabled
+        $rowExport.Buttons[0].Enabled = $enabled
+        $rowOnboard.Buttons[0].Enabled = $enabled
+        $rowOnboard.Buttons[1].Enabled = $enabled
+        $rowOffboard.Buttons[0].Enabled = $enabled
+        $rowOffboard.Buttons[1].Enabled = $enabled
+        $rowOffboard.Buttons[2].Enabled = $enabled
 
         $tenantSelector.Enabled = $enabled
         $statusProgress.Visible = $Busy
@@ -553,9 +535,14 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus $StatusText
         }
 
-        foreach ($button in $buttons) {
-            $button.Refresh()
-        }
+        $rowRefresh.Buttons[0].Refresh()
+        $rowOnline.Buttons[0].Refresh()
+        $rowExport.Buttons[0].Refresh()
+        $rowOnboard.Buttons[0].Refresh()
+        $rowOnboard.Buttons[1].Refresh()
+        $rowOffboard.Buttons[0].Refresh()
+        $rowOffboard.Buttons[1].Refresh()
+        $rowOffboard.Buttons[2].Refresh()
         $tenantSelector.Refresh()
         [System.Windows.Forms.Application]::DoEvents()
     }
