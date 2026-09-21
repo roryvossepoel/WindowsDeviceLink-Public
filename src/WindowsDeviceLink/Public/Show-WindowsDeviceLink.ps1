@@ -754,7 +754,7 @@ function Show-WindowsDeviceLink {
         $ui.Firmware.Text = [string]$local.FirmwareState
 
         $friendlyLocalState = switch ([string]$local.LocalAssociationState) {
-            'CompleteAssociationFirmwareState' { 'Complete association' }
+            'CompleteAssociationFirmwareState' { 'Full association' }
             'BaseIdentity' { 'Base identity' }
             'NoFirmwareState' { 'No firmware state' }
             'IncompleteFirmwareState' { 'Incomplete firmware state' }
@@ -1076,7 +1076,7 @@ function Show-WindowsDeviceLink {
         if ($script:WdlGuiBusy) { return }
 
         if ($isWinPE) {
-            Show-GuiError 'Full DeviceLink association completion is not supported in Windows PE. Use Pre-associate in WinPE and let full Windows/OOBE complete Device Association.'
+            Show-GuiError 'Full DeviceLink association is not supported in Windows PE. Use Pre-associate in WinPE and let full Windows/OOBE complete Device Association.'
             return
         }
 
@@ -1091,10 +1091,10 @@ function Show-WindowsDeviceLink {
             foreach ($key in $runtimeParameters.Keys) {
                 $parameters[$key] = $runtimeParameters[$key]
             }
-            $parameters.CompleteAssociation = $true
+            $parameters.FullAssociation = $true
             $parameters.Confirm = $false
 
-            Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method -CompleteAssociation" -Command
+            Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method -FullAssociation" -Command
 
             $resultObjects = New-Object System.Collections.Generic.List[object]
             & {
