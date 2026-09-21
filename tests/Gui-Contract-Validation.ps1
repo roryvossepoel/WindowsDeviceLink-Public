@@ -30,6 +30,9 @@ if (-not $command.Parameters.ContainsKey('Method')) {
 if (-not $command.Parameters.ContainsKey('Tenants')) {
     throw 'FAIL: Show-WindowsDeviceLink must expose -Tenants.'
 }
+if (-not $command.Parameters.ContainsKey('WindowsManagementServicePath')) {
+    throw 'FAIL: Show-WindowsDeviceLink must expose -WindowsManagementServicePath for Windows PE runtime selection.'
+}
 if ($command.Parameters['Tenants'].ParameterType -ne [hashtable]) {
     throw 'FAIL: Show-WindowsDeviceLink -Tenants must remain a hashtable.'
 }
@@ -70,6 +73,11 @@ foreach ($required in @(
     'System.Windows.Forms',
     'ShowDialog',
     'MiniNT',
+    'Get-GuiRuntimeParameters',
+    'Set-GuiCapabilities',
+    'WindowsManagementServicePath',
+    'Windows PE',
+    'Full association is not currently supported in Windows PE',
     'Get-WindowsDeviceLinkLocalAssociation',
     'Get-WindowsDeviceLinkStatus',
     'Get-WindowsDeviceLink',
@@ -99,4 +107,12 @@ if ($source -match [regex]::Escape('PlaceholderText')) {
     throw 'FAIL: GUI uses TextBox.PlaceholderText, which is not compatible with Windows PowerShell 5.1 / .NET Framework WinForms.'
 }
 
-Write-Host 'PASS: Show-WindowsDeviceLink is exported, WinPE-guarded, WinForms-based, and delegates lifecycle actions to existing cmdlets.'
+if ($source -match [regex]::Escape('Show-WindowsDeviceLink is not supported in Windows PE yet')) {
+    throw 'FAIL: Show-WindowsDeviceLink must not hard-block Windows PE.'
+}
+
+if ($source -notmatch [regex]::Escape("$canCompleteAssociation = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'")) {
+    throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
+}
+
+Write-Host 'PASS: Show-WindowsDeviceLink is exported, WinPE-aware, WinForms-based, runtime-path capable, and delegates lifecycle actions to existing cmdlets.'
