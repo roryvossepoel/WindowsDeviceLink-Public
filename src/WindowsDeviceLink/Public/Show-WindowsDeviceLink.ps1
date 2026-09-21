@@ -1,33 +1,26 @@
 function Show-WindowsDeviceLink {
     <#
     .SYNOPSIS
-    Opens a compact WindowsDeviceLink operator dashboard.
+    Opens the WindowsDeviceLink operator dashboard.
 
     .DESCRIPTION
-    Opens a WinForms-based dashboard on full Windows. The dashboard presents local
-    DeviceLink firmware and tenant-correlation state without automatically materializing
-    a new DeviceLink identity.
+    Opens a compact Windows 11 Settings-inspired WinForms dashboard on full Windows.
 
-    Operator actions delegate to the existing WindowsDeviceLink cmdlets. State-changing
-    actions always require an explicit GUI confirmation before the underlying cmdlet is
-    invoked.
+    The dashboard reads local DeviceLink state without automatically materializing a new
+    DeviceLink identity. Operator actions delegate to existing WindowsDeviceLink cmdlets.
+    State-changing actions require an explicit GUI confirmation.
 
-    The GUI is a convenience layer only; lifecycle and safety logic remains in the
-    existing public cmdlets.
+    The layout is intentionally compact and vertically scrollable so it remains usable on
+    lower-resolution displays. WinPE remains a command-line workflow for now.
 
     .EXAMPLE
     Show-WindowsDeviceLink
-
-    Opens the WindowsDeviceLink dashboard.
-
-    .NOTES
-    The GUI is supported on full Windows only. WinPE remains a command-line workflow.
     #>
     [CmdletBinding()]
     param()
 
     if (Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT') {
-        throw 'Show-WindowsDeviceLink is not supported in Windows PE. Use the WindowsDeviceLink command-line cmdlets instead.'
+        throw 'Show-WindowsDeviceLink is not supported in Windows PE yet. Use the WindowsDeviceLink command-line cmdlets instead.'
     }
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -35,153 +28,254 @@ function Show-WindowsDeviceLink {
 
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
+    $workingArea = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $targetWidth = [Math]::Max(820,[Math]::Min(1120,$workingArea.Width - 32))
+    $targetHeight = [Math]::Max(620,[Math]::Min(860,$workingArea.Height - 48))
+
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'WindowsDeviceLink'
     $form.StartPosition = 'CenterScreen'
-    $form.Size = New-Object System.Drawing.Size(1020,900)
-    $form.MinimumSize = New-Object System.Drawing.Size(980,840)
+    $form.Size = New-Object System.Drawing.Size($targetWidth,$targetHeight)
+    $form.MinimumSize = New-Object System.Drawing.Size(820,620)
     $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
+    $form.BackColor = [System.Drawing.Color]::FromArgb(243,243,243)
+
+    $content = New-Object System.Windows.Forms.Panel
+    $content.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $content.AutoScroll = $true
+    $content.BackColor = $form.BackColor
+    $form.Controls.Add($content)
 
     $title = New-Object System.Windows.Forms.Label
     $title.Text = 'WindowsDeviceLink'
-    $title.Font = New-Object System.Drawing.Font('Segoe UI',18,[System.Drawing.FontStyle]::Bold)
-    $title.Location = New-Object System.Drawing.Point(20,14)
+    $title.Font = New-Object System.Drawing.Font('Segoe UI',20,[System.Drawing.FontStyle]::Bold)
+    $title.Location = New-Object System.Drawing.Point(28,18)
     $title.AutoSize = $true
-    $form.Controls.Add($title)
+    $content.Controls.Add($title)
 
     $subtitle = New-Object System.Windows.Forms.Label
-    $subtitle.Text = 'Windows Autopilot Device Preparation • Device Association'
+    $subtitle.Text = 'Windows Autopilot Device Preparation - Device Association'
     $subtitle.Font = New-Object System.Drawing.Font('Segoe UI',9)
-    $subtitle.Location = New-Object System.Drawing.Point(24,50)
+    $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
+    $subtitle.Location = New-Object System.Drawing.Point(31,58)
     $subtitle.AutoSize = $true
-    $form.Controls.Add($subtitle)
+    $content.Controls.Add($subtitle)
 
-    function New-ValueLabel {
-        param(
-            [System.Windows.Forms.Control]$Parent,
-            [string]$Caption,
-            [int]$Y
-        )
+    function New-Card {
+        param([string]$Title,[int]$X,[int]$Y,[int]$Width,[int]$Height)
+
+        $panel = New-Object System.Windows.Forms.Panel
+        $panel.Location = New-Object System.Drawing.Point($X,$Y)
+        $panel.Size = New-Object System.Drawing.Size($Width,$Height)
+        $panel.BackColor = [System.Drawing.Color]::White
+        $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+        $content.Controls.Add($panel)
+
+        if (-not [string]::IsNullOrWhiteSpace($Title)) {
+            $label = New-Object System.Windows.Forms.Label
+            $label.Text = $Title
+            $label.Font = New-Object System.Drawing.Font('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
+            $label.Location = New-Object System.Drawing.Point(18,14)
+            $label.AutoSize = $true
+            $panel.Controls.Add($label)
+        }
+
+        $panel
+    }
+
+    function New-ValuePair {
+        param([System.Windows.Forms.Control]$Parent,[string]$Caption,[int]$Y)
 
         $captionLabel = New-Object System.Windows.Forms.Label
         $captionLabel.Text = $Caption
-        $captionLabel.Location = New-Object System.Drawing.Point(14,$Y)
-        $captionLabel.Size = New-Object System.Drawing.Size(150,22)
-        $captionLabel.Font = New-Object System.Drawing.Font('Segoe UI',9)
+        $captionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+        $captionLabel.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
+        $captionLabel.Location = New-Object System.Drawing.Point(18,$Y)
+        $captionLabel.Size = New-Object System.Drawing.Size(135,20)
         $Parent.Controls.Add($captionLabel)
 
         $valueLabel = New-Object System.Windows.Forms.Label
-        $valueLabel.Text = '—'
-        $valueLabel.Location = New-Object System.Drawing.Point(168,$Y)
-        $valueLabel.Size = New-Object System.Drawing.Size(290,38)
+        $valueLabel.Text = '-'
         $valueLabel.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
+        $valueLabel.Location = New-Object System.Drawing.Point(155,$Y - 1)
+        $valueLabel.Size = New-Object System.Drawing.Size(330,34)
         $valueLabel.AutoEllipsis = $true
         $Parent.Controls.Add($valueLabel)
 
         $valueLabel
     }
 
-    function New-Group {
-        param(
-            [string]$Text,
-            [int]$X,
-            [int]$Y,
-            [int]$Width,
-            [int]$Height
-        )
+    function New-ActionRow {
+        param([System.Windows.Forms.Control]$Parent,[string]$Title,[string]$Description,[int]$Y,[string]$ButtonText)
 
-        $group = New-Object System.Windows.Forms.GroupBox
-        $group.Text = $Text
-        $group.Location = New-Object System.Drawing.Point($X,$Y)
-        $group.Size = New-Object System.Drawing.Size($Width,$Height)
-        $group.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-        $form.Controls.Add($group)
-        $group
+        $row = New-Object System.Windows.Forms.Panel
+        $row.Location = New-Object System.Drawing.Point(0,$Y)
+        $row.Size = New-Object System.Drawing.Size(900,56)
+        $row.BackColor = [System.Drawing.Color]::White
+        $Parent.Controls.Add($row)
+
+        $titleLabel = New-Object System.Windows.Forms.Label
+        $titleLabel.Text = $Title
+        $titleLabel.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
+        $titleLabel.Location = New-Object System.Drawing.Point(18,8)
+        $titleLabel.AutoSize = $true
+        $row.Controls.Add($titleLabel)
+
+        $descriptionLabel = New-Object System.Windows.Forms.Label
+        $descriptionLabel.Text = $Description
+        $descriptionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8)
+        $descriptionLabel.ForeColor = [System.Drawing.Color]::FromArgb(110,110,110)
+        $descriptionLabel.Location = New-Object System.Drawing.Point(18,29)
+        $descriptionLabel.AutoSize = $true
+        $row.Controls.Add($descriptionLabel)
+
+        $button = New-Object System.Windows.Forms.Button
+        $button.Text = $ButtonText
+        $button.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+        $button.Size = New-Object System.Drawing.Size(125,30)
+        $button.Location = New-Object System.Drawing.Point(755,13)
+        $button.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+        $row.Controls.Add($button)
+
+        [pscustomobject]@{
+            Panel = $row
+            Button = $button
+            Title = $titleLabel
+            Description = $descriptionLabel
+        }
     }
 
-    $deviceGroup = New-Group -Text 'Device' -X 20 -Y 82 -Width 470 -Height 220
-    $localGroup  = New-Group -Text 'Local association' -X 510 -Y 82 -Width 470 -Height 220
-    $cloudGroup  = New-Group -Text 'Cloud association' -X 20 -Y 316 -Width 470 -Height 190
-    $actionGroup = New-Group -Text 'Actions' -X 510 -Y 316 -Width 470 -Height 270
-    $consoleGroup = New-Group -Text 'Activity console' -X 20 -Y 600 -Width 960 -Height 230
+    $ui = @{}
+    $script:WdlGuiBusy = $false
+    $script:WdlGuiLocalAssociation = $null
+    $script:WdlGuiCloudStatus = $null
+
+    $deviceCard = New-Card -Title 'Device' -X 28 -Y 92 -Width 500 -Height 190
+    $localCard = New-Card -Title 'Local association' -X 544 -Y 92 -Width 500 -Height 190
+
+    $ui.Manufacturer = New-ValuePair -Parent $deviceCard -Caption 'Manufacturer' -Y 48
+    $ui.Model        = New-ValuePair -Parent $deviceCard -Caption 'Model' -Y 78
+    $ui.Serial       = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 108
+    $ui.Runtime      = New-ValuePair -Parent $deviceCard -Caption 'Runtime' -Y 138
+
+    $ui.Firmware   = New-ValuePair -Parent $localCard -Caption 'Firmware state' -Y 48
+    $ui.LocalState = New-ValuePair -Parent $localCard -Caption 'Local state' -Y 78
+    $ui.TenantId   = New-ValuePair -Parent $localCard -Caption 'Tenant ID' -Y 108
+    $ui.Trust      = New-ValuePair -Parent $localCard -Caption 'Trust / source' -Y 138
+
+    $cloudCard = New-Card -Title 'Cloud association' -X 28 -Y 296 -Width 1016 -Height 122
+    $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'Association state' -Y 48
+    $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant ID' -Y 78
+
+    $cloudIdCaption = New-Object System.Windows.Forms.Label
+    $cloudIdCaption.Text = 'Association ID'
+    $cloudIdCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+    $cloudIdCaption.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
+    $cloudIdCaption.Location = New-Object System.Drawing.Point(520,48)
+    $cloudIdCaption.Size = New-Object System.Drawing.Size(115,20)
+    $cloudCard.Controls.Add($cloudIdCaption)
+
+    $ui.CloudId = New-Object System.Windows.Forms.Label
+    $ui.CloudId.Text = '-'
+    $ui.CloudId.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
+    $ui.CloudId.Location = New-Object System.Drawing.Point(638,47)
+    $ui.CloudId.Size = New-Object System.Drawing.Size(350,28)
+    $ui.CloudId.AutoEllipsis = $true
+    $cloudCard.Controls.Add($ui.CloudId)
+
+    $tenantCaption = New-Object System.Windows.Forms.Label
+    $tenantCaption.Text = 'Tenant override'
+    $tenantCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+    $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
+    $tenantCaption.Location = New-Object System.Drawing.Point(520,78)
+    $tenantCaption.Size = New-Object System.Drawing.Size(115,20)
+    $cloudCard.Controls.Add($tenantCaption)
+
+    $tenantBox = New-Object System.Windows.Forms.TextBox
+    $tenantBox.Location = New-Object System.Drawing.Point(638,75)
+    $tenantBox.Size = New-Object System.Drawing.Size(350,24)
+    $tenantBox.Font = New-Object System.Drawing.Font('Consolas',8.5)
+    $cloudCard.Controls.Add($tenantBox)
+
+    $recommendedCard = New-Card -Title '' -X 28 -Y 432 -Width 1016 -Height 86
+
+    $recommendedTag = New-Object System.Windows.Forms.Label
+    $recommendedTag.Text = 'Recommended action'
+    $recommendedTag.Font = New-Object System.Drawing.Font('Segoe UI',8,[System.Drawing.FontStyle]::Bold)
+    $recommendedTag.ForeColor = [System.Drawing.SystemColors]::Highlight
+    $recommendedTag.Location = New-Object System.Drawing.Point(18,12)
+    $recommendedTag.AutoSize = $true
+    $recommendedCard.Controls.Add($recommendedTag)
+
+    $recommendedTitle = New-Object System.Windows.Forms.Label
+    $recommendedTitle.Text = 'Check local state'
+    $recommendedTitle.Font = New-Object System.Drawing.Font('Segoe UI',11,[System.Drawing.FontStyle]::Bold)
+    $recommendedTitle.Location = New-Object System.Drawing.Point(18,34)
+    $recommendedTitle.AutoSize = $true
+    $recommendedCard.Controls.Add($recommendedTitle)
+
+    $recommendedDescription = New-Object System.Windows.Forms.Label
+    $recommendedDescription.Text = 'Refresh the device state to determine the next recommended step.'
+    $recommendedDescription.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+    $recommendedDescription.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
+    $recommendedDescription.Location = New-Object System.Drawing.Point(20,58)
+    $recommendedDescription.AutoSize = $true
+    $recommendedCard.Controls.Add($recommendedDescription)
+
+    $recommendedButton = New-Object System.Windows.Forms.Button
+    $recommendedButton.Text = 'Refresh'
+    $recommendedButton.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
+    $recommendedButton.Size = New-Object System.Drawing.Size(150,34)
+    $recommendedButton.Location = New-Object System.Drawing.Point(840,26)
+    $recommendedCard.Controls.Add($recommendedButton)
+
+    $actionsTitle = New-Object System.Windows.Forms.Label
+    $actionsTitle.Text = 'Actions'
+    $actionsTitle.Font = New-Object System.Drawing.Font('Segoe UI',13,[System.Drawing.FontStyle]::Bold)
+    $actionsTitle.Location = New-Object System.Drawing.Point(30,536)
+    $actionsTitle.AutoSize = $true
+    $content.Controls.Add($actionsTitle)
+
+    $actionsPanel = New-Card -Title '' -X 28 -Y 570 -Width 1016 -Height 236
+    $rowRefresh  = New-ActionRow -Parent $actionsPanel -Title 'Refresh local state' -Description 'Re-read firmware, runtime and local tenant correlation.' -Y 0 -ButtonText 'Refresh'
+    $rowIdentity = New-ActionRow -Parent $actionsPanel -Title 'Load DeviceLink identity' -Description 'Generate/read the current DeviceLink identity if needed.' -Y 58 -ButtonText 'Load identity'
+    $rowOnline   = New-ActionRow -Parent $actionsPanel -Title 'Check cloud association' -Description 'Query the tenant-side Device Association using Interactive authentication.' -Y 116 -ButtonText 'Check online'
+    $rowExport   = New-ActionRow -Parent $actionsPanel -Title 'Export DeviceLink CSV' -Description 'Export the Microsoft-generated .devicelink.csv for this device.' -Y 174 -ButtonText 'Export CSV'
+
+    $advancedTitle = New-Object System.Windows.Forms.Label
+    $advancedTitle.Text = 'Advanced / lifecycle'
+    $advancedTitle.Font = New-Object System.Drawing.Font('Segoe UI',13,[System.Drawing.FontStyle]::Bold)
+    $advancedTitle.Location = New-Object System.Drawing.Point(30,824)
+    $advancedTitle.AutoSize = $true
+    $content.Controls.Add($advancedTitle)
+
+    $advancedPanel = New-Card -Title '' -X 28 -Y 858 -Width 1016 -Height 178
+    $rowRegister = New-ActionRow -Parent $advancedPanel -Title 'Create pre-association' -Description 'Create the tenant-side Device Association pre-association.' -Y 0 -ButtonText 'Pre-associate'
+    $rowComplete = New-ActionRow -Parent $advancedPanel -Title 'Complete association' -Description 'Run native DeviceLink completion and verify the final local state.' -Y 58 -ButtonText 'Complete'
+    $rowOffboard = New-ActionRow -Parent $advancedPanel -Title 'Offboarding' -Description 'Remove cloud association or reset local DeviceLink state.' -Y 116 -ButtonText 'Options...'
+
+    $activityTitle = New-Object System.Windows.Forms.Label
+    $activityTitle.Text = 'Activity'
+    $activityTitle.Font = New-Object System.Drawing.Font('Segoe UI',13,[System.Drawing.FontStyle]::Bold)
+    $activityTitle.Location = New-Object System.Drawing.Point(30,1054)
+    $activityTitle.AutoSize = $true
+    $content.Controls.Add($activityTitle)
+
+    $activityCard = New-Card -Title '' -X 28 -Y 1088 -Width 1016 -Height 188
 
     $consoleBox = New-Object System.Windows.Forms.TextBox
-    $consoleBox.Location = New-Object System.Drawing.Point(14,26)
-    $consoleBox.Size = New-Object System.Drawing.Size(932,188)
+    $consoleBox.Location = New-Object System.Drawing.Point(16,14)
+    $consoleBox.Size = New-Object System.Drawing.Size(982,156)
     $consoleBox.Multiline = $true
     $consoleBox.ReadOnly = $true
     $consoleBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
     $consoleBox.WordWrap = $false
-    $consoleBox.Font = New-Object System.Drawing.Font('Consolas',9)
-    $consoleBox.BackColor = [System.Drawing.SystemColors]::Window
-    $consoleGroup.Controls.Add($consoleBox)
+    $consoleBox.Font = New-Object System.Drawing.Font('Consolas',8.5)
+    $consoleBox.BackColor = [System.Drawing.Color]::FromArgb(250,250,250)
+    $consoleBox.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $activityCard.Controls.Add($consoleBox)
 
-    $ui = @{}
-    $ui.Manufacturer = New-ValueLabel -Parent $deviceGroup -Caption 'Manufacturer' -Y 28
-    $ui.Model        = New-ValueLabel -Parent $deviceGroup -Caption 'Model' -Y 62
-    $ui.Serial       = New-ValueLabel -Parent $deviceGroup -Caption 'Serial number' -Y 96
-    $ui.Runtime      = New-ValueLabel -Parent $deviceGroup -Caption 'Runtime' -Y 130
-    $ui.LinkId       = New-ValueLabel -Parent $deviceGroup -Caption 'Link ID' -Y 164
-
-    $ui.Firmware     = New-ValueLabel -Parent $localGroup -Caption 'Firmware state' -Y 28
-    $ui.LocalState   = New-ValueLabel -Parent $localGroup -Caption 'Local state' -Y 62
-    $ui.TenantId     = New-ValueLabel -Parent $localGroup -Caption 'Tenant ID' -Y 96
-    $ui.Source       = New-ValueLabel -Parent $localGroup -Caption 'Source' -Y 130
-    $ui.Trust        = New-ValueLabel -Parent $localGroup -Caption 'Trust' -Y 164
-
-    $ui.CloudState   = New-ValueLabel -Parent $cloudGroup -Caption 'Association state' -Y 28
-    $ui.CloudTenant  = New-ValueLabel -Parent $cloudGroup -Caption 'Tenant ID' -Y 62
-    $ui.CloudId      = New-ValueLabel -Parent $cloudGroup -Caption 'Association ID' -Y 96
-    $ui.CloudMessage = New-ValueLabel -Parent $cloudGroup -Caption 'Status' -Y 130
-
-    $tenantCaption = New-Object System.Windows.Forms.Label
-    $tenantCaption.Text = 'Tenant override (optional)'
-    $tenantCaption.Location = New-Object System.Drawing.Point(14,30)
-    $tenantCaption.Size = New-Object System.Drawing.Size(180,22)
-    $tenantCaption.Font = New-Object System.Drawing.Font('Segoe UI',9)
-    $actionGroup.Controls.Add($tenantCaption)
-
-    $tenantBox = New-Object System.Windows.Forms.TextBox
-    $tenantBox.Location = New-Object System.Drawing.Point(198,27)
-    $tenantBox.Size = New-Object System.Drawing.Size(250,24)
-    $tenantBox.Font = New-Object System.Drawing.Font('Consolas',9)
-    $actionGroup.Controls.Add($tenantBox)
-
-    function New-ActionButton {
-        param(
-            [string]$Text,
-            [int]$X,
-            [int]$Y,
-            [int]$Width = 138
-        )
-
-        $button = New-Object System.Windows.Forms.Button
-        $button.Text = $Text
-        $button.Location = New-Object System.Drawing.Point($X,$Y)
-        $button.Size = New-Object System.Drawing.Size($Width,34)
-        $button.Font = New-Object System.Drawing.Font('Segoe UI',9)
-        $actionGroup.Controls.Add($button)
-        $button
-    }
-
-    $btnRefresh    = New-ActionButton -Text 'Refresh' -X 14 -Y 70
-    $btnIdentity   = New-ActionButton -Text 'Load identity' -X 164 -Y 70
-    $btnOnline     = New-ActionButton -Text 'Check online' -X 314 -Y 70
-
-    $btnExport     = New-ActionButton -Text 'Export CSV' -X 14 -Y 114
-    $btnRegister   = New-ActionButton -Text 'Pre-associate' -X 164 -Y 114
-    $btnComplete   = New-ActionButton -Text 'Complete' -X 314 -Y 114
-
-    $btnRemove     = New-ActionButton -Text 'Remove cloud' -X 14 -Y 158
-    $btnReset      = New-ActionButton -Text 'Reset local' -X 164 -Y 158
-    $btnClose      = New-ActionButton -Text 'Close' -X 314 -Y 158
-
-    $actionNote = New-Object System.Windows.Forms.Label
-    $actionNote.Text = 'State-changing actions call the existing cmdlets and require confirmation.'
-    $actionNote.Location = New-Object System.Drawing.Point(16,208)
-    $actionNote.Size = New-Object System.Drawing.Size(430,40)
-    $actionNote.Font = New-Object System.Drawing.Font('Segoe UI',8)
-    $actionGroup.Controls.Add($actionNote)
+    $content.AutoScrollMinSize = New-Object System.Drawing.Size(0,1315)
 
     $statusStrip = New-Object System.Windows.Forms.StatusStrip
     $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
@@ -199,8 +293,9 @@ function Show-WindowsDeviceLink {
     [void]$statusStrip.Items.Add($statusProgress)
     $form.Controls.Add($statusStrip)
 
-    $script:WdlGuiLocalAssociation = $null
-    $script:WdlGuiBusy = $false
+    $offboardingMenu = New-Object System.Windows.Forms.ContextMenuStrip
+    $menuRemoveCloud = $offboardingMenu.Items.Add('Remove cloud association')
+    $menuResetLocal = $offboardingMenu.Items.Add('Reset local DeviceLink state')
 
     function Set-GuiStatus {
         param([string]$Text)
@@ -208,54 +303,8 @@ function Show-WindowsDeviceLink {
         [System.Windows.Forms.Application]::DoEvents()
     }
 
-    $actionControls = @(
-        $btnRefresh,
-        $btnIdentity,
-        $btnOnline,
-        $btnExport,
-        $btnRegister,
-        $btnComplete,
-        $btnRemove,
-        $btnReset,
-        $btnClose,
-        $tenantBox
-    )
-
-    function Set-GuiBusy {
-        param(
-            [Parameter(Mandatory)][bool]$Busy,
-            [string]$StatusText
-        )
-
-        $script:WdlGuiBusy = $Busy
-
-        foreach ($control in $actionControls) {
-            $control.Enabled = -not $Busy
-        }
-
-        $statusProgress.Visible = $Busy
-        $form.UseWaitCursor = $Busy
-
-        if ($Busy) {
-            if (-not [string]::IsNullOrWhiteSpace($StatusText)) {
-                Set-GuiStatus $StatusText
-            }
-        }
-        elseif (-not [string]::IsNullOrWhiteSpace($StatusText)) {
-            Set-GuiStatus $StatusText
-        }
-
-        [System.Windows.Forms.Application]::DoEvents()
-    }
-
     function Write-GuiConsole {
-        param(
-            [AllowNull()]
-            [AllowEmptyString()]
-            [string]$Message,
-            [switch]$Command,
-            [switch]$ErrorMessage
-        )
+        param([AllowNull()][AllowEmptyString()][string]$Message,[switch]$Command,[switch]$ErrorMessage)
 
         if ([string]::IsNullOrWhiteSpace($Message)) { return }
 
@@ -267,20 +316,19 @@ function Show-WindowsDeviceLink {
         $consoleBox.SelectionStart = $consoleBox.TextLength
         $consoleBox.ScrollToCaret()
         [System.Windows.Forms.Application]::DoEvents()
-
         Write-Host $line
     }
 
     function Write-GuiObject {
         param($InputObject)
-
         if ($null -eq $InputObject) { return }
+
         $text = ($InputObject | Format-List * | Out-String).TrimEnd()
-        if (-not [string]::IsNullOrWhiteSpace($text)) {
-            foreach ($line in ($text -split "\r?\n")) {
-                if ([string]::IsNullOrWhiteSpace($line)) { continue }
-                Write-GuiConsole -Message $line
-            }
+        if ([string]::IsNullOrWhiteSpace($text)) { return }
+
+        foreach ($line in ($text -split '\r?\n')) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            Write-GuiConsole -Message $line
         }
     }
 
@@ -288,69 +336,37 @@ function Show-WindowsDeviceLink {
         param([string]$Message)
         Write-GuiConsole -Message $Message -ErrorMessage
         [void][System.Windows.Forms.MessageBox]::Show(
-            $form,
-            $Message,
-            'WindowsDeviceLink',
+            $form,$Message,'WindowsDeviceLink',
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
         )
     }
 
     function Confirm-GuiAction {
-        param(
-            [string]$Title,
-            [string]$Message
-        )
-
-        $result = [System.Windows.Forms.MessageBox]::Show(
-            $form,
-            $Message,
-            $Title,
+        param([string]$Title,[string]$Message)
+        ([System.Windows.Forms.MessageBox]::Show(
+            $form,$Message,$Title,
             [System.Windows.Forms.MessageBoxButtons]::YesNo,
             [System.Windows.Forms.MessageBoxIcon]::Warning
-        )
-
-        $result -eq [System.Windows.Forms.DialogResult]::Yes
+        ) -eq [System.Windows.Forms.DialogResult]::Yes)
     }
 
-    function Refresh-LocalView {
-        Set-GuiStatus 'Refreshing local state...'
-        Write-GuiConsole -Message 'Refresh local state' -Command
-        try {
-            $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
-            $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
-            $support = Test-WindowsDeviceLinkSupport
-            $local = Get-WindowsDeviceLinkLocalAssociation
-            $script:WdlGuiLocalAssociation = $local
+    $actionControls = @(
+        $rowRefresh.Button,$rowIdentity.Button,$rowOnline.Button,$rowExport.Button,
+        $rowRegister.Button,$rowComplete.Button,$rowOffboard.Button,$recommendedButton,$tenantBox
+    )
 
-            $ui.Manufacturer.Text = [string]$cs.Manufacturer
-            $ui.Model.Text = [string]$cs.Model
-            $ui.Serial.Text = [string]$bios.SerialNumber
+    function Set-GuiBusy {
+        param([Parameter(Mandatory)][bool]$Busy,[string]$StatusText)
 
-            if ($support.Supported) {
-                $runtimeText = "$($support.Environment) • $($support.ActivationMode)"
-                if ($support.DllVersion) { $runtimeText += " • $($support.DllVersion)" }
-                $ui.Runtime.Text = $runtimeText
-            }
-            else {
-                $ui.Runtime.Text = "Unsupported: $($support.Reason)"
-            }
+        $script:WdlGuiBusy = $Busy
+        foreach ($control in $actionControls) { $control.Enabled = -not $Busy }
 
-            $ui.LinkId.Text = if ($local.LinkId) { [string]$local.LinkId } else { 'Not materialized' }
-            $ui.Firmware.Text = [string]$local.FirmwareState
-            $ui.LocalState.Text = [string]$local.LocalAssociationState
-            $ui.TenantId.Text = if ($local.TenantId) { [string]$local.TenantId } else { 'Unavailable' }
-            $ui.Source.Text = [string]$local.Source
-            $ui.Trust.Text = [string]$local.TrustLevel
+        $statusProgress.Visible = $Busy
+        $form.UseWaitCursor = $Busy
 
-
-            Set-GuiStatus "Local state refreshed • $($local.FirmwareState) • $($local.TrustLevel)"
-            Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source), trust: $($local.TrustLevel)"
-        }
-        catch {
-            Set-GuiStatus 'Local refresh failed'
-            Show-GuiError $_.Exception.Message
-        }
+        if (-not [string]::IsNullOrWhiteSpace($StatusText)) { Set-GuiStatus $StatusText }
+        [System.Windows.Forms.Application]::DoEvents()
     }
 
     function Get-TenantOverride {
@@ -362,142 +378,210 @@ function Show-WindowsDeviceLink {
         $null
     }
 
-    $btnRefresh.Add_Click({
+    function Update-Recommendation {
+        $local = $script:WdlGuiLocalAssociation
+        $cloud = $script:WdlGuiCloudStatus
+
+        if (-not $local) {
+            $recommendedTitle.Text = 'Refresh local state'
+            $recommendedDescription.Text = 'Read the current DeviceLink state before taking another action.'
+            $recommendedButton.Text = 'Refresh'
+            $recommendedButton.Tag = 'Refresh'
+            return
+        }
+
+        if ($local.FirmwareState -eq '0/4') {
+            $recommendedTitle.Text = 'Load DeviceLink identity'
+            $recommendedDescription.Text = 'No current DeviceLink identity exists. Create/read the base identity first.'
+            $recommendedButton.Text = 'Load identity'
+            $recommendedButton.Tag = 'Identity'
+            return
+        }
+
+        if (-not $cloud) {
+            $recommendedTitle.Text = 'Check cloud association'
+            $recommendedDescription.Text = 'Local state is available. Check tenant-side state before changing the lifecycle.'
+            $recommendedButton.Text = 'Check online'
+            $recommendedButton.Tag = 'Online'
+            return
+        }
+
+        if ($cloud.AssociationPresent -and [string]$cloud.AssociationState -ieq 'preassociated' -and $local.FirmwareState -eq '2/4') {
+            $recommendedTitle.Text = 'Complete Device Association'
+            $recommendedDescription.Text = 'The device is pre-associated and local firmware is ready for native completion.'
+            $recommendedButton.Text = 'Complete'
+            $recommendedButton.Tag = 'Complete'
+            return
+        }
+
+        if (-not $cloud.AssociationPresent -and $local.FirmwareState -eq '2/4') {
+            $recommendedTitle.Text = 'Create pre-association'
+            $recommendedDescription.Text = 'The local identity exists, but no tenant-side Device Association was found.'
+            $recommendedButton.Text = 'Pre-associate'
+            $recommendedButton.Tag = 'Register'
+            return
+        }
+
+        if ($local.FirmwareState -eq '4/4') {
+            $recommendedTitle.Text = 'Association locally complete'
+            $recommendedDescription.Text = 'Local DeviceLink state is complete. Refresh or check online for verification.'
+            $recommendedButton.Text = 'Refresh'
+            $recommendedButton.Tag = 'Refresh'
+            return
+        }
+
+        $recommendedTitle.Text = 'Review current state'
+        $recommendedDescription.Text = 'The current lifecycle state does not map to a single recommended mutation.'
+        $recommendedButton.Text = 'Refresh'
+        $recommendedButton.Tag = 'Refresh'
+    }
+
+    function Refresh-LocalView {
+        Set-GuiStatus 'Refreshing local state...'
+        Write-GuiConsole -Message 'Refresh local state' -Command
+
+        $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
+        $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        $support = Test-WindowsDeviceLinkSupport
+        $local = Get-WindowsDeviceLinkLocalAssociation
+        $script:WdlGuiLocalAssociation = $local
+
+        $ui.Manufacturer.Text = [string]$cs.Manufacturer
+        $ui.Model.Text = [string]$cs.Model
+        $ui.Serial.Text = [string]$bios.SerialNumber
+
+        if ($support.Supported) {
+            $runtimeText = "$($support.Environment) | $($support.ActivationMode)"
+            if ($support.DllVersion) { $runtimeText += " | $($support.DllVersion)" }
+            $ui.Runtime.Text = $runtimeText
+        }
+        else {
+            $ui.Runtime.Text = "Unsupported: $($support.Reason)"
+        }
+
+        $ui.Firmware.Text = [string]$local.FirmwareState
+        $ui.LocalState.Text = [string]$local.LocalAssociationState
+        $ui.TenantId.Text = if ($local.TenantId) { [string]$local.TenantId } else { 'Unavailable' }
+        $ui.Trust.Text = "$($local.TrustLevel) | $($local.Source)"
+
+        Set-GuiStatus "Local state refreshed | $($local.FirmwareState) | $($local.TrustLevel)"
+        Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source), trust: $($local.TrustLevel)"
+        Update-Recommendation
+    }
+
+    function Invoke-GuiRefresh {
         if ($script:WdlGuiBusy) { return }
         Set-GuiBusy -Busy $true -StatusText 'Refreshing local state...'
-        try {
-            Refresh-LocalView
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    })
+        try { Refresh-LocalView }
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
+    }
 
-    $btnIdentity.Add_Click({
+    function Invoke-GuiIdentity {
         if ($script:WdlGuiBusy) { return }
         Set-GuiBusy -Busy $true -StatusText 'Loading DeviceLink identity...'
         try {
             Write-GuiConsole -Message 'Get-WindowsDeviceLink' -Command
             $identity = Get-WindowsDeviceLink
             Write-GuiObject $identity
-            Set-GuiStatus "DeviceLink identity loaded: $($identity.LinkId)"
             Refresh-LocalView
         }
-        catch {
-            Set-GuiStatus 'Identity load failed'
-            Show-GuiError $_.Exception.Message
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    })
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
+    }
 
-    $btnOnline.Add_Click({
+    function Invoke-GuiOnline {
         if ($script:WdlGuiBusy) { return }
         Set-GuiBusy -Busy $true -StatusText 'Checking tenant-side Device Association...'
         try {
-            $parameters = @{ Online = $true; Method = 'Interactive' }
+            $parameters = @{ Online=$true; Method='Interactive' }
             $tenant = Get-TenantOverride
             if ($tenant) { $parameters.TenantId = $tenant }
 
             $displayTenant = if ($parameters.ContainsKey('TenantId')) { " -TenantId $($parameters.TenantId)" } else { '' }
             Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method Interactive$displayTenant" -Command
+
             $cloud = Get-WindowsDeviceLinkStatus @parameters
+            $script:WdlGuiCloudStatus = $cloud
             Write-GuiObject $cloud
+
             $ui.CloudState.Text = [string]$cloud.AssociationState
-            $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { '—' }
-            $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { '—' }
-            $ui.CloudMessage.Text = if ($cloud.AssociationError) { [string]$cloud.AssociationError } else { 'Lookup completed' }
+            $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { '-' }
+            $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { '-' }
+
             Set-GuiStatus 'Cloud lookup completed'
+            Update-Recommendation
         }
         catch {
-            $ui.CloudMessage.Text = 'Lookup failed'
             Set-GuiStatus 'Cloud lookup failed'
             Show-GuiError $_.Exception.Message
         }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    })
+        finally { Set-GuiBusy -Busy $false }
+    }
 
-    $btnExport.Add_Click({
+    function Invoke-GuiExport {
+        if ($script:WdlGuiBusy) { return }
+
         $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
         $dialog.Description = 'Choose a folder for the DeviceLink CSV'
-        if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
-            $dialog.Dispose()
-            return
-        }
-
-        if ($script:WdlGuiBusy) {
-            $dialog.Dispose()
-            return
-        }
-
-        Set-GuiBusy -Busy $true -StatusText 'Exporting DeviceLink CSV...'
         try {
+            if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+            Set-GuiBusy -Busy $true -StatusText 'Exporting DeviceLink CSV...'
             Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$($dialog.SelectedPath)'" -Command
+
             $file = Get-WindowsDeviceLink -OutputDirectory $dialog.SelectedPath
             Write-GuiObject $file
             Set-GuiStatus "CSV exported: $($file.FullName)"
+
             [void][System.Windows.Forms.MessageBox]::Show(
                 $form,
-                "Exported to:
-$($file.FullName)",
+                ('Exported to:' + [Environment]::NewLine + $file.FullName),
                 'WindowsDeviceLink',
                 [System.Windows.Forms.MessageBoxButtons]::OK,
                 [System.Windows.Forms.MessageBoxIcon]::Information
             )
+
             Refresh-LocalView
         }
-        catch {
-            Set-GuiStatus 'CSV export failed'
-            Show-GuiError $_.Exception.Message
-        }
+        catch { Show-GuiError $_.Exception.Message }
         finally {
-            $dialog.Dispose()
             Set-GuiBusy -Busy $false
+            $dialog.Dispose()
         }
-    })
+    }
 
-    $btnRegister.Add_Click({
+    function Invoke-GuiRegister {
         if ($script:WdlGuiBusy) { return }
-        if (-not (Confirm-GuiAction -Title 'Create pre-association' -Message 'Create or attempt a tenant-side Device Association pre-association for this device?')) {
-            return
-        }
+        if (-not (Confirm-GuiAction -Title 'Create pre-association' -Message 'Create or attempt a tenant-side Device Association pre-association for this device?')) { return }
 
         Set-GuiBusy -Busy $true -StatusText 'Creating tenant-side pre-association...'
         try {
             $identity = Get-WindowsDeviceLink
-            $parameters = @{ Method = 'Interactive'; Confirm = $false }
+            $parameters = @{ Method='Interactive'; Confirm=$false }
             $tenant = $tenantBox.Text.Trim()
             if ($tenant) { $parameters.TenantId = $tenant }
 
             $displayTenant = if ($parameters.ContainsKey('TenantId')) { " -TenantId $($parameters.TenantId)" } else { '' }
             Write-GuiConsole -Message "Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method Interactive$displayTenant" -Command
+
             $result = $identity | Register-WindowsDeviceLink @parameters
             Write-GuiObject $result
             Set-GuiStatus "Pre-association completed: $($result.AssociationState)"
+            $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
         }
-        catch {
-            Set-GuiStatus 'Pre-association failed'
-            Show-GuiError $_.Exception.Message
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    })
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
+    }
 
-    $btnComplete.Add_Click({
+    function Invoke-GuiComplete {
         if ($script:WdlGuiBusy) { return }
-        if (-not (Confirm-GuiAction -Title 'Complete association' -Message 'Run native DeviceLink association completion now? This can take one or more minutes and changes local DeviceLink state.')) {
-            return
-        }
+        if (-not (Confirm-GuiAction -Title 'Complete association' -Message 'Run native DeviceLink association completion now? This can take one or more minutes and changes local DeviceLink state.')) { return }
 
         Set-GuiBusy -Busy $true -StatusText 'Completing DeviceLink association...'
         try {
             Write-GuiConsole -Message 'Complete-WindowsDeviceLinkAssociation -Confirm:$false' -Command
-
             $resultObjects = New-Object System.Collections.Generic.List[object]
 
             & {
@@ -512,95 +596,88 @@ $($file.FullName)",
                 else {
                     $resultObjects.Add($_)
                 }
-
                 [System.Windows.Forms.Application]::DoEvents()
             }
 
             $result = @($resultObjects.ToArray()) | Select-Object -Last 1
             Write-GuiObject $result
-
-            $resultText = if ($result -and $result.PSObject.Properties.Name -contains 'Result') {
-                [string]$result.Result
-            }
-            else {
-                'Completed'
-            }
-
-            Set-GuiStatus "Completion result: $resultText"
+            Set-GuiStatus 'Association completion finished'
+            $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
         }
-        catch {
-            Set-GuiStatus 'Association completion failed'
-            Show-GuiError $_.Exception.Message
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    })
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
+    }
 
-    $btnRemove.Add_Click({
+    function Invoke-GuiRemoveCloud {
         if ($script:WdlGuiBusy) { return }
-        if (-not (Confirm-GuiAction -Title 'Remove cloud association' -Message 'Delete the tenant-side Device Association record for this device? Local DeviceLink firmware state will not be reset.')) {
-            return
-        }
+        if (-not (Confirm-GuiAction -Title 'Remove cloud association' -Message 'Delete the tenant-side Device Association record? Local DeviceLink firmware is not reset.')) { return }
 
         Set-GuiBusy -Busy $true -StatusText 'Removing tenant-side Device Association...'
         try {
-            $parameters = @{ Method = 'Interactive'; Confirm = $false }
+            $parameters = @{ Method='Interactive'; Confirm=$false }
             $tenant = Get-TenantOverride
             if ($tenant) { $parameters.TenantId = $tenant }
 
             $displayTenant = if ($parameters.ContainsKey('TenantId')) { " -TenantId $($parameters.TenantId)" } else { '' }
-            Write-GuiConsole -Message "Remove-WindowsDeviceLinkAssociation -Method Interactive$displayTenant -Confirm:`$false" -Command
+            Write-GuiConsole -Message ("Remove-WindowsDeviceLinkAssociation -Method Interactive" + $displayTenant + " -Confirm:False") -Command
+
             $result = Remove-WindowsDeviceLinkAssociation @parameters
             Write-GuiObject $result
+            $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = '—'
-            $ui.CloudId.Text = '—'
-            $ui.CloudMessage.Text = 'Cloud association removed; refresh/check online to verify.'
-            Set-GuiStatus 'Tenant-side association removal completed'
+            $ui.CloudTenant.Text = '-'
+            $ui.CloudId.Text = '-'
             Refresh-LocalView
         }
-        catch {
-            Set-GuiStatus 'Cloud removal failed'
-            Show-GuiError $_.Exception.Message
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    })
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
+    }
 
-    $btnReset.Add_Click({
+    function Invoke-GuiResetLocal {
         if ($script:WdlGuiBusy) { return }
-        if (-not (Confirm-GuiAction -Title 'Reset local DeviceLink state' -Message 'Remove all known local DeviceLink UEFI variables? This is destructive local cleanup and does not delete the cloud Device Association record.')) {
-            return
-        }
+        if (-not (Confirm-GuiAction -Title 'Reset local DeviceLink state' -Message 'Remove all known local DeviceLink UEFI variables? This does not delete the cloud Device Association record.')) { return }
 
         Set-GuiBusy -Busy $true -StatusText 'Resetting local DeviceLink firmware state...'
         try {
             Write-GuiConsole -Message 'Reset-WindowsDeviceLinkFirmwareState -Confirm:$false' -Command
             $result = Reset-WindowsDeviceLinkFirmwareState -Confirm:$false
             Write-GuiObject $result
-            Set-GuiStatus 'Local DeviceLink firmware state reset'
+            $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
         }
-        catch {
-            Set-GuiStatus 'Local reset failed'
-            Show-GuiError $_.Exception.Message
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
+    }
+
+    $rowRefresh.Button.Add_Click({ Invoke-GuiRefresh })
+    $rowIdentity.Button.Add_Click({ Invoke-GuiIdentity })
+    $rowOnline.Button.Add_Click({ Invoke-GuiOnline })
+    $rowExport.Button.Add_Click({ Invoke-GuiExport })
+    $rowRegister.Button.Add_Click({ Invoke-GuiRegister })
+    $rowComplete.Button.Add_Click({ Invoke-GuiComplete })
+
+    $rowOffboard.Button.Add_Click({
+        if ($script:WdlGuiBusy) { return }
+        $offboardingMenu.Show($rowOffboard.Button,0,$rowOffboard.Button.Height)
     })
 
-    $btnClose.Add_Click({
+    $menuRemoveCloud.Add_Click({ Invoke-GuiRemoveCloud })
+    $menuResetLocal.Add_Click({ Invoke-GuiResetLocal })
+
+    $recommendedButton.Add_Click({
         if ($script:WdlGuiBusy) { return }
-        $form.Close()
+        switch ([string]$recommendedButton.Tag) {
+            'Identity' { Invoke-GuiIdentity }
+            'Online'   { Invoke-GuiOnline }
+            'Register' { Invoke-GuiRegister }
+            'Complete' { Invoke-GuiComplete }
+            default    { Invoke-GuiRefresh }
+        }
     })
 
     $form.Add_FormClosing({
         param($sender,$eventArgs)
-
         if ($script:WdlGuiBusy) {
             $eventArgs.Cancel = $true
             Write-GuiConsole -Message 'Close request ignored because an operation is still running.'
@@ -610,20 +687,74 @@ $($file.FullName)",
     $form.Add_Shown({
         Write-GuiConsole -Message 'WindowsDeviceLink operator dashboard opened.'
         Set-GuiBusy -Busy $true -StatusText 'Loading local state...'
-        try {
-            Refresh-LocalView
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
+        try { Refresh-LocalView }
+        catch { Show-GuiError $_.Exception.Message }
+        finally { Set-GuiBusy -Busy $false }
     })
 
+    function Resize-GuiLayout {
+        $viewportWidth = [Math]::Max(780,$content.ClientSize.Width - 56)
+        $fullWidth = $viewportWidth
+        $gap = 16
+        $halfWidth = [Math]::Floor(($fullWidth - $gap) / 2)
+
+        if ($fullWidth -ge 900) {
+            $deviceCard.Location = New-Object System.Drawing.Point(28,92)
+            $deviceCard.Size = New-Object System.Drawing.Size($halfWidth,190)
+            $localCard.Location = New-Object System.Drawing.Point((28 + $halfWidth + $gap),92)
+            $localCard.Size = New-Object System.Drawing.Size($halfWidth,190)
+            $topBottom = 296
+        }
+        else {
+            $deviceCard.Location = New-Object System.Drawing.Point(28,92)
+            $deviceCard.Size = New-Object System.Drawing.Size($fullWidth,190)
+            $localCard.Location = New-Object System.Drawing.Point(28,296)
+            $localCard.Size = New-Object System.Drawing.Size($fullWidth,190)
+            $topBottom = 500
+        }
+
+        $cloudCard.Location = New-Object System.Drawing.Point(28,$topBottom)
+        $cloudCard.Width = $fullWidth
+
+        $recommendedY = $topBottom + 136
+        $recommendedCard.Location = New-Object System.Drawing.Point(28,$recommendedY)
+        $recommendedCard.Width = $fullWidth
+        $recommendedButton.Left = [Math]::Max(620,$fullWidth - 176)
+
+        $actionsY = $recommendedY + 104
+        $actionsTitle.Location = New-Object System.Drawing.Point(30,$actionsY)
+        $actionsPanel.Location = New-Object System.Drawing.Point(28,($actionsY + 34))
+        $actionsPanel.Width = $fullWidth
+
+        $advancedY = $actionsY + 288
+        $advancedTitle.Location = New-Object System.Drawing.Point(30,$advancedY)
+        $advancedPanel.Location = New-Object System.Drawing.Point(28,($advancedY + 34))
+        $advancedPanel.Width = $fullWidth
+
+        $activityY = $advancedY + 230
+        $activityTitle.Location = New-Object System.Drawing.Point(30,$activityY)
+        $activityCard.Location = New-Object System.Drawing.Point(28,($activityY + 34))
+        $activityCard.Width = $fullWidth
+        $consoleBox.Width = $fullWidth - 34
+
+        foreach ($row in @($rowRefresh,$rowIdentity,$rowOnline,$rowExport,$rowRegister,$rowComplete,$rowOffboard)) {
+            $row.Panel.Width = $fullWidth - 2
+            $row.Button.Left = [Math]::Max(620,$fullWidth - 152)
+        }
+
+        $content.AutoScrollMinSize = New-Object System.Drawing.Size(0,($activityY + 260))
+    }
+
+    $form.Add_Resize({ Resize-GuiLayout })
+
     try {
+        Resize-GuiLayout
         [void]$form.ShowDialog()
     }
     finally {
         $form.Dispose()
         Remove-Variable WdlGuiLocalAssociation -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable WdlGuiCloudStatus -Scope Script -ErrorAction SilentlyContinue
         Remove-Variable WdlGuiBusy -Scope Script -ErrorAction SilentlyContinue
     }
 }
