@@ -33,6 +33,9 @@ if (-not $command.Parameters.ContainsKey('Tenants')) {
 if (-not $command.Parameters.ContainsKey('TenantsUri')) {
     throw 'FAIL: Show-WindowsDeviceLink must expose -TenantsUri.'
 }
+if (-not $command.Parameters.ContainsKey('TenantsPath')) {
+    throw 'FAIL: Show-WindowsDeviceLink must expose -TenantsPath.'
+}
 if (-not $command.Parameters.ContainsKey('WindowsManagementServicePath')) {
     throw 'FAIL: Show-WindowsDeviceLink must expose -WindowsManagementServicePath for Windows PE runtime selection.'
 }
@@ -82,7 +85,9 @@ foreach ($required in @(
     'Get-GuiRuntimeParameters',
     'Set-GuiCapabilities',
     'TenantsUri',
+    'TenantsPath',
     'Invoke-RestMethod',
+    'ConvertFrom-Json',
     'must be an absolute HTTPS URI',
     'WindowsManagementServicePath',
     'Windows PE',
