@@ -154,6 +154,9 @@ jobs:
           & (Join-Path $PWD 'tests\Online-Method-Validation.ps1') -ModulePath $manifestPath
           if (-not $?) { throw 'Online-Method-Validation.ps1 failed.' }
 
+          & (Join-Path $PWD 'tests\Gui-Contract-Validation.ps1') -ModulePath $manifestPath
+          if (-not $?) { throw 'Gui-Contract-Validation.ps1 failed.' }
+
           Remove-Module WindowsDeviceLink -Force -ErrorAction SilentlyContinue
           Import-Module $manifestPath -Force
           $smokeModule = Get-Module WindowsDeviceLink -ErrorAction Stop
