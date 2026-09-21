@@ -450,48 +450,43 @@ function Show-WindowsDeviceLink {
         ) -eq [System.Windows.Forms.DialogResult]::Yes)
     }
 
-    $actionControls = @(
-        $rowRefresh.Buttons[0],
-        $rowOnline.Buttons[0],
-        $rowExport.Buttons[0],
-        $rowOnboard.Buttons[0],
-        $rowOnboard.Buttons[1],
-        $rowOffboard.Buttons[0],
-        $rowOffboard.Buttons[1],
-        $rowOffboard.Buttons[2],
-        $tenantSelector
-    )
-
-    function Get-GuiButtons {
-        param([System.Windows.Forms.Control]$Parent)
-
-        $buttons = New-Object System.Collections.Generic.List[object]
-        foreach ($control in $Parent.Controls) {
-            if ($control -is [System.Windows.Forms.Button]) {
-                $buttons.Add($control)
-            }
-            if ($control.HasChildren) {
-                foreach ($childButton in @(Get-GuiButtons -Parent $control)) {
-                    $buttons.Add($childButton)
-                }
-            }
-        }
-        $buttons.ToArray()
-    }
-
     function Set-GuiBusy {
-        param([Parameter(Mandatory)][bool]$Busy,[string]$StatusText)
+        param(
+            [Parameter(Mandatory)][bool]$Busy,
+            [string]$StatusText
+        )
 
         $script:WdlGuiBusy = $Busy
 
-        foreach ($control in $actionControls) {
-            $control.Enabled = -not $Busy
+        $enabled = -not $Busy
+        $buttonForeColor = if ($Busy) {
+            [System.Drawing.Color]::FromArgb(145,145,145)
+        }
+        else {
+            [System.Drawing.SystemColors]::ControlText
         }
 
-        # Disable the complete parent as a second safety layer so no action child can
-        # remain clickable or visually active while an operation is running.
-        $actionsPanel.Enabled = -not $Busy
-        $tenantSelector.Enabled = -not $Busy
+        # Keep this list deliberately explicit. These are every actionable button
+        # in the dashboard; no recursive control discovery is used here.
+        $rowRefresh.Buttons[0].Enabled = $enabled
+        $rowOnline.Buttons[0].Enabled = $enabled
+        $rowExport.Buttons[0].Enabled = $enabled
+        $rowOnboard.Buttons[0].Enabled = $enabled
+        $rowOnboard.Buttons[1].Enabled = $enabled
+        $rowOffboard.Buttons[0].Enabled = $enabled
+        $rowOffboard.Buttons[1].Enabled = $enabled
+        $rowOffboard.Buttons[2].Enabled = $enabled
+
+        $rowRefresh.Buttons[0].ForeColor = $buttonForeColor
+        $rowOnline.Buttons[0].ForeColor = $buttonForeColor
+        $rowExport.Buttons[0].ForeColor = $buttonForeColor
+        $rowOnboard.Buttons[0].ForeColor = $buttonForeColor
+        $rowOnboard.Buttons[1].ForeColor = $buttonForeColor
+        $rowOffboard.Buttons[0].ForeColor = $buttonForeColor
+        $rowOffboard.Buttons[1].ForeColor = $buttonForeColor
+        $rowOffboard.Buttons[2].ForeColor = $buttonForeColor
+
+        $tenantSelector.Enabled = $enabled
 
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
@@ -500,6 +495,9 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus $StatusText
         }
 
+        # Force a repaint before the long-running action begins.
+        $actionsPanel.Refresh()
+        $tenantSelector.Refresh()
         [System.Windows.Forms.Application]::DoEvents()
     }
 
