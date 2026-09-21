@@ -405,7 +405,7 @@ function Show-WindowsDeviceLink {
     $btnClearActivity = New-Object System.Windows.Forms.Button
     $btnClearActivity.Text = 'Clear'
     $btnClearActivity.Font = New-Object System.Drawing.Font('Segoe UI',8.3)
-    $btnClearActivity.Size = [System.Drawing.Size]::new(72,26)
+    $btnClearActivity.Size = [System.Drawing.Size]::new(64,24)
     $btnClearActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::System
     $content.Controls.Add($btnClearActivity)
 
@@ -962,7 +962,7 @@ function Show-WindowsDeviceLink {
 
         $activityY = $actionsY + 270
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
-        $btnClearActivity.Location = [System.Drawing.Point]::new(($fullWidth - 58),($activityY - 2))
+        $btnClearActivity.Location = [System.Drawing.Point]::new(($fullWidth - 50),($activityY - 1))
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 24
