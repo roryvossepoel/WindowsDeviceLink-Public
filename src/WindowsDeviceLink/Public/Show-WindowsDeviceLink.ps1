@@ -441,13 +441,69 @@ function Show-WindowsDeviceLink {
     }
 
     function Confirm-GuiAction {
-        param([string]$Title,[string]$Message)
+        param(
+            [string]$Title,
+            [string]$Message
+        )
 
-        ([System.Windows.Forms.MessageBox]::Show(
-            $form,$Message,$Title,
-            [System.Windows.Forms.MessageBoxButtons]::YesNo,
-            [System.Windows.Forms.MessageBoxIcon]::Warning
-        ) -eq [System.Windows.Forms.DialogResult]::Yes)
+        $dialog = New-Object System.Windows.Forms.Form
+        $dialog.Text = $Title
+        $dialog.StartPosition = 'CenterParent'
+        $dialog.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        $dialog.MaximizeBox = $false
+        $dialog.MinimizeBox = $false
+        $dialog.ShowInTaskbar = $false
+        $dialog.ClientSize = [System.Drawing.Size]::new(600,185)
+        $dialog.BackColor = [System.Drawing.Color]::White
+
+        $iconBox = New-Object System.Windows.Forms.PictureBox
+        $iconBox.Location = [System.Drawing.Point]::new(24,28)
+        $iconBox.Size = [System.Drawing.Size]::new(40,40)
+        $iconBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::StretchImage
+        $iconBox.Image = [System.Drawing.SystemIcons]::Warning.ToBitmap()
+        $dialog.Controls.Add($iconBox)
+
+        $messageLabel = New-Object System.Windows.Forms.Label
+        $messageLabel.Text = $Message
+        $messageLabel.Font = New-Object System.Drawing.Font('Segoe UI',9)
+        $messageLabel.Location = [System.Drawing.Point]::new(82,24)
+        $messageLabel.Size = [System.Drawing.Size]::new(490,95)
+        $messageLabel.AutoEllipsis = $false
+        $dialog.Controls.Add($messageLabel)
+
+        $buttonPanel = New-Object System.Windows.Forms.Panel
+        $buttonPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
+        $buttonPanel.Height = 54
+        $buttonPanel.BackColor = [System.Drawing.Color]::FromArgb(246,246,246)
+        $dialog.Controls.Add($buttonPanel)
+
+        $yesButton = New-Object System.Windows.Forms.Button
+        $yesButton.Text = 'Yes'
+        $yesButton.DialogResult = [System.Windows.Forms.DialogResult]::Yes
+        $yesButton.Size = [System.Drawing.Size]::new(108,32)
+        $yesButton.Location = [System.Drawing.Point]::new(356,11)
+        $yesButton.Font = New-Object System.Drawing.Font('Segoe UI',9)
+        $buttonPanel.Controls.Add($yesButton)
+
+        $noButton = New-Object System.Windows.Forms.Button
+        $noButton.Text = 'No'
+        $noButton.DialogResult = [System.Windows.Forms.DialogResult]::No
+        $noButton.Size = [System.Drawing.Size]::new(108,32)
+        $noButton.Location = [System.Drawing.Point]::new(476,11)
+        $noButton.Font = New-Object System.Drawing.Font('Segoe UI',9)
+        $buttonPanel.Controls.Add($noButton)
+
+        $dialog.AcceptButton = $yesButton
+        $dialog.CancelButton = $noButton
+
+        try {
+            $result = $dialog.ShowDialog($form)
+            return ($result -eq [System.Windows.Forms.DialogResult]::Yes)
+        }
+        finally {
+            if ($iconBox.Image) { $iconBox.Image.Dispose() }
+            $dialog.Dispose()
+        }
     }
 
     function Set-GuiBusy {
