@@ -928,7 +928,29 @@ function Show-WindowsDeviceLink {
                 $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
             }
 
-            Set-GuiStatus 'Pre-association completed'
+            $statusText = 'Pre-association completed'
+            if ($result) {
+                if ($result.PSObject.Properties.Name -contains 'Changed' -and -not [bool]$result.Changed) {
+                    if ($result.PSObject.Properties.Name -contains 'AfterState' -and [string]$result.AfterState -eq 'Preassociated') {
+                        $statusText = 'Already pre-associated - no change made'
+                    }
+                    elseif ($result.PSObject.Properties.Name -contains 'AfterState' -and [string]$result.AfterState -eq 'Associated') {
+                        $statusText = 'Already associated - no change made'
+                    }
+                    elseif ($result.PSObject.Properties.Name -contains 'Message' -and -not [string]::IsNullOrWhiteSpace([string]$result.Message)) {
+                        $statusText = [string]$result.Message
+                    }
+                }
+                elseif ($result.PSObject.Properties.Name -contains 'Changed' -and [bool]$result.Changed) {
+                    $statusText = 'Pre-association created successfully'
+                }
+                elseif ($result.PSObject.Properties.Name -contains 'Message' -and -not [string]::IsNullOrWhiteSpace([string]$result.Message)) {
+                    $statusText = [string]$result.Message
+                }
+            }
+
+            Set-GuiStatus $statusText
+            Write-GuiConsole -Message $statusText
         }
         catch {
             Set-GuiStatus 'Pre-association failed'
