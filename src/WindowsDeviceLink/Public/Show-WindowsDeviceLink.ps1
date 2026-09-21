@@ -1062,17 +1062,53 @@ function Show-WindowsDeviceLink {
         }
 
         Set-GuiBusy -Busy $true -StatusText 'Performing full offboarding...'
+        $effectiveAccessToken = $null
         try {
             $auth = Get-GuiAuthParameters
+            $effectiveAuth = @{}
+            foreach ($key in $auth.Keys) { $effectiveAuth[$key] = $auth[$key] }
+
+            if ($Method -eq 'DeviceCode') {
+                Write-GuiConsole -Message 'Acquiring one DeviceCode token for the complete offboarding flow.' -Command
+
+                $tokenParameters = @{}
+                if ($auth.ContainsKey('TenantId')) { $tokenParameters.TenantId = $auth.TenantId }
+                if ($auth.ContainsKey('ClientId')) { $tokenParameters.ClientId = $auth.ClientId }
+
+                $tokenResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                    Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters
+                })
+                $token = $tokenResults | Select-Object -Last 1
+
+                if (-not $token -or [string]::IsNullOrWhiteSpace([string]$token.AccessToken)) {
+                    throw 'Device code authentication did not return an access token.'
+                }
+
+                $effectiveAccessToken = ConvertTo-SecureString ([string]$token.AccessToken) -AsPlainText -Force
+                $effectiveAuth = @{
+                    Method = 'AccessToken'
+                    AccessToken = $effectiveAccessToken
+                    Environment = $Environment
+                    ClientTimeout = $ClientTimeout
+                }
+                if ($token.TenantId) {
+                    $effectiveAuth.TenantId = [string]$token.TenantId
+                }
+
+                $token = $null
+                Write-GuiConsole -Message 'DeviceCode token acquired once; reusing it for cloud verification and removal.'
+            }
+
             $statusParameters = @{}
-            foreach ($key in $auth.Keys) { $statusParameters[$key] = $auth[$key] }
+            foreach ($key in $effectiveAuth.Keys) { $statusParameters[$key] = $effectiveAuth[$key] }
             $runtimeParameters = Get-GuiRuntimeParameters
             foreach ($key in $runtimeParameters.Keys) {
                 $statusParameters[$key] = $runtimeParameters[$key]
             }
             $statusParameters.Online = $true
 
-            Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
+            $displayMethod = [string]$effectiveAuth.Method
+            Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $displayMethod" -Command
             $cloudResults = @(Invoke-GuiInformationCommand -ScriptBlock {
                 Get-WindowsDeviceLinkStatus @statusParameters
             })
@@ -1085,10 +1121,10 @@ function Show-WindowsDeviceLink {
 
             if ($cloud.AssociationPresent) {
                 $removeParameters = @{}
-                foreach ($key in $auth.Keys) { $removeParameters[$key] = $auth[$key] }
+                foreach ($key in $effectiveAuth.Keys) { $removeParameters[$key] = $effectiveAuth[$key] }
                 $removeParameters.Confirm = $false
 
-                Write-GuiConsole -Message "Remove-WindowsDeviceLinkAssociation -Method $Method" -Command
+                Write-GuiConsole -Message "Remove-WindowsDeviceLinkAssociation -Method $displayMethod" -Command
                 $removeResults = @(Invoke-GuiInformationCommand -ScriptBlock {
                     Remove-WindowsDeviceLinkAssociation @removeParameters
                 })
@@ -1115,7 +1151,10 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus 'Full offboarding failed'
             Show-GuiError $_.Exception.Message
         }
-        finally { Set-GuiBusy -Busy $false }
+        finally {
+            $effectiveAccessToken = $null
+            Set-GuiBusy -Busy $false
+        }
     }
 
     $btnRefresh.Add_Click({ Invoke-GuiRefresh })
