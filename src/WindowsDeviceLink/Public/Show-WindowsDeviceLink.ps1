@@ -1140,13 +1140,21 @@ function Show-WindowsDeviceLink {
         catch {
             $message = [string]$_.Exception.Message
             if ($message -like "No Device Association record was found for serial number *") {
-                Write-GuiConsole -Message 'No cloud association found - no change required'
+                $noChangeMessage = 'No cloud association was found. Nothing was removed.'
+                Write-GuiConsole -Message $noChangeMessage
                 $script:WdlGuiCloudStatus = $null
                 $ui.CloudState.Text = 'NotAssociated'
                 $ui.CloudTenant.Text = 'Unavailable'
                 $ui.CloudId.Text = 'Unavailable'
                 Refresh-LocalView
-                Set-GuiStatus 'No cloud association found - no change required'
+                Set-GuiStatus $noChangeMessage
+                [void][System.Windows.Forms.MessageBox]::Show(
+                    $form,
+                    $noChangeMessage,
+                    'WindowsDeviceLink',
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Information
+                )
             }
             else {
                 Set-GuiStatus 'Cloud offboarding failed'
