@@ -25,6 +25,40 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify release source
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ($env:SOURCE_REF -ne 'main') {
+              throw "GitHub releases must be created from the main branch. Current ref: '$env:SOURCE_REF'."
+          }
+
+          $headers = @{
+              Authorization = "Bearer $env:GH_TOKEN"
+              Accept = 'application/vnd.github+json'
+              'X-GitHub-Api-Version' = '2022-11-28'
+          }
+
+          $commitApi = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/commits/$env:SOURCE_SHA"
+          $commit = Invoke-RestMethod -Uri $commitApi -Headers $headers -Method Get -ErrorAction Stop
+
+          if (-not $commit.commit.verification.verified) {
+              $reason = [string]$commit.commit.verification.reason
+              throw "Release source commit '$env:SOURCE_SHA' is not GitHub Verified. Verification reason: '$reason'. Merge the release PR through GitHub before creating a release."
+          }
+
+          $remoteMain = (git rev-parse origin/main).Trim()
+          if ($remoteMain -ne $env:SOURCE_SHA) {
+              throw "Release source '$env:SOURCE_SHA' is not the current origin/main commit '$remoteMain'."
+          }
+
+          Write-Host "Release source is GitHub Verified and matches origin/main: $env:SOURCE_SHA"
+
       - name: Validate and resolve version
         id: release
         shell: powershell
