@@ -29,12 +29,13 @@ foreach ($required in @(
     'ShowDialog',
     'MiniNT',
     'Get-WindowsDeviceLinkLocalAssociation',
-    'Get-WindowsDeviceLinkFirmwareState',
+    'Get-WindowsDeviceLinkStatus',
     'Get-WindowsDeviceLink',
-    'Register-WindowsDeviceLink',
-    'Complete-WindowsDeviceLinkAssociation',
+    'Initialize-WindowsDeviceLink',
     'Remove-WindowsDeviceLinkAssociation',
-    'Reset-WindowsDeviceLinkFirmwareState'
+    'Reset-WindowsDeviceLinkFirmwareState',
+    'CompleteAssociation',
+    'Full DeviceLink offboarding'
 )) {
     if ($source -notmatch [regex]::Escape($required)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI/delegation contract '$required'."
