@@ -40,9 +40,24 @@ if (-not $validateSet -or 'Interactive' -notin $validateSet.ValidValues) {
     throw 'FAIL: Show-WindowsDeviceLink -Method must continue to support Interactive.'
 }
 
-$paramBlockText = $command.ScriptBlock.Ast.ParamBlock.Extent.Text
-if ($paramBlockText -notmatch "\[string\]\$Method\s*=\s*'Interactive'") {
-    throw 'FAIL: Show-WindowsDeviceLink must keep Interactive as the default authentication method.'
+$methodParameterAst = @(
+    $command.ScriptBlock.Ast.ParamBlock.Parameters |
+        Where-Object { $_.Name.VariablePath.UserPath -eq 'Method' }
+) | Select-Object -First 1
+
+if (-not $methodParameterAst) {
+    throw 'FAIL: Show-WindowsDeviceLink Method parameter AST could not be resolved.'
+}
+
+$methodDefault = if ($methodParameterAst.DefaultValue) {
+    $methodParameterAst.DefaultValue.Extent.Text.Trim()
+}
+else {
+    $null
+}
+
+if ($methodDefault -ne "'Interactive'") {
+    throw "FAIL: Show-WindowsDeviceLink must keep Interactive as the default authentication method. Observed default: '$methodDefault'."
 }
 
 
