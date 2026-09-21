@@ -35,8 +35,8 @@ function Show-WindowsDeviceLink {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'WindowsDeviceLink'
     $form.StartPosition = 'CenterScreen'
-    $form.Size = New-Object System.Drawing.Size($targetWidth,$targetHeight)
-    $form.MinimumSize = New-Object System.Drawing.Size(820,620)
+    $form.Size = [System.Drawing.Size]::new($targetWidth,$targetHeight)
+    $form.MinimumSize = [System.Drawing.Size]::new(820,620)
     $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
     $form.BackColor = [System.Drawing.Color]::FromArgb(243,243,243)
 
@@ -49,7 +49,7 @@ function Show-WindowsDeviceLink {
     $title = New-Object System.Windows.Forms.Label
     $title.Text = 'WindowsDeviceLink'
     $title.Font = New-Object System.Drawing.Font('Segoe UI',20,[System.Drawing.FontStyle]::Bold)
-    $title.Location = New-Object System.Drawing.Point(28,18)
+    $title.Location = [System.Drawing.Point]::new(28,18)
     $title.AutoSize = $true
     $content.Controls.Add($title)
 
@@ -57,7 +57,7 @@ function Show-WindowsDeviceLink {
     $subtitle.Text = 'Windows Autopilot Device Preparation - Device Association'
     $subtitle.Font = New-Object System.Drawing.Font('Segoe UI',9)
     $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
-    $subtitle.Location = New-Object System.Drawing.Point(31,58)
+    $subtitle.Location = [System.Drawing.Point]::new(31,58)
     $subtitle.AutoSize = $true
     $content.Controls.Add($subtitle)
 
@@ -65,17 +65,17 @@ function Show-WindowsDeviceLink {
         param([string]$Title,[int]$X,[int]$Y,[int]$Width,[int]$Height)
 
         $panel = New-Object System.Windows.Forms.Panel
-        $panel.Location = New-Object System.Drawing.Point($X,$Y)
-        $panel.Size = New-Object System.Drawing.Size($Width,$Height)
+        $panel.Location = [System.Drawing.Point]::new([int]$X,[int]$Y)
+        $panel.Size = [System.Drawing.Size]::new([int]$Width,[int]$Height)
         $panel.BackColor = [System.Drawing.Color]::White
-        $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+        $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::None
         $content.Controls.Add($panel)
 
         if (-not [string]::IsNullOrWhiteSpace($Title)) {
             $label = New-Object System.Windows.Forms.Label
             $label.Text = $Title
             $label.Font = New-Object System.Drawing.Font('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
-            $label.Location = New-Object System.Drawing.Point(18,14)
+            $label.Location = [System.Drawing.Point]::new(18,14)
             $label.AutoSize = $true
             $panel.Controls.Add($label)
         }
@@ -90,15 +90,15 @@ function Show-WindowsDeviceLink {
         $captionLabel.Text = $Caption
         $captionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
         $captionLabel.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
-        $captionLabel.Location = New-Object System.Drawing.Point(18,$Y)
-        $captionLabel.Size = New-Object System.Drawing.Size(135,20)
+        $captionLabel.Location = [System.Drawing.Point]::new(18,$Y)
+        $captionLabel.Size = [System.Drawing.Size]::new(135,20)
         $Parent.Controls.Add($captionLabel)
 
         $valueLabel = New-Object System.Windows.Forms.Label
         $valueLabel.Text = '-'
         $valueLabel.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-        $valueLabel.Location = New-Object System.Drawing.Point(155,$Y - 1)
-        $valueLabel.Size = New-Object System.Drawing.Size(330,34)
+        $valueLabel.Location = [System.Drawing.Point]::new(155,([int]$Y - 1))
+        $valueLabel.Size = [System.Drawing.Size]::new(330,34)
         $valueLabel.AutoEllipsis = $true
         $Parent.Controls.Add($valueLabel)
 
@@ -109,15 +109,15 @@ function Show-WindowsDeviceLink {
         param([System.Windows.Forms.Control]$Parent,[string]$Title,[string]$Description,[int]$Y,[string]$ButtonText)
 
         $row = New-Object System.Windows.Forms.Panel
-        $row.Location = New-Object System.Drawing.Point(0,$Y)
-        $row.Size = New-Object System.Drawing.Size(900,56)
+        $row.Location = [System.Drawing.Point]::new(0,[int]$Y)
+        $row.Size = [System.Drawing.Size]::new(900,50)
         $row.BackColor = [System.Drawing.Color]::White
         $Parent.Controls.Add($row)
 
         $titleLabel = New-Object System.Windows.Forms.Label
         $titleLabel.Text = $Title
         $titleLabel.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-        $titleLabel.Location = New-Object System.Drawing.Point(18,8)
+        $titleLabel.Location = [System.Drawing.Point]::new(18,6)
         $titleLabel.AutoSize = $true
         $row.Controls.Add($titleLabel)
 
@@ -125,17 +125,23 @@ function Show-WindowsDeviceLink {
         $descriptionLabel.Text = $Description
         $descriptionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8)
         $descriptionLabel.ForeColor = [System.Drawing.Color]::FromArgb(110,110,110)
-        $descriptionLabel.Location = New-Object System.Drawing.Point(18,29)
+        $descriptionLabel.Location = [System.Drawing.Point]::new(18,25)
         $descriptionLabel.AutoSize = $true
         $row.Controls.Add($descriptionLabel)
 
         $button = New-Object System.Windows.Forms.Button
         $button.Text = $ButtonText
         $button.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
-        $button.Size = New-Object System.Drawing.Size(125,30)
-        $button.Location = New-Object System.Drawing.Point(755,13)
+        $button.Size = [System.Drawing.Size]::new(118,28)
+        $button.Location = [System.Drawing.Point]::new(760,11)
         $button.FlatStyle = [System.Windows.Forms.FlatStyle]::System
         $row.Controls.Add($button)
+
+        $separator = New-Object System.Windows.Forms.Panel
+        $separator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
+        $separator.Location = [System.Drawing.Point]::new(18,49)
+        $separator.Size = [System.Drawing.Size]::new(860,1)
+        $row.Controls.Add($separator)
 
         [pscustomobject]@{
             Panel = $row
@@ -150,8 +156,8 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiLocalAssociation = $null
     $script:WdlGuiCloudStatus = $null
 
-    $deviceCard = New-Card -Title 'Device' -X 28 -Y 92 -Width 500 -Height 190
-    $localCard = New-Card -Title 'Local association' -X 544 -Y 92 -Width 500 -Height 190
+    $deviceCard = New-Card -Title 'Device' -X 28 -Y 92 -Width 500 -Height 176
+    $localCard = New-Card -Title 'Local association' -X 544 -Y 92 -Width 500 -Height 176
 
     $ui.Manufacturer = New-ValuePair -Parent $deviceCard -Caption 'Manufacturer' -Y 48
     $ui.Model        = New-ValuePair -Parent $deviceCard -Caption 'Model' -Y 78
@@ -163,7 +169,7 @@ function Show-WindowsDeviceLink {
     $ui.TenantId   = New-ValuePair -Parent $localCard -Caption 'Tenant ID' -Y 108
     $ui.Trust      = New-ValuePair -Parent $localCard -Caption 'Trust / source' -Y 138
 
-    $cloudCard = New-Card -Title 'Cloud association' -X 28 -Y 296 -Width 1016 -Height 122
+    $cloudCard = New-Card -Title 'Cloud association' -X 28 -Y 282 -Width 1016 -Height 112
     $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'Association state' -Y 48
     $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant ID' -Y 78
 
@@ -171,15 +177,15 @@ function Show-WindowsDeviceLink {
     $cloudIdCaption.Text = 'Association ID'
     $cloudIdCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
     $cloudIdCaption.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
-    $cloudIdCaption.Location = New-Object System.Drawing.Point(520,48)
-    $cloudIdCaption.Size = New-Object System.Drawing.Size(115,20)
+    $cloudIdCaption.Location = [System.Drawing.Point]::new(520,48)
+    $cloudIdCaption.Size = [System.Drawing.Size]::new(115,20)
     $cloudCard.Controls.Add($cloudIdCaption)
 
     $ui.CloudId = New-Object System.Windows.Forms.Label
     $ui.CloudId.Text = '-'
     $ui.CloudId.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-    $ui.CloudId.Location = New-Object System.Drawing.Point(638,47)
-    $ui.CloudId.Size = New-Object System.Drawing.Size(350,28)
+    $ui.CloudId.Location = [System.Drawing.Point]::new(638,47)
+    $ui.CloudId.Size = [System.Drawing.Size]::new(350,28)
     $ui.CloudId.AutoEllipsis = $true
     $cloudCard.Controls.Add($ui.CloudId)
 
@@ -187,30 +193,30 @@ function Show-WindowsDeviceLink {
     $tenantCaption.Text = 'Tenant override'
     $tenantCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
     $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
-    $tenantCaption.Location = New-Object System.Drawing.Point(520,78)
-    $tenantCaption.Size = New-Object System.Drawing.Size(115,20)
+    $tenantCaption.Location = [System.Drawing.Point]::new(520,78)
+    $tenantCaption.Size = [System.Drawing.Size]::new(115,20)
     $cloudCard.Controls.Add($tenantCaption)
 
     $tenantBox = New-Object System.Windows.Forms.TextBox
-    $tenantBox.Location = New-Object System.Drawing.Point(638,75)
-    $tenantBox.Size = New-Object System.Drawing.Size(350,24)
+    $tenantBox.Location = [System.Drawing.Point]::new(638,75)
+    $tenantBox.Size = [System.Drawing.Size]::new(350,24)
     $tenantBox.Font = New-Object System.Drawing.Font('Consolas',8.5)
     $cloudCard.Controls.Add($tenantBox)
 
-    $recommendedCard = New-Card -Title '' -X 28 -Y 432 -Width 1016 -Height 86
+    $recommendedCard = New-Card -Title '' -X 28 -Y 408 -Width 1016 -Height 78
 
     $recommendedTag = New-Object System.Windows.Forms.Label
     $recommendedTag.Text = 'Recommended action'
     $recommendedTag.Font = New-Object System.Drawing.Font('Segoe UI',8,[System.Drawing.FontStyle]::Bold)
     $recommendedTag.ForeColor = [System.Drawing.SystemColors]::Highlight
-    $recommendedTag.Location = New-Object System.Drawing.Point(18,12)
+    $recommendedTag.Location = [System.Drawing.Point]::new(18,12)
     $recommendedTag.AutoSize = $true
     $recommendedCard.Controls.Add($recommendedTag)
 
     $recommendedTitle = New-Object System.Windows.Forms.Label
     $recommendedTitle.Text = 'Check local state'
     $recommendedTitle.Font = New-Object System.Drawing.Font('Segoe UI',11,[System.Drawing.FontStyle]::Bold)
-    $recommendedTitle.Location = New-Object System.Drawing.Point(18,34)
+    $recommendedTitle.Location = [System.Drawing.Point]::new(18,34)
     $recommendedTitle.AutoSize = $true
     $recommendedCard.Controls.Add($recommendedTitle)
 
@@ -218,54 +224,54 @@ function Show-WindowsDeviceLink {
     $recommendedDescription.Text = 'Refresh the device state to determine the next recommended step.'
     $recommendedDescription.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
     $recommendedDescription.ForeColor = [System.Drawing.Color]::FromArgb(96,96,96)
-    $recommendedDescription.Location = New-Object System.Drawing.Point(20,58)
+    $recommendedDescription.Location = [System.Drawing.Point]::new(20,58)
     $recommendedDescription.AutoSize = $true
     $recommendedCard.Controls.Add($recommendedDescription)
 
     $recommendedButton = New-Object System.Windows.Forms.Button
     $recommendedButton.Text = 'Refresh'
     $recommendedButton.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-    $recommendedButton.Size = New-Object System.Drawing.Size(150,34)
-    $recommendedButton.Location = New-Object System.Drawing.Point(840,26)
+    $recommendedButton.Size = [System.Drawing.Size]::new(150,34)
+    $recommendedButton.Location = [System.Drawing.Point]::new(840,26)
     $recommendedCard.Controls.Add($recommendedButton)
 
     $actionsTitle = New-Object System.Windows.Forms.Label
     $actionsTitle.Text = 'Actions'
     $actionsTitle.Font = New-Object System.Drawing.Font('Segoe UI',13,[System.Drawing.FontStyle]::Bold)
-    $actionsTitle.Location = New-Object System.Drawing.Point(30,536)
+    $actionsTitle.Location = [System.Drawing.Point]::new(30,500)
     $actionsTitle.AutoSize = $true
     $content.Controls.Add($actionsTitle)
 
-    $actionsPanel = New-Card -Title '' -X 28 -Y 570 -Width 1016 -Height 236
+    $actionsPanel = New-Card -Title '' -X 28 -Y 532 -Width 1016 -Height 202
     $rowRefresh  = New-ActionRow -Parent $actionsPanel -Title 'Refresh local state' -Description 'Re-read firmware, runtime and local tenant correlation.' -Y 0 -ButtonText 'Refresh'
-    $rowIdentity = New-ActionRow -Parent $actionsPanel -Title 'Load DeviceLink identity' -Description 'Generate/read the current DeviceLink identity if needed.' -Y 58 -ButtonText 'Load identity'
-    $rowOnline   = New-ActionRow -Parent $actionsPanel -Title 'Check cloud association' -Description 'Query the tenant-side Device Association using Interactive authentication.' -Y 116 -ButtonText 'Check online'
-    $rowExport   = New-ActionRow -Parent $actionsPanel -Title 'Export DeviceLink CSV' -Description 'Export the Microsoft-generated .devicelink.csv for this device.' -Y 174 -ButtonText 'Export CSV'
+    $rowIdentity = New-ActionRow -Parent $actionsPanel -Title 'Load DeviceLink identity' -Description 'Generate/read the current DeviceLink identity if needed.' -Y 50 -ButtonText 'Load identity'
+    $rowOnline   = New-ActionRow -Parent $actionsPanel -Title 'Check cloud association' -Description 'Query the tenant-side Device Association using Interactive authentication.' -Y 100 -ButtonText 'Check online'
+    $rowExport   = New-ActionRow -Parent $actionsPanel -Title 'Export DeviceLink CSV' -Description 'Export the Microsoft-generated .devicelink.csv for this device.' -Y 150 -ButtonText 'Export CSV'
 
     $advancedTitle = New-Object System.Windows.Forms.Label
     $advancedTitle.Text = 'Advanced / lifecycle'
     $advancedTitle.Font = New-Object System.Drawing.Font('Segoe UI',13,[System.Drawing.FontStyle]::Bold)
-    $advancedTitle.Location = New-Object System.Drawing.Point(30,824)
+    $advancedTitle.Location = [System.Drawing.Point]::new(30,750)
     $advancedTitle.AutoSize = $true
     $content.Controls.Add($advancedTitle)
 
-    $advancedPanel = New-Card -Title '' -X 28 -Y 858 -Width 1016 -Height 178
+    $advancedPanel = New-Card -Title '' -X 28 -Y 782 -Width 1016 -Height 152
     $rowRegister = New-ActionRow -Parent $advancedPanel -Title 'Create pre-association' -Description 'Create the tenant-side Device Association pre-association.' -Y 0 -ButtonText 'Pre-associate'
-    $rowComplete = New-ActionRow -Parent $advancedPanel -Title 'Complete association' -Description 'Run native DeviceLink completion and verify the final local state.' -Y 58 -ButtonText 'Complete'
-    $rowOffboard = New-ActionRow -Parent $advancedPanel -Title 'Offboarding' -Description 'Remove cloud association or reset local DeviceLink state.' -Y 116 -ButtonText 'Options...'
+    $rowComplete = New-ActionRow -Parent $advancedPanel -Title 'Complete association' -Description 'Run native DeviceLink completion and verify the final local state.' -Y 50 -ButtonText 'Complete'
+    $rowOffboard = New-ActionRow -Parent $advancedPanel -Title 'Offboarding' -Description 'Remove cloud association or reset local DeviceLink state.' -Y 100 -ButtonText 'Options...'
 
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
     $activityTitle.Font = New-Object System.Drawing.Font('Segoe UI',13,[System.Drawing.FontStyle]::Bold)
-    $activityTitle.Location = New-Object System.Drawing.Point(30,1054)
+    $activityTitle.Location = [System.Drawing.Point]::new(30,950)
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
 
-    $activityCard = New-Card -Title '' -X 28 -Y 1088 -Width 1016 -Height 188
+    $activityCard = New-Card -Title '' -X 28 -Y 982 -Width 1016 -Height 168
 
     $consoleBox = New-Object System.Windows.Forms.TextBox
-    $consoleBox.Location = New-Object System.Drawing.Point(16,14)
-    $consoleBox.Size = New-Object System.Drawing.Size(982,156)
+    $consoleBox.Location = [System.Drawing.Point]::new(16,14)
+    $consoleBox.Size = [System.Drawing.Size]::new(982,136)
     $consoleBox.Multiline = $true
     $consoleBox.ReadOnly = $true
     $consoleBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
@@ -275,7 +281,7 @@ function Show-WindowsDeviceLink {
     $consoleBox.BorderStyle = [System.Windows.Forms.BorderStyle]::None
     $activityCard.Controls.Add($consoleBox)
 
-    $content.AutoScrollMinSize = New-Object System.Drawing.Size(0,1315)
+    $content.AutoScrollMinSize = [System.Drawing.Size]::new(0,1185)
 
     $statusStrip = New-Object System.Windows.Forms.StatusStrip
     $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
@@ -286,7 +292,7 @@ function Show-WindowsDeviceLink {
     $statusProgress = New-Object System.Windows.Forms.ToolStripProgressBar
     $statusProgress.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
     $statusProgress.MarqueeAnimationSpeed = 30
-    $statusProgress.Size = New-Object System.Drawing.Size(150,16)
+    $statusProgress.Size = [System.Drawing.Size]::new(150,16)
     $statusProgress.Visible = $false
 
     [void]$statusStrip.Items.Add($statusLabel)
@@ -699,50 +705,50 @@ function Show-WindowsDeviceLink {
         $halfWidth = [Math]::Floor(($fullWidth - $gap) / 2)
 
         if ($fullWidth -ge 900) {
-            $deviceCard.Location = New-Object System.Drawing.Point(28,92)
-            $deviceCard.Size = New-Object System.Drawing.Size($halfWidth,190)
-            $localCard.Location = New-Object System.Drawing.Point((28 + $halfWidth + $gap),92)
-            $localCard.Size = New-Object System.Drawing.Size($halfWidth,190)
-            $topBottom = 296
+            $deviceCard.Location = [System.Drawing.Point]::new(28,92)
+            $deviceCard.Size = [System.Drawing.Size]::new([int]$halfWidth,176)
+            $localCard.Location = [System.Drawing.Point]::new((28 + $halfWidth + $gap),92)
+            $localCard.Size = [System.Drawing.Size]::new([int]$halfWidth,176)
+            $topBottom = 282
         }
         else {
-            $deviceCard.Location = New-Object System.Drawing.Point(28,92)
-            $deviceCard.Size = New-Object System.Drawing.Size($fullWidth,190)
-            $localCard.Location = New-Object System.Drawing.Point(28,296)
-            $localCard.Size = New-Object System.Drawing.Size($fullWidth,190)
-            $topBottom = 500
+            $deviceCard.Location = [System.Drawing.Point]::new(28,92)
+            $deviceCard.Size = [System.Drawing.Size]::new([int]$fullWidth,176)
+            $localCard.Location = [System.Drawing.Point]::new(28,282)
+            $localCard.Size = [System.Drawing.Size]::new([int]$fullWidth,176)
+            $topBottom = 472
         }
 
-        $cloudCard.Location = New-Object System.Drawing.Point(28,$topBottom)
+        $cloudCard.Location = [System.Drawing.Point]::new(28,$topBottom)
         $cloudCard.Width = $fullWidth
 
-        $recommendedY = $topBottom + 136
-        $recommendedCard.Location = New-Object System.Drawing.Point(28,$recommendedY)
+        $recommendedY = $topBottom + 124
+        $recommendedCard.Location = [System.Drawing.Point]::new(28,$recommendedY)
         $recommendedCard.Width = $fullWidth
         $recommendedButton.Left = [Math]::Max(620,$fullWidth - 176)
 
-        $actionsY = $recommendedY + 104
-        $actionsTitle.Location = New-Object System.Drawing.Point(30,$actionsY)
-        $actionsPanel.Location = New-Object System.Drawing.Point(28,($actionsY + 34))
+        $actionsY = $recommendedY + 94
+        $actionsTitle.Location = [System.Drawing.Point]::new(30,$actionsY)
+        $actionsPanel.Location = [System.Drawing.Point]::new(28,($actionsY + 34))
         $actionsPanel.Width = $fullWidth
 
-        $advancedY = $actionsY + 288
-        $advancedTitle.Location = New-Object System.Drawing.Point(30,$advancedY)
-        $advancedPanel.Location = New-Object System.Drawing.Point(28,($advancedY + 34))
+        $advancedY = $actionsY + 250
+        $advancedTitle.Location = [System.Drawing.Point]::new(30,$advancedY)
+        $advancedPanel.Location = [System.Drawing.Point]::new(28,($advancedY + 34))
         $advancedPanel.Width = $fullWidth
 
-        $activityY = $advancedY + 230
-        $activityTitle.Location = New-Object System.Drawing.Point(30,$activityY)
-        $activityCard.Location = New-Object System.Drawing.Point(28,($activityY + 34))
+        $activityY = $advancedY + 200
+        $activityTitle.Location = [System.Drawing.Point]::new(30,$activityY)
+        $activityCard.Location = [System.Drawing.Point]::new(28,($activityY + 34))
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 34
 
         foreach ($row in @($rowRefresh,$rowIdentity,$rowOnline,$rowExport,$rowRegister,$rowComplete,$rowOffboard)) {
             $row.Panel.Width = $fullWidth - 2
-            $row.Button.Left = [Math]::Max(620,$fullWidth - 152)
+            $row.Button.Left = [Math]::Max(600,$fullWidth - 140)
         }
 
-        $content.AutoScrollMinSize = New-Object System.Drawing.Size(0,($activityY + 260))
+        $content.AutoScrollMinSize = [System.Drawing.Size]::new(0,([int]$activityY + 230))
     }
 
     $form.Add_Resize({ Resize-GuiLayout })
