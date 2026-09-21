@@ -9,8 +9,7 @@ function Show-WindowsDeviceLink {
     The GUI focuses on inspecting Device Association state, onboarding, and offboarding.
     Lifecycle actions delegate to existing WindowsDeviceLink public cmdlets.
 
-    Interactive authentication is the default. Use -Method and the corresponding authentication
-    parameters to select another supported authentication flow.
+    Interactive authentication is the default on full Windows. Windows PE defaults to DeviceCode because Interactive browser authentication is unavailable there. Use -Method and the corresponding authentication parameters to select another supported authentication flow.
 
     Use -Tenants to provide friendly tenant names for the tenant selector:
 
@@ -34,7 +33,7 @@ function Show-WindowsDeviceLink {
             'DeviceCode','Interactive','ClientSecret','AccessToken','Certificate',
             'CertificateThumbprint','CertificateSubjectName','EnvironmentVariable','ManagedIdentity'
         )]
-        [string]$Method = 'Interactive',
+        [string]$Method,
 
         [ValidateNotNullOrEmpty()]
         [string]$TenantId,
@@ -71,6 +70,16 @@ function Show-WindowsDeviceLink {
     $outerBoundParameters = @{}
     foreach ($key in $PSBoundParameters.Keys) {
         $outerBoundParameters[$key] = $PSBoundParameters[$key]
+    }
+
+    $isWinPE = Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT'
+
+    if (-not $outerBoundParameters.ContainsKey('Method')) {
+        $Method = if ($isWinPE) { 'DeviceCode' } else { 'Interactive' }
+    }
+
+    if ($isWinPE -and $Method -eq 'Interactive') {
+        throw 'Interactive authentication is not available in Windows PE. Use -Method DeviceCode or a supported app-only authentication method.'
     }
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -599,6 +608,10 @@ function Show-WindowsDeviceLink {
                 $btnFullAssociate,
                 'Full association is not currently supported in Windows PE. Pre-associate the device and let Windows complete Device Association during OOBE.'
             )
+            $toolTip.SetToolTip(
+                $btnOnline,
+                "Windows PE online operations use authentication method '$Method'. Interactive browser authentication is not supported in WinPE."
+            )
         }
         else {
             $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and complete Device Association on this device.')
@@ -889,6 +902,11 @@ function Show-WindowsDeviceLink {
     function Invoke-GuiFullAssociate {
         if ($script:WdlGuiBusy) { return }
 
+        if ($isWinPE) {
+            Show-GuiError 'Full DeviceLink association completion is not supported in Windows PE. Use Pre-associate in WinPE and let full Windows/OOBE complete Device Association.'
+            return
+        }
+
         if (-not (Confirm-GuiAction -Title 'Full association' -Message 'Ensure pre-association exists and complete Device Association on this device?')) {
             return
         }
@@ -1091,7 +1109,7 @@ function Show-WindowsDeviceLink {
     })
 
     $form.Add_Shown({
-        $environmentName = if (Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT') { 'Windows PE' } else { 'Windows' }
+        $environmentName = if ($isWinPE) { 'Windows PE' } else { 'Windows' }
         Write-GuiConsole -Message "WindowsDeviceLink dashboard opened in $environmentName. Authentication method: $Method."
         Set-GuiBusy -Busy $true -StatusText 'Loading local state...'
         try { Refresh-LocalView }
