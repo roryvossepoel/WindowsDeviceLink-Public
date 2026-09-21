@@ -180,7 +180,13 @@ Get-WindowsDeviceLink |
 Show-WindowsDeviceLink
 ```
 
-The GUI is supported on Windows 11 and compatible Windows PE environments. `Interactive` authentication remains the default for online actions in both environments, with `DeviceCode` available as an explicit alternative. In Windows PE, supply a compatible `Windows.Management.Service.dll` through `-WindowsManagementServicePath` or the documented module runtime location. Native full association remains unavailable in Windows PE; use pre-association and let Windows complete Device Association during OOBE.
+![WindowsDeviceLink operator GUI](docs/images/windowsdevicelink-gui.svg)
+
+The screenshot uses sanitized example data; device name and serial number are intentionally omitted.
+
+The GUI is supported on Windows 11 and compatible Windows PE environments. Full Windows defaults to `Interactive` authentication. Windows PE defaults to `DeviceCode` because interactive browser authentication is unavailable there. In Windows PE, supply a compatible `Windows.Management.Service.dll` through `-WindowsManagementServicePath` or the documented module runtime location when required. Native full association remains unavailable in Windows PE; use pre-association and let Windows complete Device Association during OOBE.
+
+See the [operator GUI guide](docs/GUI.md) for authentication parameters, tenant JSON sources, Windows 11 vs Windows PE behavior and runtime-DLL usage.
 
 Optional tenant selector:
 
@@ -367,6 +373,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 
 - [AUTOPILOT-V1-VS-DEVICE-PREPARATION.md](docs/AUTOPILOT-V1-VS-DEVICE-PREPARATION.md) — classic Windows Autopilot vs Windows Autopilot device preparation.
 - [FAQ.md](docs/FAQ.md) — practical operations and lifecycle questions.
+- [GUI.md](docs/GUI.md) — operator GUI, authentication, tenant selectors and Windows PE runtime usage.
 - [INSTALLATION.md](docs/INSTALLATION.md) — Windows 11 / WinPE installation and troubleshooting.
 - [WINPE-WORKFLOW.md](docs/WINPE-WORKFLOW.md) — supported WinPE workflow and native completion boundary.
 - [ONLINE-METHODS.md](docs/ONLINE-METHODS.md) — cloud operations and authentication methods.
