@@ -76,19 +76,46 @@ function Get-WindowsDeviceLinkStatus {
     $association = $null
     $associationError = $null
     $cloudChecked = $false
+
+    $lookupSerialNumber = if ($deviceLink -and -not [string]::IsNullOrWhiteSpace([string]$deviceLink.SerialNumber)) {
+        ([string]$deviceLink.SerialNumber).Trim()
+    }
+    else {
+        $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($lookupSerialNumber)) {
+        try {
+            $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
+            $lookupSerialNumber = [string]$bios.SerialNumber
+        }
+        catch {
+            if (Get-Command Get-WmiObject -ErrorAction SilentlyContinue) {
+                try {
+                    $lookupSerialNumber = [string](Get-WmiObject -Class Win32_BIOS -ErrorAction Stop).SerialNumber
+                }
+                catch {}
+            }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($lookupSerialNumber)) {
+            $lookupSerialNumber = $lookupSerialNumber.Trim()
+        }
+    }
+
     if ($Online) {
         $cloudChecked = $true
-        if (-not $deviceLink -or [string]::IsNullOrWhiteSpace([string]$deviceLink.SerialNumber)) {
+        if ([string]::IsNullOrWhiteSpace($lookupSerialNumber)) {
             $associationError = 'The local serial number is unavailable, so the Device Association lookup could not be performed.'
         }
         else {
             try {
-                $associationParameters = @{ SerialNumber=$deviceLink.SerialNumber; Method=$Method; Environment=$Environment; ClientTimeout=$ClientTimeout }
+                $associationParameters = @{ SerialNumber=$lookupSerialNumber; Method=$Method; Environment=$Environment; ClientTimeout=$ClientTimeout }
                 foreach ($name in @('TenantId','ClientId','AccessToken','Certificate','CertificateThumbprint','CertificateSubjectName','SendCertificateChain','ClientSecret')) {
                     if ($PSBoundParameters.ContainsKey($name)) { $associationParameters[$name] = $PSBoundParameters[$name] }
                 }
                 $associationResults = @(Get-WindowsDeviceLinkAssociation @associationParameters -ErrorAction Stop)
-                if ($associationResults.Count -gt 1) { $associationError = "Multiple Device Association records were returned for serial number '$($deviceLink.SerialNumber)'." }
+                if ($associationResults.Count -gt 1) { $associationError = "Multiple Device Association records were returned for serial number '$lookupSerialNumber'." }
                 elseif ($associationResults.Count -eq 1) { $association = $associationResults[0] }
             }
             catch { $associationError = $_.Exception.Message }
@@ -102,7 +129,7 @@ function Get-WindowsDeviceLinkStatus {
     [pscustomobject]@{
         PSTypeName='Windows.DeviceLink.Status'; Environment=$support.Environment; Architecture=$support.Architecture; Supported=[bool]$support.Supported
         SupportReason=$support.Reason; DllSource=$support.DllSource; ActivationMode=$support.ActivationMode; DllPath=$support.DllPath; DllVersion=$support.DllVersion
-        DeviceLinkPresent=$null -ne $deviceLink; SerialNumber=if($deviceLink){$deviceLink.SerialNumber}else{$null}; Manufacturer=if($deviceLink){$deviceLink.Manufacturer}else{$null}
+        DeviceLinkPresent=$null -ne $deviceLink; SerialNumber=$lookupSerialNumber; Manufacturer=if($deviceLink){$deviceLink.Manufacturer}else{$null}
         Model=if($deviceLink){$deviceLink.Model}else{$null}; SmbiosUuid=if($deviceLink){$deviceLink.SmbiosUuid}else{$null}; LinkId=if($deviceLink){$deviceLink.LinkId}else{$null}
         PayloadCreationTimeUtc=if($deviceLink){$deviceLink.PayloadCreationTimeUtc}else{$null}; FirmwareCreationTimeUtc=$firmwareCreationTimeUtc; IdentityError=$identityError
         FirmwareChecked=$null -eq $firmwareError; FirmwareStateComplete=if($firmwareError){$null}else{$firmwareStateComplete}; FirmwareVariablesPresent=if($firmwareError){$null}else{"$firmwarePresentCount/$firmwareExpectedCount"}
