@@ -417,9 +417,36 @@ $($file.FullName)",
         Set-GuiStatus 'Completing DeviceLink association...'
         try {
             Write-GuiConsole -Message 'Complete-WindowsDeviceLinkAssociation -Confirm:$false' -Command
-            $result = Complete-WindowsDeviceLinkAssociation -Confirm:$false
+
+            $resultObjects = New-Object System.Collections.Generic.List[object]
+
+            & {
+                Complete-WindowsDeviceLinkAssociation -Confirm:$false
+            } 6>&1 | ForEach-Object {
+                if ($_ -is [System.Management.Automation.InformationRecord]) {
+                    $message = [string]$_.MessageData
+                    if (-not [string]::IsNullOrWhiteSpace($message)) {
+                        Write-GuiConsole -Message $message
+                    }
+                }
+                else {
+                    $resultObjects.Add($_)
+                }
+
+                [System.Windows.Forms.Application]::DoEvents()
+            }
+
+            $result = @($resultObjects.ToArray()) | Select-Object -Last 1
             Write-GuiObject $result
-            Set-GuiStatus "Completion result: $($result.Result)"
+
+            $resultText = if ($result -and $result.PSObject.Properties.Name -contains 'Result') {
+                [string]$result.Result
+            }
+            else {
+                'Completed'
+            }
+
+            Set-GuiStatus "Completion result: $resultText"
             Refresh-LocalView
         }
         catch {
