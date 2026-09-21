@@ -115,7 +115,7 @@ Or as one guarded operation:
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -CompleteAssociation
+    -FullAssociation
 ```
 
 The initializer verifies the state before and after each transition and remains idempotent on an already-associated device.
