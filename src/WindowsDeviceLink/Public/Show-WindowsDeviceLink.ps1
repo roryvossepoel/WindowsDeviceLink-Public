@@ -614,7 +614,16 @@ function Show-WindowsDeviceLink {
             }
 
             $rows = New-Object System.Collections.Generic.List[object]
+            $compactHiddenProperties = @(
+                'RegistrationResult',
+                'BeforeStatus',
+                'AfterStatus',
+                'FullAssociationDetails'
+            )
+
             foreach ($property in $properties) {
+                if ([string]$property.Name -in $compactHiddenProperties) { continue }
+
                 $value = $property.Value
                 if ($null -eq $value) { continue }
 
@@ -718,17 +727,45 @@ function Show-WindowsDeviceLink {
 
     function Set-GuiCapabilities {
         $support = $script:WdlGuiSupport
+        $local = $script:WdlGuiLocalAssociation
+        $cloud = $script:WdlGuiCloudStatus
+
         $runtimeReady = $support -and [bool]$support.Supported
         $canFullAssociation = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'
+
+        $cloudState = if ($cloud) { ([string]$cloud.AssociationState).Trim().ToLowerInvariant() } else { '' }
+        $cloudKnownAbsent = $cloud -and (
+            $cloud.AssociationPresent -eq $false -or
+            $cloudState -eq 'notassociated'
+        )
+        $cloudAlreadyPresent = $cloudState -in @('preassociated','associated')
+        $localFullyAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
+        $alreadyFullyAssociated = $localFullyAssociated -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
         $btnOnline.Enabled = $runtimeReady
         $btnExport.Enabled = $runtimeReady
-        $btnPreassociate.Enabled = $runtimeReady
-        $btnFullAssociate.Enabled = $canFullAssociation
-        $btnCloudOffboard.Enabled = $true
+        $btnPreassociate.Enabled = $runtimeReady -and -not $cloudAlreadyPresent
+        $btnFullAssociate.Enabled = $canFullAssociation -and -not $alreadyFullyAssociated
+        $btnCloudOffboard.Enabled = -not $cloudKnownAbsent
         $btnLocalOffboard.Enabled = $true
         $btnFullOffboard.Enabled = $runtimeReady
+
+        $toolTip.SetToolTip($btnPreassociate, 'Create the tenant-side Device Association pre-association.')
+        $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
+        $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and perform full Device Association on this device.')
+
+        if ($cloudAlreadyPresent) {
+            $toolTip.SetToolTip($btnPreassociate, 'The cloud association already exists; pre-association is not required.')
+        }
+
+        if ($alreadyFullyAssociated) {
+            $toolTip.SetToolTip($btnFullAssociate, 'The device is already fully associated.')
+        }
+
+        if ($cloudKnownAbsent) {
+            $toolTip.SetToolTip($btnCloudOffboard, 'Cloud state is already known to be Not associated; there is nothing to remove.')
+        }
 
         if ($support -and [string]$support.Environment -eq 'WindowsPE') {
             $toolTip.SetToolTip(
@@ -739,9 +776,6 @@ function Show-WindowsDeviceLink {
                 $btnOnline,
                 "Windows PE online operations use authentication method '$Method'. Interactive browser authentication is not supported in WinPE."
             )
-        }
-        else {
-            $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and complete Device Association on this device.')
         }
 
         if (-not $runtimeReady -and $support) {
@@ -880,9 +914,9 @@ function Show-WindowsDeviceLink {
         }
 
         $friendlySource = switch ([string]$local.TrustLevel) {
-            'CorrelatedLocalSources' { 'Correlated local sources' }
-            'LocalRegistryHint' { 'Local registry hint' }
-            'StructurallyObservedJwtClaim' { 'Association JWT claim' }
+            'CorrelatedLocalSources' { 'Registry + JWT' }
+            'LocalRegistryHint' { 'Registry' }
+            'StructurallyObservedJwtClaim' { 'JWT' }
             'Conflict' { 'Conflict' }
             'Unavailable' { 'Unavailable' }
             default { $technicalSource }
