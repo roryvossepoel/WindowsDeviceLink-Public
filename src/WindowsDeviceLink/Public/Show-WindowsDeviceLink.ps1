@@ -426,7 +426,9 @@ function Show-WindowsDeviceLink {
 
     $cloudCard = New-Card -Title 'Cloud association' -X 14 -Y 150 -Width 1030 -Height 84
     $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 80
+    $ui.CloudState.Text = 'Not checked'
     $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant ID' -Y 56 -CaptionWidth 80
+    $ui.CloudTenant.Text = 'Unavailable'
 
     $cloudIdCaption = New-Object System.Windows.Forms.Label
     $cloudIdCaption.Text = 'Association ID'
@@ -474,7 +476,7 @@ function Show-WindowsDeviceLink {
     $rowRefresh = New-ActionRow -Parent $actionsPanel -Title 'Refresh' -Description 'Refresh local DeviceLink and firmware information.' -Y 0 -Buttons @('Refresh')
     $rowOnline  = New-ActionRow -Parent $actionsPanel -Title 'Check online' -Description 'Query the tenant-side Device Association using the selected tenant context.' -Y 46 -Buttons @('Check online')
     $rowExport  = New-ActionRow -Parent $actionsPanel -Title 'Export DeviceLink CSV' -Description 'Export the Microsoft-generated .devicelink.csv.' -Y 92 -Buttons @('Export CSV')
-    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the complete onboarding flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
+    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the full association flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
     $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full')
 
     $offboardSeparator = @(
