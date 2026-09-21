@@ -40,9 +40,14 @@ if (-not $validateSet -or 'Interactive' -notin $validateSet.ValidValues) {
     throw 'FAIL: Show-WindowsDeviceLink -Method must continue to support Interactive.'
 }
 
-$methodParameterAst = @(
-    $command.ScriptBlock.Ast.ParamBlock.Parameters |
-        Where-Object { $_.Name.VariablePath.UserPath -eq 'Method' }
+$methodParameterAst = $command.ScriptBlock.Ast.FindAll(
+    {
+        param($ast)
+
+        $ast -is [System.Management.Automation.Language.ParameterAst] -and
+        $ast.Name.VariablePath.UserPath -eq 'Method'
+    },
+    $true
 ) | Select-Object -First 1
 
 if (-not $methodParameterAst) {
