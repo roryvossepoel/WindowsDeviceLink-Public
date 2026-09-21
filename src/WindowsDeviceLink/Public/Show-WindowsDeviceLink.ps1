@@ -16,7 +16,8 @@ function Show-WindowsDeviceLink {
     @{'Management'='11111111-1111-1111-1111-111111111111'; 'Contoso'='22222222-2222-2222-2222-222222222222'}
 
     Use -TenantsUri to load the same friendly-name-to-tenant-ID mapping from a trusted HTTPS JSON endpoint.
-    When both are supplied, values passed through -Tenants override entries with the same name from -TenantsUri.
+    Use -TenantsPath to load the same JSON format from a local file.
+    Precedence is: TenantsUri, then TenantsPath, then explicit -Tenants values.
 
     .EXAMPLE
     Show-WindowsDeviceLink
@@ -32,6 +33,9 @@ function Show-WindowsDeviceLink {
 
     .EXAMPLE
     Show-WindowsDeviceLink -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
+
+    .EXAMPLE
+    Show-WindowsDeviceLink -TenantsPath 'E:\Config\tenants.json'
     #>
     [CmdletBinding()]
     param(
@@ -48,6 +52,9 @@ function Show-WindowsDeviceLink {
 
         [ValidateNotNull()]
         [uri]$TenantsUri,
+
+        [ValidateNotNullOrEmpty()]
+        [string]$TenantsPath,
 
         [ValidateNotNullOrEmpty()]
         [string]$ClientId,
@@ -279,6 +286,41 @@ function Show-WindowsDeviceLink {
 
         if ($effectiveTenants.Count -eq 0) {
             throw "The tenant JSON at '$($TenantsUri.AbsoluteUri)' did not contain any tenant entries."
+        }
+    }
+
+    if ($outerBoundParameters.ContainsKey('TenantsPath')) {
+        if (-not (Test-Path -LiteralPath $TenantsPath -PathType Leaf)) {
+            throw "Tenant JSON file '$TenantsPath' was not found."
+        }
+
+        try {
+            $localTenantObject = Get-Content -LiteralPath $TenantsPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            throw "Unable to load tenant JSON from '$TenantsPath': $($_.Exception.Message)"
+        }
+
+        if ($null -eq $localTenantObject -or $localTenantObject -is [System.Array]) {
+            throw 'The tenant JSON must be a JSON object that maps friendly tenant names to tenant GUIDs.'
+        }
+
+        foreach ($property in @($localTenantObject.PSObject.Properties)) {
+            $name = [string]$property.Name
+            $id = [string]$property.Value
+            $parsedTenantId = [guid]::Empty
+
+            if ([string]::IsNullOrWhiteSpace($name) -or
+                [string]::IsNullOrWhiteSpace($id) -or
+                -not [guid]::TryParse($id.Trim(),[ref]$parsedTenantId)) {
+                throw "Invalid tenant entry '$name' in '$TenantsPath'. Each value must be a tenant GUID."
+            }
+
+            $effectiveTenants[$name.Trim()] = $parsedTenantId.ToString()
+        }
+
+        if ($localTenantObject.PSObject.Properties.Count -eq 0) {
+            throw "The tenant JSON file '$TenantsPath' did not contain any tenant entries."
         }
     }
 
