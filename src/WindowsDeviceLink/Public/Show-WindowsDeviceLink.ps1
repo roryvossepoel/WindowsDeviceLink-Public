@@ -472,12 +472,65 @@ function Show-WindowsDeviceLink {
 
         if ($null -eq $InputObject) { return }
 
-        $text = ($InputObject | Format-List * | Out-String).TrimEnd()
-        if ([string]::IsNullOrWhiteSpace($text)) { return }
+        foreach ($item in @($InputObject)) {
+            if ($null -eq $item) { continue }
 
-        foreach ($line in ($text -split '\r?\n')) {
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
-            Write-GuiConsole -Message $line
+            $properties = @($item.PSObject.Properties)
+            if ($properties.Count -eq 0) {
+                $text = [string]$item
+                if (-not [string]::IsNullOrWhiteSpace($text)) {
+                    Write-GuiConsole -Message $text
+                }
+                continue
+            }
+
+            $rows = New-Object System.Collections.Generic.List[object]
+            foreach ($property in $properties) {
+                $value = $property.Value
+                if ($null -eq $value) { continue }
+
+                if ($value -is [string] -and [string]::IsNullOrWhiteSpace($value)) { continue }
+
+                if ($value -is [datetime]) {
+                    $displayValue = $value.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+                }
+                elseif ($value -is [datetimeoffset]) {
+                    $displayValue = $value.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+                }
+                elseif ($value -is [System.Collections.IEnumerable] -and -not ($value -is [string])) {
+                    $items = @($value)
+                    if ($items.Count -eq 0) { continue }
+                    $displayValue = ($items | ForEach-Object { [string]$_ }) -join ', '
+                }
+                else {
+                    $displayValue = [string]$value
+                }
+
+                if ([string]::IsNullOrWhiteSpace($displayValue)) { continue }
+
+                $rows.Add([pscustomobject]@{
+                    Name = [string]$property.Name
+                    Value = $displayValue
+                })
+            }
+
+            if ($rows.Count -eq 0) { continue }
+
+            $nameWidth = [Math]::Min(
+                34,
+                [Math]::Max(
+                    8,
+                    (@($rows | ForEach-Object { $_.Name.Length }) | Measure-Object -Maximum).Maximum
+                )
+            )
+
+            foreach ($row in $rows) {
+                $name = $row.Name
+                if ($name.Length -gt $nameWidth) {
+                    $name = $name.Substring(0,$nameWidth)
+                }
+                Write-GuiConsole -Message (("{0,-$nameWidth} : {1}" -f $name,$row.Value))
+            }
         }
     }
 
@@ -585,23 +638,44 @@ function Show-WindowsDeviceLink {
         $ui.Auth.Text = if ($selectedTenant) { "$Method | $selectedTenant" } else { $Method }
 
         $ui.Firmware.Text = [string]$local.FirmwareState
-        $ui.LocalState.Text = [string]$local.LocalAssociationState
+
+        $friendlyLocalState = switch ([string]$local.LocalAssociationState) {
+            'CompleteAssociationFirmwareState' { 'Complete association' }
+            'BaseIdentity' { 'Base identity' }
+            'NoFirmwareState' { 'No firmware state' }
+            'IncompleteFirmwareState' { 'Incomplete firmware state' }
+            default { [string]$local.LocalAssociationState }
+        }
+        $ui.LocalState.Text = $friendlyLocalState
+
         $ui.TenantId.Text = if ($local.TenantId) { [string]$local.TenantId } else { 'Unavailable' }
-        if ([string]$local.TrustLevel -eq 'Unavailable' -and [string]$local.Source -eq 'Unavailable') {
-            $ui.Source.Text = 'Unavailable'
+
+        $technicalSource = if ([string]$local.TrustLevel -eq 'Unavailable' -and [string]$local.Source -eq 'Unavailable') {
+            'Unavailable'
         }
         elseif ([string]::IsNullOrWhiteSpace([string]$local.TrustLevel)) {
-            $ui.Source.Text = [string]$local.Source
+            [string]$local.Source
         }
         elseif ([string]::IsNullOrWhiteSpace([string]$local.Source)) {
-            $ui.Source.Text = [string]$local.TrustLevel
+            [string]$local.TrustLevel
         }
         else {
-            $ui.Source.Text = "$($local.TrustLevel) | $($local.Source)"
+            "$($local.TrustLevel) | $($local.Source)"
         }
 
+        $friendlySource = switch ([string]$local.TrustLevel) {
+            'CorrelatedLocalSources' { 'Correlated local sources' }
+            'LocalRegistryHint' { 'Local registry hint' }
+            'StructurallyObservedJwtClaim' { 'Association JWT claim' }
+            'Conflict' { 'Conflict' }
+            'Unavailable' { 'Unavailable' }
+            default { $technicalSource }
+        }
+
+        $ui.Source.Text = $friendlySource
+
         $toolTip.SetToolTip($ui.TenantId, [string]$ui.TenantId.Text)
-        $toolTip.SetToolTip($ui.Source, [string]$ui.Source.Text)
+        $toolTip.SetToolTip($ui.Source, $technicalSource)
 
         Set-GuiStatus "Local state refreshed | $($local.FirmwareState)"
         Write-GuiConsole -Message "Local state: $($local.FirmwareState), tenant source: $($local.Source)"
