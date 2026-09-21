@@ -203,12 +203,8 @@ function Show-WindowsDeviceLink {
             $button.Size = [System.Drawing.Size]::new($buttonWidth,28)
             $right -= $buttonWidth
             $button.Location = [System.Drawing.Point]::new($right,9)
-            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-            $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(190,190,190)
-            $button.FlatAppearance.BorderSize = 1
-            $button.BackColor = [System.Drawing.Color]::White
-            $button.ForeColor = [System.Drawing.Color]::FromArgb(32,32,32)
-            $button.UseVisualStyleBackColor = $false
+            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+            $button.UseVisualStyleBackColor = $true
             $row.Controls.Add($button)
             $buttonList.Insert(0,$button)
             $right -= $gap
@@ -518,53 +514,38 @@ function Show-WindowsDeviceLink {
         )
 
         $script:WdlGuiBusy = $Busy
-
         $enabled = -not $Busy
-        $buttonForeColor = if ($Busy) {
-            [System.Drawing.Color]::FromArgb(145,145,145)
-        }
-        else {
-            [System.Drawing.Color]::FromArgb(32,32,32)
-        }
 
-        $buttonBackColor = if ($Busy) {
-            [System.Drawing.Color]::FromArgb(236,236,236)
+        $buttons = @(
+            $rowRefresh.Buttons[0],
+            $rowOnline.Buttons[0],
+            $rowExport.Buttons[0],
+            $rowOnboard.Buttons[0],
+            $rowOnboard.Buttons[1],
+            $rowOffboard.Buttons[0],
+            $rowOffboard.Buttons[1],
+            $rowOffboard.Buttons[2]
+        )
+
+        foreach ($button in $buttons) {
+            if ($Busy) {
+                $button.UseVisualStyleBackColor = $false
+                $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+                $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(205,205,205)
+                $button.FlatAppearance.BorderSize = 1
+                $button.BackColor = [System.Drawing.Color]::FromArgb(238,238,238)
+                $button.ForeColor = [System.Drawing.Color]::FromArgb(145,145,145)
+                $button.Enabled = $false
+            }
+            else {
+                $button.Enabled = $true
+                $button.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+                $button.UseVisualStyleBackColor = $true
+                $button.ForeColor = [System.Drawing.SystemColors]::ControlText
+            }
         }
-        else {
-            [System.Drawing.Color]::White
-        }
-
-        # Keep this list deliberately explicit. These are every actionable button
-        # in the dashboard; no recursive control discovery is used here.
-        $rowRefresh.Buttons[0].Enabled = $enabled
-        $rowOnline.Buttons[0].Enabled = $enabled
-        $rowExport.Buttons[0].Enabled = $enabled
-        $rowOnboard.Buttons[0].Enabled = $enabled
-        $rowOnboard.Buttons[1].Enabled = $enabled
-        $rowOffboard.Buttons[0].Enabled = $enabled
-        $rowOffboard.Buttons[1].Enabled = $enabled
-        $rowOffboard.Buttons[2].Enabled = $enabled
-
-        $rowRefresh.Buttons[0].ForeColor = $buttonForeColor
-        $rowOnline.Buttons[0].ForeColor = $buttonForeColor
-        $rowExport.Buttons[0].ForeColor = $buttonForeColor
-        $rowOnboard.Buttons[0].ForeColor = $buttonForeColor
-        $rowOnboard.Buttons[1].ForeColor = $buttonForeColor
-        $rowOffboard.Buttons[0].ForeColor = $buttonForeColor
-        $rowOffboard.Buttons[1].ForeColor = $buttonForeColor
-        $rowOffboard.Buttons[2].ForeColor = $buttonForeColor
-
-        $rowRefresh.Buttons[0].BackColor = $buttonBackColor
-        $rowOnline.Buttons[0].BackColor = $buttonBackColor
-        $rowExport.Buttons[0].BackColor = $buttonBackColor
-        $rowOnboard.Buttons[0].BackColor = $buttonBackColor
-        $rowOnboard.Buttons[1].BackColor = $buttonBackColor
-        $rowOffboard.Buttons[0].BackColor = $buttonBackColor
-        $rowOffboard.Buttons[1].BackColor = $buttonBackColor
-        $rowOffboard.Buttons[2].BackColor = $buttonBackColor
 
         $tenantSelector.Enabled = $enabled
-
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
 
@@ -572,8 +553,9 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus $StatusText
         }
 
-        # Force an immediate repaint before the long-running action begins.
-        $actionsPanel.Refresh()
+        foreach ($button in $buttons) {
+            $button.Refresh()
+        }
         $tenantSelector.Refresh()
         [System.Windows.Forms.Application]::DoEvents()
     }
