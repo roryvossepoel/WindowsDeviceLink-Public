@@ -182,46 +182,9 @@ Show-WindowsDeviceLink
 
 ![WindowsDeviceLink operator GUI](docs/images/windowsdevicelink-gui.svg)
 
-The screenshot uses sanitized example data; device name and serial number are intentionally omitted.
+The GUI is available on Windows 11 and compatible Windows PE environments. Windows 11 defaults to `Interactive` authentication; Windows PE defaults to `DeviceCode`. Full association is available on supported full Windows only.
 
-The GUI is supported on Windows 11 and compatible Windows PE environments. Full Windows defaults to `Interactive` authentication. Windows PE defaults to `DeviceCode` because interactive browser authentication is unavailable there. In Windows PE, supply a compatible `Windows.Management.Service.dll` through `-WindowsManagementServicePath` or the documented module runtime location when required. Native full association remains unavailable in Windows PE; use pre-association and let Windows complete Device Association during OOBE.
-
-See the [operator GUI guide](docs/GUI.md) for authentication parameters, tenant JSON sources, Windows 11 vs Windows PE behavior and runtime-DLL usage.
-
-Optional tenant selector:
-
-```powershell
-Show-WindowsDeviceLink `
-    -Tenants @{
-        'Management' = '11111111-1111-1111-1111-111111111111'
-        'Customer A' = '22222222-2222-2222-2222-222222222222'
-    }
-```
-
-Or load the tenant selector from a trusted HTTPS JSON endpoint:
-
-```powershell
-Show-WindowsDeviceLink `
-    -TenantsUri 'https://config.example.com/windowsdevicelink/tenants.json'
-```
-
-Or from a local JSON file:
-
-```powershell
-Show-WindowsDeviceLink `
-    -TenantsPath 'E:\Config\tenants.json'
-```
-
-The JSON is a simple object that maps friendly names to tenant GUIDs. When multiple sources are used, precedence is `TenantsUri` -> `TenantsPath` -> explicit `-Tenants` values.
-
-Windows PE with an explicitly supplied runtime:
-
-```powershell
-Show-WindowsDeviceLink `
-    -WindowsManagementServicePath 'X:\Runtime\Windows.Management.Service.dll'
-```
-
-Alternative authentication methods can be selected with `-Method` and the matching credential parameters.
+See the [operator GUI guide](docs/GUI.md) for authentication parameters, tenant selectors/JSON, Windows 11 vs Windows PE behavior, and `Windows.Management.Service.dll` usage.
 
 ### Identify the source tenant locally
 
