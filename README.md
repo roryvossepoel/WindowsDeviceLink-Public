@@ -192,6 +192,15 @@ Show-WindowsDeviceLink `
     }
 ```
 
+Or load the tenant selector from a trusted HTTPS JSON endpoint:
+
+```powershell
+Show-WindowsDeviceLink `
+    -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
+```
+
+The JSON is a simple object that maps friendly names to tenant GUIDs. If both `-Tenants` and `-TenantsUri` are used, local `-Tenants` values take precedence for duplicate names.
+
 Windows PE with an explicitly supplied runtime:
 
 ```powershell
