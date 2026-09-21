@@ -617,13 +617,13 @@ function Show-WindowsDeviceLink {
     function Set-GuiCapabilities {
         $support = $script:WdlGuiSupport
         $runtimeReady = $support -and [bool]$support.Supported
-        $canCompleteAssociation = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'
+        $canFullAssociation = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'
 
         $btnRefresh.Enabled = $true
         $btnOnline.Enabled = $runtimeReady
         $btnExport.Enabled = $runtimeReady
         $btnPreassociate.Enabled = $runtimeReady
-        $btnFullAssociate.Enabled = $canCompleteAssociation
+        $btnFullAssociate.Enabled = $canFullAssociation
         $btnCloudOffboard.Enabled = $true
         $btnLocalOffboard.Enabled = $true
         $btnFullOffboard.Enabled = $runtimeReady
