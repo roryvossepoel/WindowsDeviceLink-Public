@@ -84,7 +84,7 @@ foreach ($required in @(
     'Initialize-WindowsDeviceLink',
     'Remove-WindowsDeviceLinkAssociation',
     'Reset-WindowsDeviceLinkFirmwareState',
-    'CompleteAssociation',
+    'FullAssociation',
     'Full DeviceLink offboarding',
     'No cloud association was found. Nothing was removed.'
 )) {
@@ -112,13 +112,13 @@ if ($source -match [regex]::Escape('Show-WindowsDeviceLink is not supported in W
     throw 'FAIL: Show-WindowsDeviceLink must not hard-block Windows PE.'
 }
 
-$fullAssociationGuardPattern = '(?s)\$canCompleteAssociation\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
+$fullAssociationGuardPattern = '(?s)\$canFullAssociation\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
 if ($source -notmatch $fullAssociationGuardPattern) {
     throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
 }
 
-if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=\s*\$canCompleteAssociation') {
-    throw 'FAIL: Full associate button must use the Windows PE-aware completion capability.'
+if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=\s*\$canFullAssociation') {
+    throw 'FAIL: Full associate button must use the Windows PE-aware full-association capability.'
 }
 
 Write-Host 'PASS: Show-WindowsDeviceLink is exported, WinPE-aware, WinForms-based, runtime-path capable, and delegates lifecycle actions to existing cmdlets.'
