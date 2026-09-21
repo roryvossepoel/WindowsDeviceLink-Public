@@ -350,6 +350,37 @@ function Show-WindowsDeviceLink {
     $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the complete onboarding flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
     $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full')
 
+    $busyOverlay = New-Object System.Windows.Forms.Panel
+    $busyOverlay.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $busyOverlay.BackColor = [System.Drawing.Color]::FromArgb(246,246,246)
+    $busyOverlay.Visible = $false
+
+    $busyOverlayLabel = New-Object System.Windows.Forms.Label
+    $busyOverlayLabel.Text = 'Operation in progress...'
+    $busyOverlayLabel.Font = New-Object System.Drawing.Font('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
+    $busyOverlayLabel.ForeColor = [System.Drawing.Color]::FromArgb(90,90,90)
+    $busyOverlayLabel.AutoSize = $true
+    $busyOverlayLabel.Location = [System.Drawing.Point]::new(24,92)
+    $busyOverlay.Controls.Add($busyOverlayLabel)
+
+    $busyOverlaySubLabel = New-Object System.Windows.Forms.Label
+    $busyOverlaySubLabel.Text = 'Actions are temporarily unavailable.'
+    $busyOverlaySubLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+    $busyOverlaySubLabel.ForeColor = [System.Drawing.Color]::FromArgb(120,120,120)
+    $busyOverlaySubLabel.AutoSize = $true
+    $busyOverlaySubLabel.Location = [System.Drawing.Point]::new(24,118)
+    $busyOverlay.Controls.Add($busyOverlaySubLabel)
+
+    $busyOverlayProgress = New-Object System.Windows.Forms.ProgressBar
+    $busyOverlayProgress.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+    $busyOverlayProgress.MarqueeAnimationSpeed = 30
+    $busyOverlayProgress.Location = [System.Drawing.Point]::new(24,148)
+    $busyOverlayProgress.Size = [System.Drawing.Size]::new(300,10)
+    $busyOverlay.Controls.Add($busyOverlayProgress)
+
+    $actionsPanel.Controls.Add($busyOverlay)
+    $busyOverlay.BringToFront()
+
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
     $activityTitle.Font = New-Object System.Drawing.Font('Segoe UI',11,[System.Drawing.FontStyle]::Bold)
@@ -488,6 +519,12 @@ function Show-WindowsDeviceLink {
 
         $tenantSelector.Enabled = $enabled
 
+        $busyOverlay.Visible = $Busy
+        if ($Busy) {
+            $busyOverlayLabel.Text = if ([string]::IsNullOrWhiteSpace($StatusText)) { 'Operation in progress...' } else { $StatusText }
+            $busyOverlay.BringToFront()
+        }
+
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
 
@@ -495,7 +532,8 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus $StatusText
         }
 
-        # Force a repaint before the long-running action begins.
+        # Force an immediate repaint before the long-running action begins.
+        $busyOverlay.Refresh()
         $actionsPanel.Refresh()
         $tenantSelector.Refresh()
         [System.Windows.Forms.Application]::DoEvents()
@@ -880,6 +918,8 @@ function Show-WindowsDeviceLink {
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 24
+
+        $busyOverlayProgress.Width = [Math]::Min(360,[Math]::Max(220,$fullWidth - 48))
 
         foreach ($row in @($rowRefresh,$rowOnline,$rowExport,$rowOnboard,$rowOffboard)) {
             $row.Panel.Width = $fullWidth
