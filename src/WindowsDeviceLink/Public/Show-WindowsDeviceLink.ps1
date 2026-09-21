@@ -854,25 +854,121 @@ function Show-WindowsDeviceLink {
         finally { Set-GuiBusy -Busy $false }
     }
 
+    function Select-GuiExportDirectory {
+        if (-not $isWinPE) {
+            $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+            $dialog.Description = 'Choose a folder for the DeviceLink CSV'
+            try {
+                if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+                    return $null
+                }
+                return [string]$dialog.SelectedPath
+            }
+            finally {
+                $dialog.Dispose()
+            }
+        }
+
+        $defaultPath = $null
+        if ($outerBoundParameters.ContainsKey('WindowsManagementServicePath')) {
+            try {
+                $defaultPath = Split-Path -Parent $WindowsManagementServicePath
+            }
+            catch {}
+        }
+        if ([string]::IsNullOrWhiteSpace($defaultPath)) {
+            try { $defaultPath = (Get-Location).Path } catch {}
+        }
+        if ([string]::IsNullOrWhiteSpace($defaultPath)) {
+            $defaultPath = 'X:\'
+        }
+
+        $pathForm = New-Object System.Windows.Forms.Form
+        $pathForm.Text = 'Export DeviceLink CSV'
+        $pathForm.StartPosition = 'CenterParent'
+        $pathForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        $pathForm.MinimizeBox = $false
+        $pathForm.MaximizeBox = $false
+        $pathForm.ShowInTaskbar = $false
+        $pathForm.Size = [System.Drawing.Size]::new(520,155)
+
+        $pathLabel = New-Object System.Windows.Forms.Label
+        $pathLabel.Text = 'Output folder'
+        $pathLabel.Font = New-Object System.Drawing.Font('Segoe UI',9)
+        $pathLabel.Location = [System.Drawing.Point]::new(14,14)
+        $pathLabel.AutoSize = $true
+        $pathForm.Controls.Add($pathLabel)
+
+        $pathBox = New-Object System.Windows.Forms.TextBox
+        $pathBox.Text = $defaultPath
+        $pathBox.Font = New-Object System.Drawing.Font('Consolas',9)
+        $pathBox.Location = [System.Drawing.Point]::new(16,40)
+        $pathBox.Size = [System.Drawing.Size]::new(472,24)
+        $pathForm.Controls.Add($pathBox)
+
+        $okButton = New-Object System.Windows.Forms.Button
+        $okButton.Text = 'Export'
+        $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $okButton.Location = [System.Drawing.Point]::new(308,78)
+        $okButton.Size = [System.Drawing.Size]::new(86,30)
+        $pathForm.Controls.Add($okButton)
+
+        $cancelButton = New-Object System.Windows.Forms.Button
+        $cancelButton.Text = 'Cancel'
+        $cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+        $cancelButton.Location = [System.Drawing.Point]::new(402,78)
+        $cancelButton.Size = [System.Drawing.Size]::new(86,30)
+        $pathForm.Controls.Add($cancelButton)
+
+        $pathForm.AcceptButton = $okButton
+        $pathForm.CancelButton = $cancelButton
+
+        try {
+            while ($true) {
+                if ($pathForm.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+                    return $null
+                }
+
+                $selectedPath = [string]$pathBox.Text
+                if (-not [string]::IsNullOrWhiteSpace($selectedPath)) {
+                    $selectedPath = $selectedPath.Trim()
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($selectedPath) -and [System.IO.Directory]::Exists($selectedPath)) {
+                    return $selectedPath
+                }
+
+                [void][System.Windows.Forms.MessageBox]::Show(
+                    $pathForm,
+                    'The specified output folder does not exist. Enter an existing folder path.',
+                    'WindowsDeviceLink',
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Warning
+                )
+            }
+        }
+        finally {
+            $pathForm.Dispose()
+        }
+    }
+
     function Invoke-GuiExport {
         if ($script:WdlGuiBusy) { return }
 
         Set-GuiBusy -Busy $true -StatusText 'Choose export folder...'
 
-        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-        $dialog.Description = 'Choose a folder for the DeviceLink CSV'
-
         try {
-            if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+            $selectedPath = Select-GuiExportDirectory
+            if ([string]::IsNullOrWhiteSpace($selectedPath)) {
                 Set-GuiStatus 'Export cancelled'
                 return
             }
 
             Set-GuiStatus 'Exporting DeviceLink CSV...'
-            Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$($dialog.SelectedPath)'" -Command
+            Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$selectedPath'" -Command
 
             $deviceLinkParameters = Get-GuiRuntimeParameters
-            $deviceLinkParameters.OutputDirectory = $dialog.SelectedPath
+            $deviceLinkParameters.OutputDirectory = $selectedPath
             $file = Get-WindowsDeviceLink @deviceLinkParameters
             Write-GuiObject $file
 
@@ -889,7 +985,6 @@ function Show-WindowsDeviceLink {
         catch { Show-GuiError $_.Exception.Message }
         finally {
             Set-GuiBusy -Busy $false
-            $dialog.Dispose()
         }
     }
 
