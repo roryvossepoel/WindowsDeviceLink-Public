@@ -1046,12 +1046,9 @@ function Show-WindowsDeviceLink {
         $activityY = $actionsY + 270
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
 
-        $fullAnchorScreen = $btnFullOffboard.Parent.PointToScreen(
-            [System.Drawing.Point]::new($btnFullOffboard.Right,$btnFullOffboard.Top)
-        )
-        $fullAnchorClient = $content.PointToClient($fullAnchorScreen)
-
-        $clearX = $fullAnchorClient.X - $btnClearActivity.Width
+        # Align Clear to the same right edge used by the action buttons.
+        # Action buttons sit 16 px inside the right edge of the Actions panel.
+        $clearX = $actionsPanel.Right - 16 - $btnClearActivity.Width
         $clearY = $activityY - 5
         $btnClearActivity.Location = [System.Drawing.Point]::new($clearX,$clearY)
 
