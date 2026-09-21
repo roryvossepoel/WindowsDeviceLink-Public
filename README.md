@@ -30,7 +30,7 @@ WindowsDeviceLink can:
 
 ## Current version
 
-The current preview release line is `0.8.0-preview1`.
+The current preview release line is `0.9.0-preview1`.
 
 This release adds `Show-WindowsDeviceLink`, a compact Windows operator GUI for local/cloud inspection, tenant selection, CSV export, pre-association, full association, cloud/local/full offboarding, and live activity logging. Interactive authentication is the default and alternative supported methods can be selected through command parameters.
 
@@ -357,7 +357,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Scope
 
-Preview release line: `0.8.0-preview1`.
+Preview release line: `0.9.0-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, the optional full-Windows operator GUI, multiple authentication methods, webhook transport and optional Azure reference backends.
 
