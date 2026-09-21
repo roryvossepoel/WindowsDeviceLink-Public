@@ -29,7 +29,7 @@ Interactive authentication is the default. For example:
 Show-WindowsDeviceLink -Method DeviceCode
 ```
 
-Provide friendly tenant choices with:
+Provide friendly tenant choices directly:
 
 ```powershell
 Show-WindowsDeviceLink -Tenants @{
@@ -37,6 +37,24 @@ Show-WindowsDeviceLink -Tenants @{
     'Contoso'    = '22222222-2222-2222-2222-222222222222'
 }
 ```
+
+Or load the selector from a centrally maintained HTTPS JSON file:
+
+```powershell
+Show-WindowsDeviceLink `
+    -TenantsUri 'https://example.contoso.com/windowsdevicelink/tenants.json'
+```
+
+The JSON format is intentionally simple:
+
+```json
+{
+  "Management": "11111111-1111-1111-1111-111111111111",
+  "Contoso": "22222222-2222-2222-2222-222222222222"
+}
+```
+
+`-TenantsUri` accepts only an absolute HTTPS URI. Tenant values must be valid GUIDs. The file should contain tenant display names and tenant IDs only; do not place credentials or secrets in it. When `-Tenants` and `-TenantsUri` are both supplied, the local `-Tenants` values override remote entries with the same name.
 
 The GUI delegates operations to the existing WindowsDeviceLink cmdlets and is available on Windows 11 and compatible Windows PE environments.
 
@@ -429,7 +447,26 @@ SignatureValidation = NotPerformed
 
 unless a trustworthy cryptographic validation mechanism is implemented in the future.
 
-## Why does completion sometimes appear to take a while?
+## How long do the common operations take?
+
+The timings below are **planning estimates from live WindowsDeviceLink validation**, not service-level guarantees. They were observed on physical test devices, including a Surface Laptop 3 on full Windows and AMD64 WinPE test hardware. Authentication, Conditional Access, network latency, Microsoft Graph response time and Windows attestation can materially change the duration.
+
+| Operation | Observed / practical duration | What usually consumes the time |
+|---|---:|---|
+| Local inspection / refresh | roughly 4-15 seconds | Runtime activation, firmware reads and local correlation |
+| Local firmware reset | usually under 1 second for the reset itself; roughly 4-17 seconds including GUI refresh/verification | UEFI variable reset is fast; verification and identity rematerialization take longer |
+| Pre-association | roughly 40-65 seconds end-to-end in the validated full-Windows runs | Authentication, Graph lookup, registration and post-registration verification |
+| Full association from an existing pre-association | roughly 70-100 seconds for the guarded native completion itself; about 1.5-2.5 minutes for the complete GUI/initializer action | Preflight, discovery, Windows attestation/configuration, JWT verification and final cloud verification |
+| Cloud-only removal | Graph deletion itself is typically a few seconds; allow roughly 10-30 seconds for lookup/authentication plus GUI verification | Authentication and locating/verifying the association usually take longer than the DELETE |
+| Full offboarding | commonly tens of seconds once authenticated | Cloud verification/removal happens first, followed by the fast local reset and refresh |
+
+Two measured full-association runs reported internal completion totals of **70.2 seconds** and **100 seconds**. Native `ConfigureDeviceLinkAsync` accounted for about **35.8-39.5 seconds** of those runs; the remaining time was preflight, discovery and verification.
+
+Two measured pre-association GUI runs completed in about **43 seconds** and **64 seconds** from action start through verified state.
+
+Treat these as operator expectations rather than timeout values. In particular, interactive or device-code sign-in can add arbitrary user time, and Windows/Microsoft service processing can occasionally take longer.
+
+## Why does full association sometimes appear to take a while?
 
 The native Windows Device Association operation can take tens of seconds or longer while Windows performs discovery, attestation, retrieval, and configuration.
 
