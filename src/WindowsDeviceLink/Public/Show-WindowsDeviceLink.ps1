@@ -285,7 +285,7 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiCloudStatus = $null
 
     $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126
-    $associationCard = New-Card -Title 'Association' -X 536 -Y 12 -Width 508 -Height 126 -Accent
+    $associationCard = New-Card -Title 'Association' -X 536 -Y 12 -Width 508 -Height 126
 
     $ui.DeviceName = New-ValuePair -Parent $deviceCard -Caption 'Device' -Y 34
     $ui.Serial     = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 56
@@ -303,7 +303,7 @@ function Show-WindowsDeviceLink {
 
     $cloudIdCaption = New-Object System.Windows.Forms.Label
     $cloudIdCaption.Text = 'Association ID'
-    $cloudIdCaption.Font = New-Object System.Drawing.Font('Segoe UI',7.8)
+    $cloudIdCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
     $cloudIdCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
     $cloudIdCaption.Location = [System.Drawing.Point]::new(500,34)
     $cloudIdCaption.Size = [System.Drawing.Size]::new(96,20)
@@ -319,7 +319,7 @@ function Show-WindowsDeviceLink {
 
     $tenantCaption = New-Object System.Windows.Forms.Label
     $tenantCaption.Text = 'Tenant'
-    $tenantCaption.Font = New-Object System.Drawing.Font('Segoe UI',7.8)
+    $tenantCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
     $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
     $tenantCaption.Location = [System.Drawing.Point]::new(500,56)
     $tenantCaption.Size = [System.Drawing.Size]::new(96,18)
@@ -327,7 +327,7 @@ function Show-WindowsDeviceLink {
 
     $tenantSelector = New-Object System.Windows.Forms.ComboBox
     $tenantSelector.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    $tenantSelector.Font = New-Object System.Drawing.Font('Segoe UI',8)
+    $tenantSelector.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
     $tenantSelector.Location = [System.Drawing.Point]::new(600,53)
     $tenantSelector.Size = [System.Drawing.Size]::new(380,24)
     foreach ($choice in $tenantChoices) {
@@ -357,11 +357,11 @@ function Show-WindowsDeviceLink {
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
 
-    $activityCard = New-Card -Title '' -X 14 -Y 544 -Width 1030 -Height 136
+    $activityCard = New-Card -Title '' -X 14 -Y 544 -Width 1030 -Height 118
 
     $consoleBox = New-Object System.Windows.Forms.TextBox
     $consoleBox.Location = [System.Drawing.Point]::new(12,10)
-    $consoleBox.Size = [System.Drawing.Size]::new(1006,114)
+    $consoleBox.Size = [System.Drawing.Size]::new(1006,96)
     $consoleBox.Multiline = $true
     $consoleBox.ReadOnly = $true
     $consoleBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
@@ -484,10 +484,13 @@ function Show-WindowsDeviceLink {
 
         $script:WdlGuiBusy = $Busy
 
-        foreach ($button in @(Get-GuiButtons -Parent $actionsPanel)) {
-            $button.Enabled = -not $Busy
+        foreach ($control in $actionControls) {
+            $control.Enabled = -not $Busy
         }
 
+        # Disable the complete parent as a second safety layer so no action child can
+        # remain clickable or visually active while an operation is running.
+        $actionsPanel.Enabled = -not $Busy
         $tenantSelector.Enabled = -not $Busy
 
         $statusProgress.Visible = $Busy
@@ -584,13 +587,18 @@ function Show-WindowsDeviceLink {
     function Invoke-GuiExport {
         if ($script:WdlGuiBusy) { return }
 
+        Set-GuiBusy -Busy $true -StatusText 'Choose export folder...'
+
         $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
         $dialog.Description = 'Choose a folder for the DeviceLink CSV'
 
         try {
-            if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+            if ($dialog.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+                Set-GuiStatus 'Export cancelled'
+                return
+            }
 
-            Set-GuiBusy -Busy $true -StatusText 'Exporting DeviceLink CSV...'
+            Set-GuiStatus 'Exporting DeviceLink CSV...'
             Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$($dialog.SelectedPath)'" -Command
 
             $file = Get-WindowsDeviceLink -OutputDirectory $dialog.SelectedPath
@@ -891,10 +899,11 @@ function Show-WindowsDeviceLink {
                 ForEach-Object { $_.Width = [Math]::Max(480,$fullWidth - 28) }
         }
 
-        $requiredHeight = $activityCard.Bottom + 6
+        $requiredHeight = $activityCard.Bottom + 2
         $availableHeight = [Math]::Max(0,$content.ClientSize.Height - 2)
+        $scrollTolerance = 10
 
-        if ($requiredHeight -gt $availableHeight) {
+        if ($requiredHeight -gt ($availableHeight + $scrollTolerance)) {
             $content.AutoScroll = $true
             $content.HorizontalScroll.Enabled = $false
             $content.HorizontalScroll.Visible = $false
