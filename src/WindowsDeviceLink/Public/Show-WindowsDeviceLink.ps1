@@ -1138,8 +1138,20 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus 'Cloud offboarding completed'
         }
         catch {
-            Set-GuiStatus 'Cloud offboarding failed'
-            Show-GuiError $_.Exception.Message
+            $message = [string]$_.Exception.Message
+            if ($message -like "No Device Association record was found for serial number *") {
+                Write-GuiConsole -Message 'No cloud association found - no change required'
+                $script:WdlGuiCloudStatus = $null
+                $ui.CloudState.Text = 'NotAssociated'
+                $ui.CloudTenant.Text = 'Unavailable'
+                $ui.CloudId.Text = 'Unavailable'
+                Refresh-LocalView
+                Set-GuiStatus 'No cloud association found - no change required'
+            }
+            else {
+                Set-GuiStatus 'Cloud offboarding failed'
+                Show-GuiError $message
+            }
         }
         finally { Set-GuiBusy -Busy $false }
     }
