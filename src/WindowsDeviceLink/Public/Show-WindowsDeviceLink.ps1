@@ -199,10 +199,14 @@ function Show-WindowsDeviceLink {
 
     function Write-GuiConsole {
         param(
-            [Parameter(Mandatory)][string]$Message,
+            [AllowNull()]
+            [AllowEmptyString()]
+            [string]$Message,
             [switch]$Command,
             [switch]$ErrorMessage
         )
+
+        if ([string]::IsNullOrWhiteSpace($Message)) { return }
 
         $timestamp = (Get-Date).ToString('HH:mm:ss')
         $prefix = if ($Command) { '>' } elseif ($ErrorMessage) { '!' } else { '-' }
