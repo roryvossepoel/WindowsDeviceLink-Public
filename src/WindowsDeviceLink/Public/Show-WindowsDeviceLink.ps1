@@ -100,11 +100,11 @@ function Show-WindowsDeviceLink {
 
     $content = New-Object System.Windows.Forms.Panel
     $content.Dock = [System.Windows.Forms.DockStyle]::Fill
-    $content.AutoScroll = $true
+    $content.AutoScroll = $false
     $content.BackColor = $form.BackColor
     $form.Controls.Add($content)
 
-    $accent = [System.Drawing.SystemColors]::Highlight
+    $accentColor = [System.Drawing.SystemColors]::Highlight
     $softAccent = [System.Drawing.Color]::FromArgb(240,247,255)
     $softDanger = [System.Drawing.Color]::FromArgb(255,246,246)
 
@@ -115,7 +115,7 @@ function Show-WindowsDeviceLink {
             [int]$Y,
             [int]$Width,
             [int]$Height,
-            [switch]$Accent
+            [switch]$UseAccent
         )
 
         $panel = New-Object System.Windows.Forms.Panel
@@ -125,9 +125,9 @@ function Show-WindowsDeviceLink {
         $panel.BorderStyle = [System.Windows.Forms.BorderStyle]::None
         $content.Controls.Add($panel)
 
-        if ($Accent) {
+        if ($UseAccent) {
             $bar = New-Object System.Windows.Forms.Panel
-            $bar.BackColor = $accent
+            $bar.BackColor = $accentColor
             $bar.Location = [System.Drawing.Point]::new(0,0)
             $bar.Size = [System.Drawing.Size]::new(3,$Height)
             $panel.Controls.Add($bar)
@@ -298,12 +298,12 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiLocalAssociation = $null
     $script:WdlGuiCloudStatus = $null
 
-    $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126 -Accent
+    $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126 -UseAccent
     $associationCard = New-Card -Title 'Association' -X 536 -Y 12 -Width 508 -Height 126 -Accent
 
     $ui.DeviceName = New-ValuePair -Parent $deviceCard -Caption 'Device' -Y 34
     $ui.Serial     = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 56
-    $ui.Runtime    = New-ValuePair -Parent $deviceCard -Caption 'Runtime' -Y 78
+    $ui.Environment = New-ValuePair -Parent $deviceCard -Caption 'Environment' -Y 78
     $ui.Auth       = New-ValuePair -Parent $deviceCard -Caption 'Authentication' -Y 100
 
     $ui.Firmware   = New-ValuePair -Parent $associationCard -Caption 'Firmware' -Y 34
@@ -485,6 +485,9 @@ function Show-WindowsDeviceLink {
             $control.Enabled = -not $Busy
         }
 
+        $actionsPanel.Enabled = -not $Busy
+        $tenantSelector.Enabled = -not $Busy
+
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
 
@@ -501,6 +504,7 @@ function Show-WindowsDeviceLink {
 
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
         $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction SilentlyContinue
         $support = Test-WindowsDeviceLinkSupport
         $local = Get-WindowsDeviceLinkLocalAssociation
 
@@ -509,14 +513,24 @@ function Show-WindowsDeviceLink {
         $ui.DeviceName.Text = "$($cs.Manufacturer) $($cs.Model)".Trim()
         $ui.Serial.Text = [string]$bios.SerialNumber
 
-        if ($support.Supported) {
-            $runtimeText = "$($support.ActivationMode)"
-            if ($support.DllVersion) { $runtimeText += " | $($support.DllVersion)" }
-            $ui.Runtime.Text = $runtimeText
+        if ($support.Environment -eq 'WindowsPE') {
+            $environmentText = 'Windows PE'
+        }
+        elseif ($os -and [string]$os.Caption -match 'Windows 11') {
+            $environmentText = 'Windows 11'
+        }
+        elseif ($os -and -not [string]::IsNullOrWhiteSpace([string]$os.Caption)) {
+            $environmentText = ([string]$os.Caption).Replace('Microsoft ','')
         }
         else {
-            $ui.Runtime.Text = "Unsupported: $($support.Reason)"
+            $environmentText = [string]$support.Environment
         }
+
+        if (-not $support.Supported) {
+            $environmentText += " (unsupported: $($support.Reason))"
+        }
+
+        $ui.Environment.Text = $environmentText
 
         $selectedTenant = Get-SelectedTenantId
         $ui.Auth.Text = if ($selectedTenant) { "$Method | $selectedTenant" } else { $Method }
@@ -826,7 +840,7 @@ function Show-WindowsDeviceLink {
     })
 
     function Resize-GuiLayout {
-        $fullWidth = [Math]::Max(780,$content.ClientSize.Width - 28)
+        $fullWidth = [Math]::Max(760,$content.ClientSize.Width - 32)
         $gap = 14
         $halfWidth = [Math]::Floor(($fullWidth - $gap) / 2)
 
@@ -876,11 +890,17 @@ function Show-WindowsDeviceLink {
         }
 
         $requiredHeight = $activityY + 188
-        if ($requiredHeight -gt $content.ClientSize.Height) {
-            $content.AutoScrollMinSize = [System.Drawing.Size]::new(0,$requiredHeight)
+        $availableHeight = [Math]::Max(0,$content.ClientSize.Height - 4)
+
+        if ($requiredHeight -gt $availableHeight) {
+            $content.AutoScroll = $true
+            $content.HorizontalScroll.Enabled = $false
+            $content.HorizontalScroll.Visible = $false
+            $content.AutoScrollMinSize = [System.Drawing.Size]::new(1,$requiredHeight)
         }
         else {
             $content.AutoScrollMinSize = [System.Drawing.Size]::Empty
+            $content.AutoScroll = $false
         }
     }
 
