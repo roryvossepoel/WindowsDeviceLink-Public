@@ -66,15 +66,12 @@ if (-not $methodParameterAst) {
     throw 'FAIL: Show-WindowsDeviceLink Method parameter AST could not be resolved.'
 }
 
-$methodDefault = if ($methodParameterAst.DefaultValue) {
-    $methodParameterAst.DefaultValue.Extent.Text.Trim()
-}
-else {
-    $null
+if ($methodParameterAst.DefaultValue) {
+    throw 'FAIL: Show-WindowsDeviceLink -Method must not have a static parameter default; the GUI resolves the default by environment.'
 }
 
-if ($methodDefault -ne "'Interactive'") {
-    throw "FAIL: Show-WindowsDeviceLink must keep Interactive as the default authentication method. Observed default: '$methodDefault'."
+if ($source -notmatch [regex]::Escape("$Method = if ($isWinPE) { 'DeviceCode' } else { 'Interactive' }")) {
+    throw 'FAIL: Show-WindowsDeviceLink must default to DeviceCode in Windows PE and Interactive on full Windows when -Method is omitted.'
 }
 
 
