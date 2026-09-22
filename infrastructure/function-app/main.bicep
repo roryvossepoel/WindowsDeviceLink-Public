@@ -253,6 +253,8 @@ resource preassociateFunction 'Microsoft.Web/sites/functions@2024-04-01' = {
     files: {
       'function.json': functionConfigText
       'run.ps1': functionScript
+      'BackendAuth.ps1': backendAuthScript
+      'AssociationOperations.ps1': associationOperationsScript
     }
   }
   dependsOn: [
