@@ -25,28 +25,27 @@ $hostPath = Join-Path $functionRoot 'host.json'
 $bicepPath = Join-Path $root 'infrastructure\function-app\main.bicep'
 $armPath = Join-Path $root 'infrastructure\function-app\azuredeploy.json'
 
-foreach ($path in @($runPath,$functionJsonPath,$lookupRunPath,$lookupFunctionJsonPath,$reconcileRunPath,$reconcileFunctionJsonPath,$associationOperationsPath,    Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure backend file is missing: $path"
+foreach ($path in @(
+    $runPath,$functionJsonPath,
+    $lookupRunPath,$lookupFunctionJsonPath,
+    $reconcileRunPath,$reconcileFunctionJsonPath,
+    $associationOperationsPath,$sharedBackendPath,
+    $hostPath,$bicepPath,$armPath
+)) {
+    Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure Function backend file is missing: $path"
 }
 
-$tokens = $null
-$errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile($runPath,[ref]$tokens,[ref]$errors)
-Assert-True ($errors.Count -eq 0) ("Function run.ps1 has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
-
-$tokens = $null
-$errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile($lookupRunPath,[ref]$tokens,[ref]$errors)
-Assert-True ($errors.Count -eq 0) ("Lookup run.ps1 has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
-
-$tokens = $null
-$errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile($sharedBackendPath,[ref]$tokens,[ref]$errors)
-Assert-True ($errors.Count -eq 0) ("Shared backend helper has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
+foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$associationOperationsPath,$sharedBackendPath)) {
+    $tokens = $null
+    $errors = $null
+    [void][Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
+    Assert-True ($errors.Count -eq 0) ("PowerShell parse errors in '$scriptPath': " + (($errors | ForEach-Object Message) -join '; '))
+}
 
 $functionJson = Get-Content -LiteralPath $functionJsonPath -Raw | ConvertFrom-Json
 $trigger = @($functionJson.bindings | Where-Object type -eq 'httpTrigger')
-Assert-True ($trigger.Count -eq 1) 'Function must expose exactly one HTTP trigger.'
-Assert-True ([string]$trigger[0].route -eq 'devicelink/preassociate') 'Unexpected Function route.'
+Assert-True ($trigger.Count -eq 1) 'Preassociate Function must expose exactly one HTTP trigger.'
+Assert-True ([string]$trigger[0].route -eq 'devicelink/preassociate') 'Unexpected preassociate Function route.'
 Assert-True ([string]$trigger[0].authLevel -eq 'anonymous') 'Function uses custom X-WindowsDeviceLink-Key validation and must keep the declared authLevel consistent.'
 
 $lookupFunctionJson = Get-Content -LiteralPath $lookupFunctionJsonPath -Raw | ConvertFrom-Json
@@ -55,27 +54,12 @@ Assert-True ($lookupTrigger.Count -eq 1) 'Lookup Function must expose exactly on
 Assert-True ([string]$lookupTrigger[0].route -eq 'devicelink/lookup') 'Unexpected lookup Function route.'
 Assert-True ('get' -in @($lookupTrigger[0].methods)) 'Lookup Function must allow GET.'
 
-$tokens = $null
-$errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile($reconcileRunPath,[ref]$tokens,[ref]$errors)
-Assert-True ($errors.Count -eq 0) ("Reconcile run.ps1 has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
-
-$tokens = $null
-$errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile($associationOperationsPath,[ref]$tokens,[ref]$errors)
-Assert-True ($errors.Count -eq 0) ("AssociationOperations.ps1 has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
-
-$tokens = $null
-$errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile(Assert-True ($errors.Count -eq 0) ("Automation runbook has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
-
 $reconcileFunctionJson = Get-Content -LiteralPath $reconcileFunctionJsonPath -Raw | ConvertFrom-Json
 $reconcileTrigger = @($reconcileFunctionJson.bindings | Where-Object type -eq 'httpTrigger')
 Assert-True ($reconcileTrigger.Count -eq 1) 'Reconcile Function must expose exactly one HTTP trigger.'
 Assert-True ([string]$reconcileTrigger[0].route -eq 'devicelink/reconcile') 'Unexpected reconcile Function route.'
 Assert-True ('post' -in @($reconcileTrigger[0].methods)) 'Reconcile Function must allow POST.'
 Assert-True ('delete' -notin @($reconcileTrigger[0].methods)) 'Reconcile Function must not expose DELETE.'
-
 
 $run = Get-Content -LiteralPath $runPath -Raw
 foreach ($needle in @(
@@ -91,7 +75,6 @@ foreach ($needle in @(
 )) {
     Assert-True ($run.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Function receiver is missing expected contract text '$needle'."
 }
-
 Assert-True ($run.IndexOf('Write-Information $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 Assert-True ($run.IndexOf('Write-Host $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 Assert-True ($run.IndexOf('Write-Output $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
@@ -112,7 +95,6 @@ foreach ($needle in @(
 )) {
     Assert-True ($lookupContract.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Lookup Function/shared backend is missing expected contract text '$needle'."
 }
-
 Assert-True ($lookupRun.IndexOf('device.deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Lookup Function must not retrieve or return DeviceLink payload data.'
 
 $reconcileRun = Get-Content -LiteralPath $reconcileRunPath -Raw
@@ -137,7 +119,6 @@ foreach ($needle in @(
 )) {
     Assert-True ($reconcileContract.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Reconcile Function/shared operations are missing expected contract text '$needle'."
 }
-
 Assert-True ($reconcileRun.IndexOf('Write-Information $deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Reconcile Function must not log DeviceLink payload data.'
 Assert-True ($reconcileRun.IndexOf('Write-Host $deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Reconcile Function must not log DeviceLink payload data.'
 
@@ -162,6 +143,8 @@ foreach ($needle in @(
 )) {
     Assert-True ($armText.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "ARM template is missing expected resource/configuration '$needle'."
 }
+
+Assert-True ($armText.IndexOf('"methods": [\n            "delete"',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function ARM template must not expose a standalone DELETE HTTP trigger.'
 
 $bicep = Get-Content -LiteralPath $bicepPath -Raw
 Assert-True ($bicep -match 'loadTextContent') 'Bicep deployment must source the committed Function receiver files.'
