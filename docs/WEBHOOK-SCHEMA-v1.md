@@ -75,13 +75,8 @@ The recommended correlation value for diagnostics is `requestId`.
 
 ## Compatible receivers
 
-Schema version 1 is shared by:
+Schema version 1 is implemented by the Azure Function receiver in `function-app/`. Compatible third-party/custom receivers can implement the same client contract.
 
-- the Azure Automation receiver in `runbooks/`;
-- the Azure Function receiver in `function-app/`;
-- compatible third-party/custom receivers.
-
-The client contract does not change based on the backend implementation.
 
 ## Tenant routing
 
@@ -98,7 +93,7 @@ The receiving backend is responsible for:
 
 ## Reconcile requests
 
-The reference backends also support a separate `DeviceLinkReconcile` request contract for New / Move / Update decisions.
+The Azure Function backend also supports a separate `DeviceLinkReconcile` request contract for New / Move / Update decisions.
 
 It uses schema version 1 but has different required routing fields (`sourceTenantId` / `targetTenantId`) and must not be treated as a normal `DeviceLinkPreassociation` request.
 
