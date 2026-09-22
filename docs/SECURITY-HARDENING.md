@@ -1,8 +1,8 @@
 # Security and hardening guidance
 
-WindowsDeviceLink provides backend code and **reference Azure deployment templates** for Azure Functions and Azure Automation.
+WindowsDeviceLink provides backend code and a **reference Azure deployment template** for the Azure Function App.
 
-The templates are intended to provide a functional, security-conscious starting point. They are **not** a complete Azure landing zone and they do not prescribe one production network/security architecture for every organization.
+The template is intended to provide a functional, security-conscious starting point. It is **not** a complete Azure landing zone and does not prescribe one production network/security architecture for every organization.
 
 ## Responsibility boundary
 
@@ -14,7 +14,7 @@ WindowsDeviceLink provides:
 - minimal Microsoft Graph permissions;
 - app-only authentication examples;
 - secret-safe logging behavior;
-- reference Function and Automation deployments;
+- a reference Azure Function deployment;
 - documented single-tenant and multitenant identity patterns.
 
 The deploying organization remains responsible for deciding which additional controls its environment requires.
@@ -23,17 +23,9 @@ The deploying organization remains responsible for deciding which additional con
 
 ### Single tenant
 
-When the Azure workload and the target Microsoft Graph tenant are the same tenant, **Managed Identity is preferred where the selected backend supports the required Graph flow**.
+The Azure Function reference backend uses its system-assigned Managed Identity for **Key Vault access**. Microsoft Graph authentication in the supplied multitenant implementation uses the backend App Registration.
 
-Benefits include:
-
-- no application secret or private key to distribute;
-- platform-managed credential lifecycle;
-- no credential value exposed to the application.
-
-The Azure Automation reference backend supports this same-tenant Managed Identity pattern.
-
-The current Azure Function reference backend uses its system-assigned Managed Identity for **Key Vault access**. Microsoft Graph authentication in that reference implementation uses the backend App Registration. Organizations that require direct same-tenant Graph authentication with Managed Identity can adapt the Function implementation to their own architecture.
+Organizations that require direct same-tenant Graph authentication with Managed Identity can adapt the Function implementation to their own architecture.
 
 ### Multiple tenants
 
@@ -88,7 +80,6 @@ Examples include:
 - Defender for Cloud;
 - certificate rotation policies;
 - custom monitoring/alerting;
-- Hybrid Runbook Workers.
 
 These are deliberately **not** all implemented by the reference templates.
 
