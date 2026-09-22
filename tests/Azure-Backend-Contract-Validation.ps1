@@ -62,6 +62,10 @@ Assert-True ('post' -in @($reconcileTrigger[0].methods)) 'Reconcile Function mus
 Assert-True ('delete' -notin @($reconcileTrigger[0].methods)) 'Reconcile Function must not expose DELETE.'
 
 $run = Get-Content -LiteralPath $runPath -Raw
+$sharedBackendForPreassociate = Get-Content -LiteralPath $sharedBackendPath -Raw
+$associationOperationsForPreassociate = Get-Content -LiteralPath $associationOperationsPath -Raw
+$preassociateContract = $run + [Environment]::NewLine + $sharedBackendForPreassociate + [Environment]::NewLine + $associationOperationsForPreassociate
+
 foreach ($needle in @(
     'X-WindowsDeviceLink-Key',
     'X-WindowsDeviceLink-Schema',
@@ -73,7 +77,7 @@ foreach ($needle in @(
     'FixedTimeEquals',
     'AssociationConflict'
 )) {
-    Assert-True ($run.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Function receiver is missing expected contract text '$needle'."
+    Assert-True ($preassociateContract.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Function preassociate/shared backend is missing expected contract text '$needle'."
 }
 Assert-True ($run.IndexOf('Write-Information $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 Assert-True ($run.IndexOf('Write-Host $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
