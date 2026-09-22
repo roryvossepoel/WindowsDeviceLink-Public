@@ -42,7 +42,7 @@ The cloud cmdlets accept an explicit authentication `-Method` where authenticati
 | `CertificateSubjectName` | Certificate already installed locally | Certificate/private key | `TenantId`, `ClientId`, `CertificateSubjectName` |
 | `EnvironmentVariable` | Existing client-credential automation | Yes | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` |
 | `ManagedIdentity` | Azure-hosted execution with an identity | No | Optional `ClientId` |
-| `Webhook` | Registration through an automation endpoint | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
+| `Webhook` | Registration through the Azure Function backend | No Graph credential | `WebhookUri`; optional `WebhookApiKey`, `TenantId` |
 
 `Webhook` applies to `Register-WindowsDeviceLink`. Association lookup/removal and online diagnostics are direct tenant-side Graph operations. `Initialize-WindowsDeviceLink` intentionally excludes Webhook because it must read and verify tenant-side state as part of its idempotent workflow.
 
@@ -152,7 +152,7 @@ $deviceLink | Register-WindowsDeviceLink `
     -TenantId '<target-tenant-id>'
 ```
 
-The receiving automation layer owns tenant routing and Graph authentication.
+The Azure Function backend owns tenant routing and Graph authentication.
 
 For idempotent `Initialize-WindowsDeviceLink`, use one of its supported direct authentication methods because initialization requires tenant-side lookup and verification.
 
