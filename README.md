@@ -15,7 +15,7 @@ WindowsDeviceLink can:
 - identify the source tenant locally from current DeviceLink registry/JWT metadata without Graph;
 - discover and complete device-side association on supported full Windows builds;
 - provide diagnostics, health classification, preflight checks and safe lifecycle orchestration;
-- send pre-association requests to optional Azure Function or Azure Automation backends.
+- send pre-association requests to the optional Azure Function backend.
 
 > [!IMPORTANT]
 > WindowsDeviceLink is preview / proof-of-concept software. The WinPE implementation and native DeviceLink full association use undocumented Windows Runtime interfaces, and Device Association cloud operations use Microsoft Graph beta endpoints. These can change without notice.
@@ -26,7 +26,7 @@ WindowsDeviceLink can:
 - **Want to know which command to run?** See the [FAQ / common operations](docs/FAQ.md).
 - **Installing on Windows 11 or WinPE?** Read the [installation guide](docs/INSTALLATION.md).
 - **Using WinPE before Windows installation?** Read the [WinPE workflow and support boundaries](docs/WINPE-WORKFLOW.md).
-- **Using an Azure backend?** Read [Azure backend options](docs/AZURE-BACKEND.md).
+- **Using the Azure Function backend?** Read [Azure Function backend](docs/AZURE-BACKEND.md).
 
 ## Current version
 
@@ -259,53 +259,40 @@ Native DeviceLink discovery/completion in WinPE remains experimental. Current re
 
 See [WINPE-WORKFLOW.md](docs/WINPE-WORKFLOW.md).
 
-## Azure backends
+## Azure Function backend
 
-WindowsDeviceLink includes two **optional reference backends** for centralized/unattended pre-association.
+WindowsDeviceLink includes an optional Azure Function backend for centralized/multitenant Device Association operations.
 
-### Azure Function
+It provides:
 
-HTTP API backend with pre-association and multitenant lookup.
+- fast multitenant lookup;
+- pre-association;
+- safe New / Update / Move reconciliation;
+- backend-side Graph authentication and verification.
 
-[![Deploy Azure Function](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
 
-### Azure Automation
+For cross-tenant use, a multitenant App Registration with certificate authentication is preferred. Client-secret authentication remains a fallback.
 
-PowerShell runbook backend. The webhook itself is created after deployment so its secret URL is not exposed through deployment output/history.
-
-[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
-
-These are working reference deployments, not prescribed production landing zones.
-
-- Same-tenant Azure Automation: **Managed Identity preferred**.
-- Cross-tenant: **multitenant App Registration + certificate preferred**.
-- Client secret: supported fallback.
-
-See:
-
-- [Azure backend architecture](docs/AZURE-BACKEND.md)
-- [App registration](docs/APP-REGISTRATION.md)
-- [Multitenant admin consent](docs/MULTITENANT-CONSENT.md)
-- [Security and hardening guidance](docs/SECURITY-HARDENING.md)
-- [Function deployment](infrastructure/function-app/README.md)
-- [Automation deployment](infrastructure/automation/README.md)
-
-### Using the webhook backend
-
-Both backends consume the same webhook contract:
+`Register-WindowsDeviceLink -Method Webhook` can send pre-association requests to the Function:
 
 ```powershell
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
         -Method Webhook `
-        -WebhookUri '<backend-uri>' `
+        -WebhookUri '<function-preassociate-uri>' `
         -WebhookApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
         -TenantId '<target-tenant-id>'
 ```
 
-`WebhookApiKey` protects the receiver. `TenantId` is target-tenant routing metadata. Neither replaces Microsoft Graph authentication performed by the backend.
+See:
 
-See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
+- [Azure Function backend](docs/AZURE-BACKEND.md)
+- [Function deployment](infrastructure/function-app/README.md)
+- [App registration](docs/APP-REGISTRATION.md)
+- [Multitenant admin consent](docs/MULTITENANT-CONSENT.md)
+- [Reconcile schema](docs/RECONCILE-SCHEMA-v1.md)
+- [Security and hardening guidance](docs/SECURITY-HARDENING.md)
 
 ## Public commands
 
@@ -340,7 +327,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 - [INSTALLATION.md](docs/INSTALLATION.md) — Windows 11 / WinPE installation and troubleshooting.
 - [WINPE-WORKFLOW.md](docs/WINPE-WORKFLOW.md) — supported WinPE workflow and native completion boundary.
 - [ONLINE-METHODS.md](docs/ONLINE-METHODS.md) — cloud operations and authentication methods.
-- [AZURE-BACKEND.md](docs/AZURE-BACKEND.md) — Function / Automation architecture and deployment.
+- [AZURE-BACKEND.md](docs/AZURE-BACKEND.md) — Azure Function backend architecture and deployment.
 - [APP-REGISTRATION.md](docs/APP-REGISTRATION.md) — multitenant Entra App Registration and Graph permission.
 - [MULTITENANT-CONSENT.md](docs/MULTITENANT-CONSENT.md) — onboarding target tenants with explicit admin consent.
 - [MULTITENANT-LOOKUP.md](docs/MULTITENANT-LOOKUP.md) — search managed tenants by serial number.
@@ -359,7 +346,7 @@ See [WEBHOOK-SCHEMA-v1.md](docs/WEBHOOK-SCHEMA-v1.md).
 
 Preview release line: `0.9.0-preview1`.
 
-In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, the optional full-Windows operator GUI, multiple authentication methods, webhook transport and optional Azure reference backends.
+In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, the optional full-Windows operator GUI, multiple authentication methods, webhook transport and the optional Azure Function reference backend.
 
 Not currently in scope: ARM64, Device Preparation policy assignment, classic Autopilot v1 management, automatic destructive repair, cryptographic association-JWT signature verification, or production support guarantees.
 
