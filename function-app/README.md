@@ -1,8 +1,8 @@
 # WindowsDeviceLink Azure Function receiver
 
-This folder contains the PowerShell Azure Function receiver for `Register-WindowsDeviceLink -Method Webhook`.
+This folder contains the WindowsDeviceLink PowerShell Azure Function backend. It is the project's only server-side backend.
 
-The Function accepts the existing webhook schema v1 and performs the tenant-side Microsoft Graph pre-association. Windows/WinPE clients do not need Graph credentials.
+The Function provides pre-association, fast multitenant lookup and safe New / Update / Move reconciliation. Windows/WinPE clients do not need Microsoft Graph credentials.
 
 ## Endpoint
 
