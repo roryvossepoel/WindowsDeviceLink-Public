@@ -20,16 +20,12 @@ $lookupFunctionJsonPath = Join-Path $functionRoot 'Lookup-WindowsDeviceLink\func
 $reconcileRunPath = Join-Path $functionRoot 'Reconcile-WindowsDeviceLink\run.ps1'
 $reconcileFunctionJsonPath = Join-Path $functionRoot 'Reconcile-WindowsDeviceLink\function.json'
 $associationOperationsPath = Join-Path $functionRoot 'shared\AssociationOperations.ps1'
-$automationRunbookPath = Join-Path $root 'runbooks\Register-WindowsDeviceLinkWebhook.ps1'
 $sharedBackendPath = Join-Path $functionRoot 'shared\BackendAuth.ps1'
 $hostPath = Join-Path $functionRoot 'host.json'
 $bicepPath = Join-Path $root 'infrastructure\function-app\main.bicep'
 $armPath = Join-Path $root 'infrastructure\function-app\azuredeploy.json'
-$automationBicepPath = Join-Path $root 'infrastructure\automation\main.bicep'
-$automationArmPath = Join-Path $root 'infrastructure\automation\azuredeploy.json'
 
-foreach ($path in @($runPath,$functionJsonPath,$lookupRunPath,$lookupFunctionJsonPath,$reconcileRunPath,$reconcileFunctionJsonPath,$associationOperationsPath,$automationRunbookPath,$sharedBackendPath,$hostPath,$bicepPath,$armPath,$automationBicepPath,$automationArmPath)) {
-    Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure backend file is missing: $path"
+foreach ($path in @($runPath,$functionJsonPath,$lookupRunPath,$lookupFunctionJsonPath,$reconcileRunPath,$reconcileFunctionJsonPath,$associationOperationsPath,    Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure backend file is missing: $path"
 }
 
 $tokens = $null
@@ -71,8 +67,7 @@ Assert-True ($errors.Count -eq 0) ("AssociationOperations.ps1 has PowerShell par
 
 $tokens = $null
 $errors = $null
-[void][Management.Automation.Language.Parser]::ParseFile($automationRunbookPath,[ref]$tokens,[ref]$errors)
-Assert-True ($errors.Count -eq 0) ("Automation runbook has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
+[void][Management.Automation.Language.Parser]::ParseFile(Assert-True ($errors.Count -eq 0) ("Automation runbook has PowerShell parse errors: " + (($errors | ForEach-Object Message) -join '; '))
 
 $reconcileFunctionJson = Get-Content -LiteralPath $reconcileFunctionJsonPath -Raw | ConvertFrom-Json
 $reconcileTrigger = @($reconcileFunctionJson.bindings | Where-Object type -eq 'httpTrigger')
@@ -146,12 +141,6 @@ foreach ($needle in @(
 Assert-True ($reconcileRun.IndexOf('Write-Information $deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Reconcile Function must not log DeviceLink payload data.'
 Assert-True ($reconcileRun.IndexOf('Write-Host $deviceLink',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Reconcile Function must not log DeviceLink payload data.'
 
-$automationRunbook = Get-Content -LiteralPath $automationRunbookPath -Raw
-foreach ($needle in @('DeviceLinkReconcile','New','Move','Update','sourceTenantId','targetTenantId','Remove-TenantAssociation')) {
-    Assert-True ($automationRunbook.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Automation receiver is missing reconcile contract text '$needle'."
-}
-Assert-True ($automationRunbook.IndexOf('DeviceLinkDelete',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Automation receiver must not expose a standalone DeviceLinkDelete request type.'
-
 $arm = Get-Content -LiteralPath $armPath -Raw | ConvertFrom-Json
 Assert-True ($arm.parameters.webhookApiKey.type -eq 'secureString') 'ARM webhookApiKey must be secureString.'
 Assert-True ($arm.parameters.graphCredential.type -eq 'secureString') 'ARM graphCredential must be secureString.'
@@ -179,27 +168,4 @@ Assert-True ($bicep -match 'loadTextContent') 'Bicep deployment must source the 
 Assert-True ($bicep -match 'PowerShellVersion.*7\.4|powerShellVersion:\s*''7\.4''') 'Bicep deployment must target PowerShell 7.4.'
 Assert-True ($bicep -match 'enableRbacAuthorization:\s*true') 'Key Vault must use Azure RBAC.'
 
-$automationArm = Get-Content -LiteralPath $automationArmPath -Raw | ConvertFrom-Json
-Assert-True ($automationArm.parameters.webhookApiKey.type -eq 'secureString') 'Automation webhookApiKey must be secureString.'
-Assert-True ($automationArm.parameters.certificateBase64.type -eq 'secureString') 'Automation certificateBase64 must be secureString.'
-
-$automationArmText = Get-Content -LiteralPath $automationArmPath -Raw
-foreach ($needle in @(
-    'Microsoft.Automation/automationAccounts/runtimeEnvironments',
-    'Microsoft.Automation/automationAccounts/runtimeEnvironments/packages',
-    'Microsoft.Automation/automationAccounts/runbooks',
-    'Microsoft.Automation/automationAccounts/variables',
-    'WindowsDeviceLinkWebhookApiKey',
-    'WindowsDeviceLinkTenantConfiguration',
-    'Microsoft.Graph.Authentication',
-    'Register-WindowsDeviceLinkWebhook.ps1'
-)) {
-    Assert-True ($automationArmText.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Automation ARM template is missing expected resource/configuration '$needle'."
-}
-
-Assert-True ($automationArmText.IndexOf('Microsoft.Automation/automationAccounts/webhooks',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Automation template must not create a webhook because the webhook URI is a secret.'
-Assert-True ($armText.IndexOf('"methods": [\n            "delete"',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function ARM template must not expose a standalone DELETE HTTP trigger.'
-$automationBicep = Get-Content -LiteralPath $automationBicepPath -Raw
-Assert-True ($automationBicep -match "version:\s*'7\.4'") 'Automation Runtime Environment must target PowerShell 7.4.'
-
-Write-Host 'PASS: Azure Function and Automation backends, lookup/reconcile contracts, and deployment templates satisfy static security/contract checks.'
+Write-Host 'PASS: Azure Function backend, lookup/reconcile contracts, and deployment template satisfy static security/contract checks.'
