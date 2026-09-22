@@ -324,7 +324,7 @@ See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for the supported installatio
 
 ## Webhook validation
 
-The webhook route has been validated end-to-end on Windows 11, including HTTPS POST, schema/request ID headers, optional API-key header, tenant routing, Azure Automation PowerShell 7.4, Managed Identity Graph authentication, successful preassociation and targeted duplicate handling.
+The webhook/pre-association contract has been validated end-to-end on Windows 11. The current active backend is the Azure Function App; lookup and reconcile have static contract coverage and are being validated live across configured tenants.
 
 See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
@@ -347,6 +347,6 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 - Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
 - Retest and optimize the beta Device Association serial-number server-side lookup; the current client-side fallback is functionally correct.
 - Webhook transport in AMD64 WinPE.
-- Second target tenant through the same webhook/runbook routing table.
+- Second target tenant through the Azure Function allow-list/routing configuration.
 - Additional Windows 11 / WinPE builds and OEMs/models.
 - Non-Global Microsoft clouds.
