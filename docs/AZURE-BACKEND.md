@@ -91,6 +91,55 @@ The Function uses application settings including:
 - `WINDOWSDEVICELINK_CERTIFICATE_PASSWORD` (optional)
 - `WINDOWSDEVICELINK_CLIENT_SECRET` (fallback)
 
+## Function-backed initialization
+
+`Initialize-WindowsDeviceLink` can use the Function App for cloud-state orchestration while keeping native DeviceLink completion local to Windows.
+
+Pre-association only:
+
+```powershell
+Initialize-WindowsDeviceLink `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
+    -TargetTenantId '<target-tenant-id>'
+```
+
+Full association:
+
+```powershell
+Initialize-WindowsDeviceLink `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
+    -TargetTenantId '<target-tenant-id>' `
+    -FullAssociation
+```
+
+The backend path performs an authoritative all-tenant lookup first.
+
+```text
+not found anywhere
+    -> pre-associate in TargetTenantId
+
+found in TargetTenantId
+    -> no cloud change
+
+found in another tenant
+    -> BLOCK
+    -> explicit tenant-move workflow required
+```
+
+`Initialize-WindowsDeviceLink` deliberately does **not** perform an implicit Move. A cross-tenant move deletes tenant-side state and therefore remains an explicit operation.
+
+With `-FullAssociation`, once the requested target tenant is verified as pre-associated, WindowsDeviceLink invokes the existing guarded local `Complete-WindowsDeviceLinkAssociation` operation. The Function App is then queried again to verify the final tenant-side state.
+
+`-BackendUri` is the API base URI ending in:
+
+```text
+/api/devicelink
+```
+
+WindowsDeviceLink derives the `lookup` and `preassociate` routes from that base URI.
+
 ## Client pre-association
 
 ```powershell
