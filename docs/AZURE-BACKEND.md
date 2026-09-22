@@ -1,39 +1,35 @@
-# Azure backend options
+# Azure Function backend
 
 > [!IMPORTANT]
-> The Azure templates in this repository are **reference deployments**: functional, security-conscious starting points rather than a prescribed production landing zone. Network isolation, ingress restrictions, private endpoints, SIEM integration and other environment-specific hardening remain the deploying organization's responsibility. See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
+> The Azure template in this repository is a **reference deployment**: a functional, security-conscious starting point rather than a prescribed production landing zone. Network isolation, ingress restrictions, private endpoints, SIEM integration and other environment-specific hardening remain the deploying organization's responsibility. See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
 
-WindowsDeviceLink can send a pre-association request to a server-side receiver instead of authenticating directly to Microsoft Graph from Windows or WinPE.
+WindowsDeviceLink uses the Azure Function App as its only server-side backend.
 
-The client-side module already supports the routing values needed by both receivers:
+The Function keeps Microsoft Graph credentials off Windows/WinPE endpoints and provides a fast HTTP API for:
 
-```powershell
-$deviceLink | Register-WindowsDeviceLink `
-    -Method Webhook `
-    -WebhookUri '<receiver-uri>' `
-    -WebhookApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
-    -TenantId '<target-tenant-id>'
-```
-
-`WebhookApiKey` becomes the `X-WindowsDeviceLink-Key` header. `TenantId` is included as routing information in webhook schema v1.
+- pre-association;
+- multitenant lookup;
+- New / Update / Move reconciliation;
+- authoritative pre/post-state verification.
 
 ## Architecture
 
 ```text
 Windows / WinPE
     |
-    | Register-WindowsDeviceLink -Method Webhook
-    | schemaVersion=1
-    | tenantId=<target tenant>
-    | X-WindowsDeviceLink-Key
+    | HTTPS + X-WindowsDeviceLink-Key
     v
 +---------------------------------------+
-| Azure Function OR Azure Automation    |
+| Azure Function App                    |
 |                                       |
-| validate schema                       |
-| validate API key                      |
-| enforce tenant allow/routing          |
+| /api/devicelink/preassociate          |
+| /api/devicelink/lookup                |
+| /api/devicelink/reconcile             |
+|                                       |
+| validate schema/API key               |
+| enforce tenant allow list             |
 | obtain app-only Graph token           |
+| lookup / mutate / verify              |
 +---------------------------------------+
                     |
                     v
@@ -43,155 +39,108 @@ Windows / WinPE
                     | application permission
                     v
              Microsoft Graph
-                    |
-                    v
-POST /beta/deviceManagement/tenantAssociatedDevices/importTenantAssociatedDevice
 ```
 
-## Backend choice
+The previous Azure Automation/runbook reference backend was removed. The project intentionally maintains one backend implementation so lookup, registration, reconciliation, safety checks and deployment remain consistent.
 
-### Azure Function
+## Endpoints
 
-Recommended when you want:
+```text
+POST /api/devicelink/preassociate
+GET  /api/devicelink/lookup?serialNumber=<serial>
+POST /api/devicelink/reconcile
+```
 
-- a conventional HTTP endpoint;
-- explicit HTTP status codes;
-- a tenant allow list;
-- native app-only OAuth without Graph SDK modules;
-- Key Vault-backed API key and Graph credential;
-- Application Insights;
-- infrastructure-as-code / Deploy to Azure.
-
-The Function receiver is in [../function-app](../function-app).
-
-### Azure Automation runbook
-
-Useful when an Automation Account already exists or when a PowerShell-centric operational model is preferred.
-
-The current runbook is in [../runbooks](../runbooks).
-
-For same-tenant Azure Automation, Managed Identity is preferred because no application credential needs to be managed. For cross-tenant use, certificate authentication through a multitenant App Registration is the portable option. Client-secret authentication is a fallback, not the preferred design.
+No standalone DELETE endpoint is exposed. Deletion is an internal guarded step of a validated Move.
 
 ## Deploy to Azure
 
-Both Azure backends now have resource-group deployment templates.
-
-### Azure Function
-
-The Function backend has a resource-group ARM template generated from the Bicep design.
-
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
 
-The deployment creates:
+The deployment creates the Function App and its supporting reference resources, including Key Vault, storage and Application Insights.
 
-- Windows Consumption Function App;
-- PowerShell 7.4 / Functions v4 configuration;
-- Storage Account;
-- Application Insights;
-- Key Vault;
-- system-assigned managed identity;
-- Key Vault Secrets User role assignment;
-- webhook API-key secret;
-- Graph credential secret;
-- inline `Register-WindowsDeviceLink` HTTP function;
-- inline `Lookup-WindowsDeviceLink` multitenant search function;
-- inline `Reconcile-WindowsDeviceLink` New / Move / Update function.
+See [../infrastructure/function-app/README.md](../infrastructure/function-app/README.md).
 
-The template intentionally does **not** create the multitenant Entra application or grant admin consent in other tenants. Those are identity-governance actions and remain explicit administrator steps.
+## Authentication
 
-## Deployment inputs
+For a backend serving multiple Entra tenants, the preferred model is:
 
-The template asks for:
-
-- `graphClientId`;
-- `allowedTenantIds`;
-- optional `defaultTenantId`;
-- optional `tenantNamesJson` for friendly lookup results;
-- `graphCredentialType` (`Certificate` preferred, `ClientSecret` supported);
-- secure Graph credential;
-- optional certificate password;
-- secure webhook API key.
-
-For `Certificate`, `graphCredential` is the base64 representation of the PFX.
-
-Example:
-
-```powershell
-[Convert]::ToBase64String(
-    [IO.File]::ReadAllBytes('C:\Secure\WindowsDeviceLinkBackend.pfx')
-)
+```text
+multitenant Entra App Registration
++ certificate credential
++ admin consent in every target tenant
++ DeviceManagementServiceConfig.ReadWrite.All
 ```
 
-Do not commit the resulting value.
+A client secret is supported as a fallback.
 
-## Client configuration
+The Function's system-assigned Managed Identity is used for Key Vault access in the reference deployment. The supplied Function code uses the configured App Registration for Microsoft Graph authentication.
 
-After deployment, use the Function endpoint output as `-WebhookUri`:
+See [APP-REGISTRATION.md](APP-REGISTRATION.md) and [MULTITENANT-CONSENT.md](MULTITENANT-CONSENT.md).
+
+## Backend settings
+
+The Function uses application settings including:
+
+- `WINDOWSDEVICELINK_API_KEY`
+- `WINDOWSDEVICELINK_CLIENT_ID`
+- `WINDOWSDEVICELINK_ALLOWED_TENANTS`
+- `WINDOWSDEVICELINK_DEFAULT_TENANT_ID` (optional)
+- `WINDOWSDEVICELINK_TENANT_NAMES_JSON` (optional)
+- `WINDOWSDEVICELINK_CERTIFICATE_PFX_BASE64` (preferred Graph credential)
+- `WINDOWSDEVICELINK_CERTIFICATE_PASSWORD` (optional)
+- `WINDOWSDEVICELINK_CLIENT_SECRET` (fallback)
+
+## Client pre-association
 
 ```powershell
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
         -Method Webhook `
-        -WebhookUri 'https://<app>.azurewebsites.net/api/devicelink/preassociate' `
+        -WebhookUri '<function-preassociate-uri>' `
         -WebhookApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
         -TenantId '<target-tenant-id>'
 ```
 
-The target tenant must also:
-
-1. be listed in `WINDOWSDEVICELINK_ALLOWED_TENANTS`;
-2. have granted admin consent to the backend application.
-
-## Security model
-
-The Azure Function reference deployment uses its **managed identity only to read Key Vault secrets**. Microsoft Graph authentication in the reference implementation uses the backend App Registration. For cross-tenant use, certificate-based client credentials are preferred; client secret is supported as a fallback.
-
-Microsoft Graph authentication uses the separate multitenant Entra application:
-
-```text
-Function managed identity
-    -> Key Vault only
-
-Multitenant backend app + certificate
-    -> Microsoft Graph in consenting tenant
-```
-
-This separation avoids storing Graph credentials on Windows/WinPE endpoints and keeps tenant onboarding explicit.
-
-### Azure Automation
-
-[![Deploy Azure Automation](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Fautomation%2Fazuredeploy.json)
-
-The Automation deployment creates the Automation Account, PowerShell 7.4 Runtime Environment, Microsoft.Graph.Authentication package, published runbook, variables, managed identity, and optional certificate asset. The Automation webhook is intentionally created afterwards so its secret URL is not exposed through deployment outputs/history. See [../infrastructure/automation/README.md](../infrastructure/automation/README.md).
-
+The API key authenticates the caller to the Function. The tenant ID is routing context; neither replaces Microsoft Graph authentication performed by the backend.
 
 ## Multitenant lookup
 
-The same Function App also exposes:
-
-```text
-GET /api/devicelink/lookup?serialNumber=<serial>
-```
-
-The endpoint searches the configured allowed tenants and reports where the serial number has a Device Association.
-
-This is intentionally a backend/operator API and does not require WindowsDeviceLink to be installed on the lookup client.
+The lookup endpoint searches all allowed tenants and returns normalized tenant-side state without returning the DeviceLink payload.
 
 See [MULTITENANT-LOOKUP.md](MULTITENANT-LOOKUP.md).
 
+## Reconcile
 
-## Multitenant reconciliation
-
-For provisioning workflows that already determine a likely source tenant and desired target tenant, the reference backends also support a controlled reconciliation model.
+The reconcile endpoint derives the required operation from fresh cloud state:
 
 ```text
-New     -> no current association; create in target
-Move    -> association exists in another tenant; remove exact source, verify, create target
-Update  -> association is already in target; no tenant move required
+not found anywhere                         -> New
+found in requested target                  -> Update / no-op
+found in another tenant + matching source  -> Move
 ```
 
-The caller's source lookup is not trusted blindly. The backend repeats the lookup immediately before any mutation and fails closed on inconsistent or ambiguous state.
-
-There is intentionally **no public/raw delete endpoint** in the reference Function or Automation backend. Association removal is only reachable as an internal step of a verified Move.
+The caller supplies facts such as expected source tenant, target tenant and current DeviceLink identity. The caller does **not** submit a New/Move/Update decision.
 
 See [RECONCILE-SCHEMA-v1.md](RECONCILE-SCHEMA-v1.md).
+
+## Safety model
+
+The Function backend:
+
+- requires an explicit tenant allow list;
+- fails closed when a configured tenant cannot be searched;
+- rejects ambiguous duplicate state;
+- verifies an expected source tenant before Move;
+- re-reads source state immediately before deletion;
+- does not blindly retry POST/DELETE after an ambiguous transport failure;
+- verifies source removal before target creation;
+- verifies target creation afterwards;
+- never resets local DeviceLink firmware;
+- never logs the complete DeviceLink payload.
+
+## Hardening
+
+The Deploy to Azure template is deliberately a reference baseline. Depending on the environment, organizations can add controls such as Private Endpoints, access restrictions, API Management, VNet integration, WAF/reverse proxy controls and SIEM forwarding without changing the WindowsDeviceLink request contract.
+
+See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
