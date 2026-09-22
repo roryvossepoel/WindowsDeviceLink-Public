@@ -10,7 +10,15 @@ function Initialize-WindowsDeviceLink {
 
     By default, existing preassociated or associated records are left unchanged. Specify
     -FullAssociation to opt in to full association after the state has been verified as
-    Preassociated. Completion uses the guarded Complete-WindowsDeviceLinkAssociation cmdlet and
+    Preassociated.
+
+    Direct mode uses the selected Microsoft Graph authentication method. Backend mode uses
+    the WindowsDeviceLink Azure Function App for authoritative multitenant cloud lookup and
+    pre-association, while native full association still runs locally on the device.
+
+    Backend mode never performs an implicit tenant move. If the current association is found
+    in a different tenant than -TargetTenantId, initialization is blocked and an explicit
+    tenant-move workflow is required. Completion uses the guarded Complete-WindowsDeviceLinkAssociation cmdlet and
     therefore performs at most one ConfigureDeviceLinkAsync call, with no retry, reset, cleanup,
     cloud deletion, or reboot.
 
@@ -46,8 +54,8 @@ function Initialize-WindowsDeviceLink {
 
         [Parameter(Mandatory, ParameterSetName = 'Backend')]
         [guid]$TargetTenantId,
-        [ValidateNotNullOrEmpty()][string]$Environment = 'Global',
-        [ValidateRange(1, 600)][double]$ClientTimeout = 100,
+        [Parameter(ParameterSetName = 'Direct')][ValidateNotNullOrEmpty()][string]$Environment = 'Global',
+        [Parameter(ParameterSetName = 'Direct')][ValidateRange(1, 600)][double]$ClientTimeout = 100,
         [ValidateNotNullOrEmpty()][string]$WindowsManagementServicePath,
         [ValidateRange(5, 600)][int]$TimeoutSeconds = 120,
         [switch]$FullAssociation
