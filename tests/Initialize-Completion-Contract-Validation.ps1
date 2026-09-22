@@ -29,6 +29,9 @@ Assert-True ($null -ne $functionAst) 'Initialize-WindowsDeviceLink function was 
 
 $parameterNames=@($functionAst.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
 Assert-True ($parameterNames -contains 'FullAssociation') 'Initialize-WindowsDeviceLink is missing the explicit -FullAssociation switch.'
+Assert-True ($parameterNames -contains 'BackendUri') 'Initialize-WindowsDeviceLink is missing -BackendUri.'
+Assert-True ($parameterNames -contains 'BackendApiKey') 'Initialize-WindowsDeviceLink is missing -BackendApiKey.'
+Assert-True ($parameterNames -contains 'TargetTenantId') 'Initialize-WindowsDeviceLink is missing -TargetTenantId.'
 
 $source=[IO.File]::ReadAllText($path)
 Assert-True ($source -match '\[switch\]\$FullAssociation') '-FullAssociation must remain an explicit switch parameter.'
@@ -41,8 +44,8 @@ Assert-True ($source -match 'FullAssociationDetails=\$completion') 'Initializati
 $fullAssociationCalls=@($functionAst.FindAll({param($n)
     $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Complete-WindowsDeviceLinkAssociation'
 },$true))
-Assert-True ($fullAssociationCalls.Count -eq 1) 'Initialize-WindowsDeviceLink must contain exactly one full-association command invocation.'
+Assert-True ($fullAssociationCalls.Count -eq 2) 'Initialize-WindowsDeviceLink must contain one guarded full-association invocation for each Direct/Backend orchestration path.'
 
 Write-Host 'PASS: Initialize-WindowsDeviceLink full association remains explicit opt-in behavior.'
-Write-Host 'PASS: Full association delegates to the guarded Complete-WindowsDeviceLinkAssociation cmdlet exactly once.'
+Write-Host 'PASS: Direct and Function-backed full association both delegate to the guarded Complete-WindowsDeviceLinkAssociation cmdlet.'
 Write-Host 'PASS: Initialization result exposes full-association request/result/details state.'
