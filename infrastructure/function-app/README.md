@@ -14,6 +14,33 @@ The Bicep deployment uses `loadTextContent()` to embed the committed Function re
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
 
+## Resource naming
+
+By default, the public deployment can generate resource names from `namePrefix`.
+
+Organizations with strict naming standards can instead provide explicit names for each resource:
+
+- `functionAppName`
+- `appServicePlanName`
+- `storageAccountName`
+- `keyVaultResourceName`
+- `applicationInsightsName`
+
+When an explicit name is supplied, it takes precedence over the generated `namePrefix` value for that resource.
+
+Example enterprise naming:
+
+```text
+Resource Group         mgtnl80rg01osd
+Function App           mgtnl80fa01osd
+App Service Plan       mgtnl80asp01osd
+Storage Account        mgtnl80sa01osd
+Key Vault              mgtnl80kv01osd
+Application Insights   mgtnl80ai01osd
+```
+
+The Resource Group is selected/created outside the template. The other five names are deployment parameters.
+
 ## Regenerate ARM JSON
 
 When `main.bicep` or the embedded Function source changes, regenerate and review `azuredeploy.json` before merging.

@@ -22,6 +22,10 @@ Assert-True ($initialize -match 'foreach\s*\(\$key\s+in\s+\$commonOnline\.Keys\)
 Assert-True ($initialize -match 'statusParameters\[\$key\]\s*=\s*\$commonOnline\[\$key\]') 'Status lookups do not inherit the shared AccessToken parameters.'
 Assert-True ($initialize -match 'registerParameters\[\$key\]\s*=\s*\$commonOnline\[\$key\]') 'Registration does not inherit the shared AccessToken parameters.'
 Assert-True (([regex]::Matches($initialize,'Get-WindowsDeviceLinkStatus')).Count -ge 2) 'Initializer must perform both pre-action and verification status reads.'
+Assert-True ($initialize -match "ParameterSetName\s*=\s*'Backend'") 'Initializer is missing the Function backend parameter set.'
+Assert-True ($initialize -match 'Get-WindowsDeviceLinkBackendStatus') 'Function-backed initialization does not use the backend status adapter.'
+Assert-True ($initialize -match 'Resolve-WindowsDeviceLinkBackendEndpoint') 'Function-backed initialization does not resolve the preassociate endpoint from the backend base URI.'
+Assert-True ($initialize -match 'AssociationInDifferentTenant') 'Function-backed initialization must explicitly block target-tenant mismatch.'
 Write-Host 'PASS: DeviceCode initializer structural contract enforces single acquisition and shared AccessToken reuse'
 
 Assert-True ($connect -match 'CertificateThumbprint') 'CertificateThumbprint parameter path is missing.'

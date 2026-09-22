@@ -76,6 +76,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Gui-Contract-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate Function-backed initializer contract
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Backend-Initialization-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate lifecycle repair planning safety
         shell: powershell
         run: |

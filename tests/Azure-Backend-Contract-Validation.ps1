@@ -127,6 +127,11 @@ Assert-True ($arm.parameters.webhookApiKey.type -eq 'secureString') 'ARM webhook
 Assert-True ($arm.parameters.graphCredential.type -eq 'secureString') 'ARM graphCredential must be secureString.'
 Assert-True ($arm.parameters.graphCertificatePassword.type -eq 'secureString') 'ARM graphCertificatePassword must be secureString.'
 
+foreach ($name in @('functionAppName','appServicePlanName','storageAccountName','keyVaultResourceName','applicationInsightsName')) {
+    Assert-True ($arm.parameters.PSObject.Properties.Name -contains $name) "ARM template is missing optional explicit resource-name parameter '$name'."
+    Assert-True ([string]$arm.parameters.$name.defaultValue -eq '') "ARM explicit resource-name parameter '$name' must default to empty so namePrefix fallback remains available."
+}
+
 $armText = Get-Content -LiteralPath $armPath -Raw
 foreach ($needle in @(
     'Microsoft.KeyVault/vaults',
@@ -150,5 +155,11 @@ $bicep = Get-Content -LiteralPath $bicepPath -Raw
 Assert-True ($bicep -match 'loadTextContent') 'Bicep deployment must source the committed Function receiver files.'
 Assert-True ($bicep -match 'PowerShellVersion.*7\.4|powerShellVersion:\s*''7\.4''') 'Bicep deployment must target PowerShell 7.4.'
 Assert-True ($bicep -match 'enableRbacAuthorization:\s*true') 'Key Vault must use Azure RBAC.'
+
+foreach ($name in @('functionAppName','appServicePlanName','storageAccountName','keyVaultResourceName','applicationInsightsName')) {
+    Assert-True ($bicep -match ("param\s+" + [regex]::Escape($name) + "\s+string\s*=\s*''")) "Bicep is missing optional explicit resource-name parameter '$name'."
+}
+Assert-True ($bicep -match 'empty\(functionAppName\).*generatedFunctionAppName') 'Function App naming must fall back to the generated prefix-based name.'
+Assert-True ($bicep -match 'empty\(storageAccountName\).*generatedStorageName') 'Storage naming must fall back to the generated prefix-based name.'
 
 Write-Host 'PASS: Azure Function backend, lookup/reconcile contracts, and deployment template satisfy static security/contract checks.'

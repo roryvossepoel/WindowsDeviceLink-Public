@@ -4,6 +4,21 @@ param namePrefix string = 'wdl'
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
+@description('Optional explicit Function App name. When empty, a name is generated from namePrefix.')
+param functionAppName string = ''
+
+@description('Optional explicit App Service Plan name. When empty, a name is generated from namePrefix.')
+param appServicePlanName string = ''
+
+@description('Optional explicit Storage Account name. When empty, a name is generated from namePrefix.')
+param storageAccountName string = ''
+
+@description('Optional explicit Key Vault name. When empty, a name is generated from namePrefix.')
+param keyVaultResourceName string = ''
+
+@description('Optional explicit Application Insights name. When empty, a name is generated from namePrefix.')
+param applicationInsightsName string = ''
+
 @description('Client ID of the multitenant Microsoft Entra application used for Microsoft Graph app-only authentication.')
 param graphClientId string
 
@@ -36,11 +51,17 @@ param graphCertificatePassword string = ''
 param webhookApiKey string
 
 var suffix = uniqueString(resourceGroup().id)
-var storageName = take(toLower(replace('${namePrefix}${suffix}', '-', '')), 24)
-var functionAppName = take('${namePrefix}-func-${suffix}', 60)
-var planName = take('${namePrefix}-plan-${suffix}', 40)
-var appInsightsName = take('${namePrefix}-appi-${suffix}', 260)
-var keyVaultName = take(toLower(replace('${namePrefix}-kv-${suffix}', '_', '-')), 24)
+var generatedStorageName = take(toLower(replace('${namePrefix}${suffix}', '-', '')), 24)
+var generatedFunctionAppName = take('${namePrefix}-func-${suffix}', 60)
+var generatedPlanName = take('${namePrefix}-plan-${suffix}', 40)
+var generatedAppInsightsName = take('${namePrefix}-appi-${suffix}', 260)
+var generatedKeyVaultName = take(toLower(replace('${namePrefix}-kv-${suffix}', '_', '-')), 24)
+
+var effectiveStorageName = empty(storageAccountName) ? generatedStorageName : storageAccountName
+var effectiveFunctionAppName = empty(functionAppName) ? generatedFunctionAppName : functionAppName
+var effectivePlanName = empty(appServicePlanName) ? generatedPlanName : appServicePlanName
+var effectiveAppInsightsName = empty(applicationInsightsName) ? generatedAppInsightsName : applicationInsightsName
+var effectiveKeyVaultName = empty(keyVaultResourceName) ? generatedKeyVaultName : keyVaultResourceName
 
 var apiKeySecretName = 'windowsdevicelink-api-key'
 var graphCredentialSecretName = graphCredentialType == 'Certificate'
@@ -58,7 +79,7 @@ var reconcileFunctionScript = loadTextContent('../../function-app/Reconcile-Wind
 var reconcileFunctionConfigText = loadTextContent('../../function-app/Reconcile-WindowsDeviceLink/function.json')
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: storageName
+  name: effectiveStorageName
   location: location
   sku: {
     name: 'Standard_LRS'
@@ -72,7 +93,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 }
 
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: appInsightsName
+  name: effectiveAppInsightsName
   location: location
   kind: 'web'
   properties: {
@@ -81,7 +102,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 }
 
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
-  name: planName
+  name: effectivePlanName
   location: location
   sku: {
     name: 'Y1'
@@ -93,7 +114,7 @@ resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
 }
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: keyVaultName
+  name: effectiveKeyVaultName
   location: location
   properties: {
     tenantId: subscription().tenantId
@@ -135,7 +156,7 @@ resource graphCertificatePasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storage.name};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storage.listKeys().keys[0].value}'
 
 resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
-  name: functionAppName
+  name: effectiveFunctionAppName
   location: location
   kind: 'functionapp'
   identity: {
