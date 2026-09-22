@@ -25,6 +25,21 @@
     },
     "webhookApiKey": {
       "value": "<random-webhook-api-key>"
+    },
+    "functionAppName": {
+      "value": ""
+    },
+    "appServicePlanName": {
+      "value": ""
+    },
+    "storageAccountName": {
+      "value": ""
+    },
+    "keyVaultResourceName": {
+      "value": ""
+    },
+    "applicationInsightsName": {
+      "value": ""
     }
   }
 }
