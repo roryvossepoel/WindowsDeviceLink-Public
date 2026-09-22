@@ -1,8 +1,6 @@
 # Multitenant backend app registration
 
-This document applies when WindowsDeviceLink uses an App Registration for app-only Microsoft Graph authentication, especially for **multi-tenant** backends.
-
-For a same-tenant Azure Automation backend, Managed Identity is preferred and an App Registration is not required for that authentication path. See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
+This document applies to the WindowsDeviceLink Azure Function backend when it uses an App Registration for app-only Microsoft Graph authentication, especially for **multi-tenant** routing.
 
 ## Recommended application design
 
