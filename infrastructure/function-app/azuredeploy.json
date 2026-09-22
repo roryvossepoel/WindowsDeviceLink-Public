@@ -12,7 +12,7 @@
       "type": "string",
       "defaultValue": "wdl",
       "metadata": {
-        "description": "Short prefix used for generated Azure resource names."
+        "description": "Short prefix used only when explicit Azure resource names are not supplied."
       }
     },
     "location": {
@@ -77,15 +77,50 @@
       "metadata": {
         "description": "Optional JSON object mapping tenant IDs to friendly names used by the multitenant lookup endpoint."
       }
+    },
+    "functionAppName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional explicit Function App name. When empty, a name is generated from namePrefix."
+      }
+    },
+    "appServicePlanName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional explicit App Service Plan name. When empty, a name is generated from namePrefix."
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional explicit Storage Account name. When empty, a name is generated from namePrefix."
+      }
+    },
+    "keyVaultResourceName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional explicit Key Vault name. When empty, a name is generated from namePrefix."
+      }
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional explicit Application Insights name. When empty, a name is generated from namePrefix."
+      }
     }
   },
   "variables": {
     "suffix": "[uniqueString(resourceGroup().id)]",
-    "storageName": "[take(toLower(replace(concat(parameters('namePrefix'), variables('suffix')), '-', '')), 24)]",
-    "functionAppName": "[take(concat(parameters('namePrefix'), '-func-', variables('suffix')), 60)]",
-    "planName": "[take(concat(parameters('namePrefix'), '-plan-', variables('suffix')), 40)]",
-    "appInsightsName": "[take(concat(parameters('namePrefix'), '-appi-', variables('suffix')), 260)]",
-    "keyVaultName": "[take(toLower(replace(concat(parameters('namePrefix'), '-kv-', variables('suffix')), '_', '-')), 24)]",
+    "storageName": "[if(empty(parameters('storageAccountName')), take(toLower(replace(concat(parameters('namePrefix'), variables('suffix')), '-', '')), 24), parameters('storageAccountName'))]",
+    "functionAppName": "[if(empty(parameters('functionAppName')), take(concat(parameters('namePrefix'), '-func-', variables('suffix')), 60), parameters('functionAppName'))]",
+    "planName": "[if(empty(parameters('appServicePlanName')), take(concat(parameters('namePrefix'), '-plan-', variables('suffix')), 40), parameters('appServicePlanName'))]",
+    "appInsightsName": "[if(empty(parameters('applicationInsightsName')), take(concat(parameters('namePrefix'), '-appi-', variables('suffix')), 260), parameters('applicationInsightsName'))]",
+    "keyVaultName": "[if(empty(parameters('keyVaultResourceName')), take(toLower(replace(concat(parameters('namePrefix'), '-kv-', variables('suffix')), '_', '-')), 24), parameters('keyVaultResourceName'))]",
     "apiKeySecretName": "windowsdevicelink-api-key",
     "graphCredentialSecretName": "[if(equals(parameters('graphCredentialType'),'Certificate'),'windowsdevicelink-graph-certificate-pfx','windowsdevicelink-graph-client-secret')]",
     "graphCertificatePasswordSecretName": "windowsdevicelink-graph-certificate-password",
