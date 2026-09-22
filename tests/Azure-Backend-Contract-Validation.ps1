@@ -79,6 +79,19 @@ Assert-True ($run.IndexOf('Write-Information $body',[StringComparison]::OrdinalI
 Assert-True ($run.IndexOf('Write-Host $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 Assert-True ($run.IndexOf('Write-Output $body',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Function must not log the request body.'
 
+foreach ($needle in @(
+    'BackendAuth.ps1',
+    'AssociationOperations.ps1',
+    'Get-WindowsDeviceLinkTenantAssociation',
+    'New-WindowsDeviceLinkBackendAssociation',
+    'VerificationFailed',
+    'CreateUncertain'
+)) {
+    Assert-True ($run.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Preassociate Function is missing shared/verification contract text '$needle'."
+}
+Assert-True ($run.IndexOf('function Get-GraphToken',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Preassociate Function must not carry a private duplicate Graph-token implementation.'
+Assert-True ($run.IndexOf('function Get-BackendCertificate',[StringComparison]::OrdinalIgnoreCase) -lt 0) 'Preassociate Function must use shared backend certificate/authentication helpers.'
+
 $lookupRun = Get-Content -LiteralPath $lookupRunPath -Raw
 $sharedBackend = Get-Content -LiteralPath $sharedBackendPath -Raw
 $lookupContract = $lookupRun + [Environment]::NewLine + $sharedBackend
