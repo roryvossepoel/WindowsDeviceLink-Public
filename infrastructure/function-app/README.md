@@ -5,14 +5,18 @@ This folder contains the infrastructure-as-code for the WindowsDeviceLink Azure 
 ## Files
 
 - `main.bicep` - source infrastructure definition.
-- `azuredeploy.json` - committed ARM template used by the Deploy to Azure button.
+- `azuredeploy.json` - generated ARM template retained for infrastructure development.
 - `parameters.example.json` - non-secret example parameter structure.
 
 The Bicep deployment uses `loadTextContent()` to embed the committed Function receiver files at deployment time.
 
-## Deploy to Azure
+## Experimental status
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
+The Bicep/ARM route is not a supported deployment method for `0.10.0-preview1`. Use the
+supplied Function App package and documented manual Azure configuration for the preview.
+Clean deployment, safe redeployment, secret preservation and the public Deploy to Azure
+experience are tracked in
+[issue #43](https://github.com/roryvossepoel/WindowsDeviceLink-Public/issues/43).
 
 ## Resource naming
 
@@ -53,7 +57,9 @@ az bicep build `
     --outfile .\infrastructure\function-app\azuredeploy.json
 ```
 
-The committed JSON must remain suitable for the public Deploy to Azure button.
+The committed JSON must remain synchronized with the reviewed Bicep source. Suitability
+for a public Deploy to Azure button requires the end-to-end validation tracked in issue
+#43.
 
 ## Secrets
 

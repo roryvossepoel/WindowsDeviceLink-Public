@@ -39,6 +39,12 @@ if (-not $command.Parameters.ContainsKey('TenantsPath')) {
 if (-not $command.Parameters.ContainsKey('WindowsManagementServicePath')) {
     throw 'FAIL: Show-WindowsDeviceLink must expose -WindowsManagementServicePath for Windows PE runtime selection.'
 }
+foreach ($parameterName in @('BackendUri','BackendApiKey','ViewMode')) {
+    if (-not $command.Parameters.ContainsKey($parameterName)) { throw "FAIL: Show-WindowsDeviceLink must expose -$parameterName." }
+}
+if ($command.Parameters['BackendApiKey'].ParameterType -ne [securestring]) {
+    throw 'FAIL: Show-WindowsDeviceLink -BackendApiKey must be SecureString.'
+}
 if ($command.Parameters['Tenants'].ParameterType -ne [hashtable]) {
     throw 'FAIL: Show-WindowsDeviceLink -Tenants must remain a hashtable.'
 }
@@ -84,9 +90,7 @@ foreach ($required in @(
     'Set-GuiCapabilities',
     'TenantsUri',
     'TenantsPath',
-    'Invoke-RestMethod',
-    'ConvertFrom-Json',
-    'must be an absolute HTTPS URI',
+    'Get-WindowsDeviceLinkTenantCatalog',
     'WindowsManagementServicePath',
     'Windows PE',
     'Full association is not currently supported in Windows PE',
@@ -98,7 +102,35 @@ foreach ($required in @(
     'Reset-WindowsDeviceLinkFirmwareState',
     'FullAssociation',
     'Full DeviceLink offboarding',
-    'No cloud association was found. Nothing was removed.'
+    'No cloud association was found. Nothing was removed.',
+    'Set-WindowsDeviceLinkTenant',
+    'Get-WindowsDeviceLinkBackendTenant',
+    'Backend mode',
+    'Direct mode',
+    'Tenant determined by sign-in',
+    'Local association',
+    'Cloud association',
+    "-Title 'Connection'",
+    "-Caption 'Manufacturer'",
+    "-Caption 'Operating system'",
+    "-Caption 'Tenant scope'",
+    'Tenant assignment',
+    'Status and export',
+    'Recovery and offboarding',
+    'Last checked',
+    'Target tenant',
+    'Register device',
+    '$showTenantSelector',
+    'The destination tenant is determined by sign-in',
+    '$activityCard.Height = $activityHeight',
+    '$btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard',
+    'New-GuiFont',
+    '$colorDeviceTint',
+    '$colorCloudTint',
+    '$colorConnectionAccent',
+    '$colorLocalAccent',
+    "'Tahoma'",
+    "'Assets\WindowsDeviceLink.ico'"
 )) {
     if ($source -notmatch [regex]::Escape($required)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI/delegation contract '$required'."
@@ -129,7 +161,7 @@ if ($source -notmatch $fullAssociationGuardPattern) {
     throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
 }
 
-if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=\s*\$canFullAssociation') {
+if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=.*\$canFullAssociation') {
     throw 'FAIL: Full associate button must use the Windows PE-aware full-association capability.'
 }
 
@@ -137,7 +169,8 @@ foreach ($requiredPolish in @(
     'cloudAlreadyPresent',
     'cloudKnownAbsent',
     'alreadyFullyAssociated',
-    'Registry + JWT',
+    "-Caption 'Link ID'",
+    "-Caption 'Created'",
     "'RegistrationResult'",
     "'BeforeStatus'",
     "'AfterStatus'",

@@ -42,7 +42,9 @@ function Write-ReconcileError {
         [string]$RequestId,
         [string]$SourceTenantId,
         [string]$TargetTenantId,
-        [string]$Decision
+        [string]$Decision,
+        [string]$Stage,
+        [System.Management.Automation.ErrorRecord]$UpstreamError
     )
 
     $response = @{
@@ -54,6 +56,15 @@ function Write-ReconcileError {
     if ($SourceTenantId) { $response.sourceTenantId = $SourceTenantId }
     if ($TargetTenantId) { $response.targetTenantId = $TargetTenantId }
     if ($Decision) { $response.decision = $Decision }
+    if ($Stage) { $response.stage = $Stage }
+    if ($UpstreamError) {
+        $diagnostic = Get-WindowsDeviceLinkUpstreamFailure -ErrorRecord $UpstreamError
+        $response.upstreamStatusCode = $diagnostic.statusCode
+        $response.upstreamErrorCode = $diagnostic.upstreamErrorCode
+        $response.aadstsCodes = $diagnostic.aadstsCodes
+        $response.upstreamCorrelationId = $diagnostic.upstreamCorrelationId
+        Write-Warning ("DeviceLink reconcile failed. RequestId={0} Stage={1} UpstreamStatusCode={2} UpstreamCode={3} AadstsCodes={4} UpstreamCorrelationId={5}" -f $RequestId,$Stage,$diagnostic.statusCode,$diagnostic.upstreamErrorCode,($diagnostic.aadstsCodes -join ','),$diagnostic.upstreamCorrelationId)
+    }
 
     Write-JsonResponse -StatusCode $StatusCode -Body $response
 }
@@ -214,9 +225,15 @@ if ($decision -eq 'New') {
         $targetToken = $null
     }
 
-    $verify = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+    try {
+        $verify = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+    }
+    catch {
+        Write-ReconcileError -StatusCode 502 -Error 'TargetVerificationFailed' -Message 'The target pre-association was attempted, but its resulting state could not be read. Re-run lookup before retrying.' -RequestId $requestId -TargetTenantId $targetTenantId -Decision 'New' -Stage 'GraphVerifyTarget' -UpstreamError $_
+        return
+    }
     if ($createError -and @($verify.Matches).Count -eq 0) {
-        Write-ReconcileError -StatusCode 502 -Error 'TargetCreateUncertain' -Message 'The target pre-association request failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -TargetTenantId $targetTenantId -Decision 'New'
+        Write-ReconcileError -StatusCode 502 -Error 'TargetCreateUncertain' -Message 'The target pre-association request failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -TargetTenantId $targetTenantId -Decision 'New' -Stage 'GraphImportTarget' -UpstreamError $createError
         return
     }
     $matches = @($verify.Matches)
@@ -254,7 +271,7 @@ catch {
     # A DELETE transport failure can be ambiguous. Verify state, but never issue a second DELETE automatically.
     $verifySourceAfterError = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
     if (@($verifySourceAfterError.Matches).Count -ne 0) {
-        Write-ReconcileError -StatusCode 502 -Error 'SourceRemovalUncertain' -Message 'Source removal failed or remains uncertain. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+        Write-ReconcileError -StatusCode 502 -Error 'SourceRemovalUncertain' -Message 'Source removal failed or remains uncertain. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move' -Stage 'GraphDeleteSource' -UpstreamError $_
         return
     }
 }
@@ -286,9 +303,15 @@ finally {
     $targetToken = $null
 }
 
-$verifyTarget = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+try {
+    $verifyTarget = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+}
+catch {
+    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed and target creation was attempted, but the resulting target state could not be read. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move' -Stage 'GraphVerifyTarget' -UpstreamError $_
+    return
+}
 if ($targetCreateError -and @($verifyTarget.Matches).Count -eq 0) {
-    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but target creation failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but target creation failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move' -Stage 'GraphImportTarget' -UpstreamError $targetCreateError
     return
 }
 $targetMatches = @($verifyTarget.Matches)

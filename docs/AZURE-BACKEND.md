@@ -8,6 +8,7 @@ WindowsDeviceLink uses the Azure Function App as its only server-side backend.
 The Function keeps Microsoft Graph credentials off Windows/WinPE endpoints and provides a fast HTTP API for:
 
 - pre-association;
+- authenticated tenant-catalog discovery;
 - multitenant lookup;
 - New / Update / Move reconciliation;
 - authoritative pre/post-state verification.
@@ -23,6 +24,7 @@ Windows / WinPE
 | Azure Function App                    |
 |                                       |
 | /api/devicelink/preassociate          |
+| /api/devicelink/tenants               |
 | /api/devicelink/lookup                |
 | /api/devicelink/reconcile             |
 |                                       |
@@ -47,19 +49,24 @@ The previous Azure Automation/runbook reference backend was removed. The project
 
 ```text
 POST /api/devicelink/preassociate
+GET  /api/devicelink/tenants
 GET  /api/devicelink/lookup?serialNumber=<serial>
 POST /api/devicelink/reconcile
 ```
 
 No standalone DELETE endpoint is exposed. Deletion is an internal guarded step of a validated Move.
 
-## Deploy to Azure
+## Deployment status for 0.10.0-preview1
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
+The supported preview route is to configure the required Azure resources and deploy the
+supplied Function App package manually. This keeps the tested backend code available
+without treating an unvalidated landing-zone template as a production installer.
 
-The deployment creates the Function App and its supporting reference resources, including Key Vault, storage and Application Insights.
-
-See [../infrastructure/function-app/README.md](../infrastructure/function-app/README.md).
+The Bicep and generated ARM files under `infrastructure/function-app` are retained as
+experimental infrastructure code. They are not currently the recommended deployment
+route. A reproducible Deploy to Azure experience, including clean deployment, safe
+redeployment and secret preservation, is tracked in
+[issue #43](https://github.com/roryvossepoel/WindowsDeviceLink-Public/issues/43).
 
 ## Authentication
 
@@ -92,6 +99,32 @@ The Function uses application settings including:
 - `WINDOWSDEVICELINK_CLIENT_SECRET` (fallback)
 
 ## Function-backed initialization
+
+For normal explicit tenant assignment from either Windows PE or OOBE/full Windows, use
+the shared assignment command:
+
+```powershell
+$apiKey = Read-Host 'WindowsDeviceLink API key' -AsSecureString
+
+Get-WindowsDeviceLinkBackendTenant `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey
+
+Set-WindowsDeviceLinkTenant `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey `
+    -TargetTenantName 'Tenant Alpha'
+```
+
+`Set-WindowsDeviceLinkTenant` resolves the friendly name against the authenticated
+catalog, but uses the tenant GUID as its authoritative automation identifier. It
+performs a complete lookup first and chooses New, no-op, or Move. A Move renews the
+local DeviceLink identity before the backend removes the proven source record and
+creates the target record. Mutations are not blindly retried.
+
+The same flow is exposed by the **Register device** action in `Show-WindowsDeviceLink`.
+
+### Lower-level initialization
 
 `Initialize-WindowsDeviceLink` can use the Function App for cloud-state orchestration while keeping native DeviceLink completion local to Windows.
 
@@ -138,7 +171,8 @@ With `-FullAssociation`, once the requested target tenant is verified as pre-ass
 /api/devicelink
 ```
 
-WindowsDeviceLink derives the `lookup` and `preassociate` routes from that base URI.
+WindowsDeviceLink derives the `tenants`, `lookup`, `preassociate`, and `reconcile`
+routes from that base URI.
 
 ## Client pre-association
 
@@ -190,6 +224,9 @@ The Function backend:
 
 ## Hardening
 
-The Deploy to Azure template is deliberately a reference baseline. Depending on the environment, organizations can add controls such as Private Endpoints, access restrictions, API Management, VNet integration, WAF/reverse proxy controls and SIEM forwarding without changing the WindowsDeviceLink request contract.
+The experimental infrastructure template is a reference baseline only. Depending on
+the environment, organizations can add controls such as Private Endpoints, access
+restrictions, API Management, VNet integration, WAF/reverse proxy controls and SIEM
+forwarding without changing the WindowsDeviceLink request contract.
 
 See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).

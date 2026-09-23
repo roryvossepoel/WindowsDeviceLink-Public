@@ -213,11 +213,18 @@ catch {
 
 $matches = @($verify.Matches)
 if ($createError -and $matches.Count -eq 0) {
+    $diagnostic = Get-WindowsDeviceLinkUpstreamFailure -ErrorRecord $createError
+    Write-Warning ("DeviceLink pre-association failed. RequestId={0} TenantId={1} Stage=GraphImportTarget UpstreamStatusCode={2} UpstreamCode={3} AadstsCodes={4} UpstreamCorrelationId={5}" -f $requestId,$tenantId,$diagnostic.statusCode,$diagnostic.upstreamErrorCode,($diagnostic.aadstsCodes -join ','),$diagnostic.upstreamCorrelationId)
     Write-JsonResponse -StatusCode 502 -Body @{
         success = $false
         requestId = $requestId
         tenantId = $tenantId
         error = 'CreateUncertain'
+        stage = 'GraphImportTarget'
+        upstreamStatusCode = $diagnostic.statusCode
+        upstreamErrorCode = $diagnostic.upstreamErrorCode
+        aadstsCodes = $diagnostic.aadstsCodes
+        upstreamCorrelationId = $diagnostic.upstreamCorrelationId
         message = 'The pre-association request failed and no resulting association could be verified. Re-run lookup before retrying.'
     }
     return
