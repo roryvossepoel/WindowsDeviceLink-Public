@@ -13,7 +13,7 @@ function Show-WindowsDeviceLink {
 
     Use -Tenants to provide friendly tenant names for the tenant selector:
 
-    @{'Management'='11111111-1111-1111-1111-111111111111'; 'Customer A'='22222222-2222-2222-2222-222222222222'}
+    @{'Tenant Alpha'='11111111-1111-1111-1111-111111111111'; 'Tenant Beta'='22222222-2222-2222-2222-222222222222'}
 
     Use -TenantsUri to load the same friendly-name-to-tenant-ID mapping from a trusted HTTPS JSON endpoint.
     Use -TenantsPath to load the same JSON format from a local file.
@@ -32,8 +32,8 @@ function Show-WindowsDeviceLink {
 
     .EXAMPLE
     Show-WindowsDeviceLink -Tenants @{
-        'Management' = '11111111-1111-1111-1111-111111111111'
-        'Customer A' = '22222222-2222-2222-2222-222222222222'
+        'Tenant Alpha' = '11111111-1111-1111-1111-111111111111'
+        'Tenant Beta' = '22222222-2222-2222-2222-222222222222'
     }
 
     .EXAMPLE
@@ -408,6 +408,51 @@ function Show-WindowsDeviceLink {
     }
 
     function Get-GuiAuthParameters {
+        $selectedTenant = Get-SelectedTenantId
+
+        if (-not $backendMode -and $Method -eq 'DeviceCode') {
+            $cacheTenantMatches = -not $selectedTenant -or
+                ([string]$script:WdlGuiSessionTenantId -ieq [string]$selectedTenant)
+            $cacheValid = $script:WdlGuiSessionAccessToken -and
+                $script:WdlGuiSessionExpiresUtc -and
+                ([DateTime]::UtcNow -lt $script:WdlGuiSessionExpiresUtc) -and
+                $cacheTenantMatches
+
+            if (-not $cacheValid) {
+                Clear-GuiSessionAuthentication
+                Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.' -Command
+
+                $tokenParameters = @{}
+                if ($selectedTenant) { $tokenParameters.TenantId = $selectedTenant }
+                if ($outerBoundParameters.ContainsKey('ClientId')) { $tokenParameters.ClientId = $ClientId }
+                $tokenResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                    Get-WindowsDeviceLinkDeviceCodeToken @tokenParameters
+                })
+                $token = $tokenResults | Select-Object -Last 1
+                if (-not $token -or [string]::IsNullOrWhiteSpace([string]$token.AccessToken)) {
+                    throw 'Device code authentication did not return an access token.'
+                }
+
+                $script:WdlGuiSessionAccessToken = ConvertTo-SecureString ([string]$token.AccessToken) -AsPlainText -Force
+                $script:WdlGuiSessionTenantId = [string]$token.TenantId
+                $expiresIn = if ($token.ExpiresIn) { [int]$token.ExpiresIn } else { 3600 }
+                $script:WdlGuiSessionExpiresUtc = [DateTime]::UtcNow.AddSeconds([Math]::Max(60,$expiresIn - 120))
+                $script:WdlGuiSessionAuthenticated = $true
+                $token = $null
+                $ui.Authentication.Text = "$Method - Signed in"
+                if ($btnSignIn) { $btnSignIn.Text = 'Sign in again' }
+                Write-GuiConsole -Message 'Direct-mode session authenticated; the in-memory token will be reused for cloud actions.'
+            }
+
+            return @{
+                Method = 'AccessToken'
+                AccessToken = $script:WdlGuiSessionAccessToken
+                TenantId = $script:WdlGuiSessionTenantId
+                Environment = $Environment
+                ClientTimeout = $ClientTimeout
+            }
+        }
+
         $parameters = @{
             Method = $Method
             Environment = $Environment
@@ -423,12 +468,25 @@ function Show-WindowsDeviceLink {
             }
         }
 
-        $selectedTenant = Get-SelectedTenantId
         if ($selectedTenant) {
             $parameters.TenantId = $selectedTenant
         }
 
         $parameters
+    }
+
+    function Clear-GuiSessionAuthentication {
+        if ($script:WdlGuiSessionAccessToken -is [System.IDisposable]) {
+            try { $script:WdlGuiSessionAccessToken.Dispose() } catch {}
+        }
+        $script:WdlGuiSessionAccessToken = $null
+        $script:WdlGuiSessionTenantId = $null
+        $script:WdlGuiSessionExpiresUtc = $null
+        $script:WdlGuiSessionAuthenticated = $false
+        if ($ui -and $ui.Authentication -and -not $backendMode) {
+            $ui.Authentication.Text = "$Method - Signed out"
+        }
+        if ($btnSignIn) { $btnSignIn.Text = 'Sign in' }
     }
 
     function Get-GuiBackendParameters {
@@ -450,6 +508,10 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiLocalAssociation = $null
     $script:WdlGuiCloudStatus = $null
     $script:WdlGuiSupport = $null
+    $script:WdlGuiSessionAccessToken = $null
+    $script:WdlGuiSessionTenantId = $null
+    $script:WdlGuiSessionExpiresUtc = $null
+    $script:WdlGuiSessionAuthenticated = $false
 
     $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126
     $connectionCard = New-Card -Title 'Connection' -X 536 -Y 12 -Width 508 -Height 126
@@ -582,7 +644,7 @@ function Show-WindowsDeviceLink {
     $assignmentSeparator.Size = [System.Drawing.Size]::new(1002,1)
     $assignmentRow.Controls.Add($assignmentSeparator)
 
-    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Refresh the local association or cloud association, or export the DeviceLink CSV.' -Y 58 -Buttons @('Refresh local','Refresh cloud','Export CSV')
+    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Sign in for cloud actions, refresh state, or export the DeviceLink CSV.' -Y 58 -Buttons @('Sign in','Refresh local','Refresh cloud','Export CSV')
     $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Direct onboarding' -Description 'Create only the pre-association, or perform the full association flow.' -Y 104 -Buttons @('Pre-associate','Full associate')
     $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Recovery and offboarding' -Description 'Reset local state, remove cloud state, or remove both.' -Y 150 -Buttons @('Cloud','Reset local','Full')
 
@@ -613,6 +675,7 @@ function Show-WindowsDeviceLink {
         $button
     }
 
+    $btnSignIn = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Sign in'
     $btnRefresh = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh local'
     $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
     $btnExport = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Export CSV'
@@ -624,6 +687,7 @@ function Show-WindowsDeviceLink {
 
     $allActionButtons = @(
         $btnAssign,
+        $btnSignIn,
         $btnRefresh,
         $btnOnline,
         $btnExport,
@@ -635,6 +699,7 @@ function Show-WindowsDeviceLink {
     )
 
     $rowOnboard.Panel.Visible = -not $backendMode
+    $btnSignIn.Visible = -not $backendMode
     $rowOffboard.Panel.Top = if ($backendMode) { 104 } else { 150 }
     $actionsPanel.Height = if ($backendMode) { 150 } else { 196 }
 
@@ -857,6 +922,7 @@ function Show-WindowsDeviceLink {
         $alreadyFullyAssociated = $localFullyAssociated -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
+        $btnSignIn.Enabled = -not $backendMode
         $btnOnline.Enabled = $runtimeReady
         $btnExport.Enabled = $runtimeReady
         $backendReadyToRegister = -not $backendMode -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
@@ -871,6 +937,7 @@ function Show-WindowsDeviceLink {
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
         $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and perform full Device Association on this device.')
         $toolTip.SetToolTip($btnAssign, 'Register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
+        $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
         if (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when none is selected.') }
         elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
 
@@ -1017,7 +1084,8 @@ function Show-WindowsDeviceLink {
         }
         else {
             $ui.ConnectionMode.Text = 'Direct'
-            $ui.Authentication.Text = [string]$Method
+            $sessionState = if ($script:WdlGuiSessionAuthenticated) { 'Signed in' } else { 'Signed out' }
+            $ui.Authentication.Text = "$Method - $sessionState"
             $ui.Endpoint.Text = 'Microsoft Graph'
             $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
         }
@@ -1092,6 +1160,12 @@ function Show-WindowsDeviceLink {
         }
         $script:WdlGuiCloudStatus = $cloud
 
+        if (-not $backendMode) {
+            $script:WdlGuiSessionAuthenticated = $true
+            $ui.Authentication.Text = "$Method - Signed in"
+            $btnSignIn.Text = 'Sign in again'
+        }
+
         $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
         $ui.CloudTenant.Text = if ($cloud.TenantId) { Get-TenantDisplayName -TenantId ([string]$cloud.TenantId) } else { 'None' }
         $cloudAssociationId = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { $null }
@@ -1128,6 +1202,25 @@ function Show-WindowsDeviceLink {
         }
         catch {
             Set-GuiStatus 'Cloud lookup failed'
+            Show-GuiError $_.Exception.Message
+        }
+        finally { Set-GuiBusy -Busy $false }
+    }
+
+    function Invoke-GuiSignIn {
+        if ($script:WdlGuiBusy -or $backendMode) { return }
+
+        Clear-GuiSessionAuthentication
+        Set-GuiBusy -Busy $true -StatusText 'Signing in...'
+        try {
+            [void](Get-GuiAuthParameters)
+            $cloud = Refresh-CloudView -WriteCommand
+            Write-GuiObject $cloud
+            Set-GuiStatus 'Signed in; cloud association loaded'
+        }
+        catch {
+            Clear-GuiSessionAuthentication
+            Set-GuiStatus 'Sign-in failed'
             Show-GuiError $_.Exception.Message
         }
         finally { Set-GuiBusy -Busy $false }
@@ -1553,7 +1646,7 @@ function Show-WindowsDeviceLink {
             $effectiveAuth = @{}
             foreach ($key in $auth.Keys) { $effectiveAuth[$key] = $auth[$key] }
 
-            if ($Method -eq 'DeviceCode') {
+            if ($effectiveAuth.Method -eq 'DeviceCode') {
                 Write-GuiConsole -Message 'Acquiring one DeviceCode token for the complete offboarding flow.' -Command
 
                 $tokenParameters = @{}
@@ -1645,6 +1738,7 @@ function Show-WindowsDeviceLink {
         }
     }
 
+    $btnSignIn.Add_Click({ Invoke-GuiSignIn })
     $btnRefresh.Add_Click({ Invoke-GuiRefresh })
     $btnAssign.Add_Click({ Invoke-GuiTenantAssignment })
     $btnOnline.Add_Click({ Invoke-GuiOnline })
@@ -1659,6 +1753,10 @@ function Show-WindowsDeviceLink {
         if (-not $script:WdlGuiBusy) {
             $selectedTenant = Get-SelectedTenantId
             if (-not $backendMode) {
+                if ($script:WdlGuiSessionAuthenticated) {
+                    Clear-GuiSessionAuthentication
+                    Write-GuiConsole -Message 'Target tenant changed; Direct-mode authentication will be renewed for the selected tenant.'
+                }
                 $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
             }
             Set-GuiCapabilities
@@ -1677,6 +1775,9 @@ function Show-WindowsDeviceLink {
             $eventArgs.Cancel = $true
             Write-GuiConsole -Message 'Close request ignored because an operation is still running.'
         }
+        else {
+            Clear-GuiSessionAuthentication
+        }
     })
 
     $form.Add_Shown({
@@ -1686,21 +1787,26 @@ function Show-WindowsDeviceLink {
         Set-GuiBusy -Busy $true -StatusText 'Loading local state...'
         try {
             Refresh-LocalView
-            try {
-                Set-GuiStatus 'Checking cloud association...'
-                $cloud = Refresh-CloudView -WriteCommand
-                Write-GuiObject $cloud
-                Set-GuiStatus 'Device and cloud state loaded'
+            if ($backendMode) {
+                try {
+                    Set-GuiStatus 'Checking cloud association...'
+                    $cloud = Refresh-CloudView -WriteCommand
+                    Write-GuiObject $cloud
+                    Set-GuiStatus 'Device and cloud state loaded'
+                }
+                catch {
+                    $ui.CloudState.Text = 'Check failed'
+                    $ui.CloudTenant.Text = 'Unavailable'
+                    $ui.CloudId.Text = 'Unavailable'
+                    $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
+                    $ui.CloudAccent.BackColor = $colorAccent
+                    $cloudCard.BackColor = $colorWarningTint
+                    Write-GuiConsole -Message ("Automatic cloud check failed: " + $_.Exception.Message) -ErrorMessage
+                    Set-GuiStatus 'Local state loaded; cloud check unavailable'
+                }
             }
-            catch {
-                $ui.CloudState.Text = 'Check failed'
-                $ui.CloudTenant.Text = 'Unavailable'
-                $ui.CloudId.Text = 'Unavailable'
-                $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
-                $ui.CloudAccent.BackColor = $colorAccent
-                $cloudCard.BackColor = $colorWarningTint
-                Write-GuiConsole -Message ("Automatic cloud check failed: " + $_.Exception.Message) -ErrorMessage
-                Set-GuiStatus 'Local state loaded; cloud check unavailable'
+            else {
+                Set-GuiStatus 'Local state loaded; sign in to check the cloud association'
             }
         }
         catch { Show-GuiError $_.Exception.Message }
