@@ -8,6 +8,7 @@ WindowsDeviceLink uses the Azure Function App as its only server-side backend.
 The Function keeps Microsoft Graph credentials off Windows/WinPE endpoints and provides a fast HTTP API for:
 
 - pre-association;
+- authenticated tenant-catalog discovery;
 - multitenant lookup;
 - New / Update / Move reconciliation;
 - authoritative pre/post-state verification.
@@ -23,6 +24,7 @@ Windows / WinPE
 | Azure Function App                    |
 |                                       |
 | /api/devicelink/preassociate          |
+| /api/devicelink/tenants               |
 | /api/devicelink/lookup                |
 | /api/devicelink/reconcile             |
 |                                       |
@@ -47,6 +49,7 @@ The previous Azure Automation/runbook reference backend was removed. The project
 
 ```text
 POST /api/devicelink/preassociate
+GET  /api/devicelink/tenants
 GET  /api/devicelink/lookup?serialNumber=<serial>
 POST /api/devicelink/reconcile
 ```
@@ -93,6 +96,32 @@ The Function uses application settings including:
 
 ## Function-backed initialization
 
+For normal explicit tenant assignment from either Windows PE or OOBE/full Windows, use
+the shared assignment command:
+
+```powershell
+$apiKey = Read-Host 'WindowsDeviceLink API key' -AsSecureString
+
+Get-WindowsDeviceLinkBackendTenant `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey
+
+Set-WindowsDeviceLinkTenant `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey `
+    -TargetTenantName 'Gemeente Kerkrade'
+```
+
+`Set-WindowsDeviceLinkTenant` resolves the friendly name against the authenticated
+catalog, but uses the tenant GUID as its authoritative automation identifier. It
+performs a complete lookup first and chooses New, no-op, or Move. A Move renews the
+local DeviceLink identity before the backend removes the proven source record and
+creates the target record. Mutations are not blindly retried.
+
+The same flow is exposed by the **Register device** action in `Show-WindowsDeviceLink`.
+
+### Lower-level initialization
+
 `Initialize-WindowsDeviceLink` can use the Function App for cloud-state orchestration while keeping native DeviceLink completion local to Windows.
 
 Pre-association only:
@@ -138,7 +167,8 @@ With `-FullAssociation`, once the requested target tenant is verified as pre-ass
 /api/devicelink
 ```
 
-WindowsDeviceLink derives the `lookup` and `preassociate` routes from that base URI.
+WindowsDeviceLink derives the `tenants`, `lookup`, `preassociate`, and `reconcile`
+routes from that base URI.
 
 ## Client pre-association
 

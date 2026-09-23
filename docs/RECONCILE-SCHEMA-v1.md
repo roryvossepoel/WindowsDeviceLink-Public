@@ -22,6 +22,11 @@ Get-WindowsDeviceLinkLocalAssociation
 
 This separates **source-tenant discovery** from **cloud-state authority**: local metadata can identify where the device came from, while the backend remains responsible for proving the current tenant-side state immediately before mutation.
 
+For a physical cross-tenant redeployment, the module renews the local DeviceLink
+identity before submitting reconciliation. The request therefore contains the old
+tenant as expected source state and the newly generated DeviceLink as target identity.
+The backend still performs its own lookup by serial number before deleting anything.
+
 
 A caller can perform a lookup before showing or submitting its form, but the backend never trusts that earlier lookup as authoritative.
 
@@ -136,6 +141,10 @@ The backend fails closed when:
 - post-state verification fails.
 
 Mutation requests are never blindly retried.
+
+Import failures in `New`, `Move`, and the separate pre-association endpoint expose `stage: GraphImportTarget`, `upstreamStatusCode`, `upstreamErrorCode`, `aadstsCodes`, and `upstreamCorrelationId` when available. Reconcile verification-read failures expose `GraphVerifyTarget`, and a failed source deletion exposes `GraphDeleteSource` when read-back confirms the source still exists. These diagnostics contain recognized protocol codes and validated correlation identifiers, not raw upstream response bodies, access tokens, or DeviceLink payloads.
+
+After `MoveIncomplete`, perform a fresh lookup across all configured tenants. If all tenant searches succeed and no association exists, a subsequent explicit recovery request can use the desired `targetTenantId` with `sourceTenantId` omitted. This is a `New` request and performs no source deletion. The original Move request with its old source tenant must not be blindly resubmitted; the source-state check will reject it. If a target association is found, preserve and inspect that result before attempting another mutation.
 
 If a DELETE or POST transport call fails, its commit state can be ambiguous. The backend performs read-only verification where possible and requires a fresh lookup before another mutation when final state cannot be proven.
 

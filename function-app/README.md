@@ -4,6 +4,11 @@ This folder contains the WindowsDeviceLink PowerShell Azure Function backend. It
 
 The Function provides pre-association, fast multitenant lookup and safe New / Update / Move reconciliation. Windows/WinPE clients do not need Microsoft Graph credentials.
 
+The authenticated tenant-catalog response is also the compatibility handshake. Backend
+API version `1.0` requires WindowsDeviceLink `0.10.0` or newer and advertises
+`TenantCatalog`, `MultitenantLookup`, and `Reconcile` capabilities. Clients fail closed
+when the version or required capabilities do not match.
+
 ## Endpoint
 
 Endpoints:
@@ -11,6 +16,7 @@ Endpoints:
 ```text
 POST /api/devicelink/preassociate
 GET  /api/devicelink/lookup?serialNumber=<serial>
+GET  /api/devicelink/tenants
 POST /api/devicelink/reconcile
 ```
 
@@ -89,6 +95,13 @@ Invoke-RestMethod `
 It first tries the Graph serial-number filter and then falls back to paged client-side matching when needed.
 
 See [../docs/MULTITENANT-LOOKUP.md](../docs/MULTITENANT-LOOKUP.md).
+
+## Tenant catalog
+
+`GET /api/devicelink/tenants` returns the allowed tenant IDs and their configured
+friendly display names. It requires the same API key as the other endpoints. The
+catalog never chooses a target tenant: UI and command-line callers must submit one
+explicit target tenant ID to the mutation workflow.
 
 
 ## Reconcile: New / Move / Update

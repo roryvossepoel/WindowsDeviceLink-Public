@@ -19,6 +19,8 @@ $lookupRunPath = Join-Path $functionRoot 'Lookup-WindowsDeviceLink\run.ps1'
 $lookupFunctionJsonPath = Join-Path $functionRoot 'Lookup-WindowsDeviceLink\function.json'
 $reconcileRunPath = Join-Path $functionRoot 'Reconcile-WindowsDeviceLink\run.ps1'
 $reconcileFunctionJsonPath = Join-Path $functionRoot 'Reconcile-WindowsDeviceLink\function.json'
+$tenantCatalogRunPath = Join-Path $functionRoot 'Get-WindowsDeviceLinkTenants\run.ps1'
+$tenantCatalogFunctionJsonPath = Join-Path $functionRoot 'Get-WindowsDeviceLinkTenants\function.json'
 $associationOperationsPath = Join-Path $functionRoot 'shared\AssociationOperations.ps1'
 $sharedBackendPath = Join-Path $functionRoot 'shared\BackendAuth.ps1'
 $hostPath = Join-Path $functionRoot 'host.json'
@@ -29,13 +31,14 @@ foreach ($path in @(
     $runPath,$functionJsonPath,
     $lookupRunPath,$lookupFunctionJsonPath,
     $reconcileRunPath,$reconcileFunctionJsonPath,
+    $tenantCatalogRunPath,$tenantCatalogFunctionJsonPath,
     $associationOperationsPath,$sharedBackendPath,
     $hostPath,$bicepPath,$armPath
 )) {
     Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure Function backend file is missing: $path"
 }
 
-foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$associationOperationsPath,$sharedBackendPath)) {
+foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$tenantCatalogRunPath,$associationOperationsPath,$sharedBackendPath)) {
     $tokens = $null
     $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
@@ -60,6 +63,16 @@ Assert-True ($reconcileTrigger.Count -eq 1) 'Reconcile Function must expose exac
 Assert-True ([string]$reconcileTrigger[0].route -eq 'devicelink/reconcile') 'Unexpected reconcile Function route.'
 Assert-True ('post' -in @($reconcileTrigger[0].methods)) 'Reconcile Function must allow POST.'
 Assert-True ('delete' -notin @($reconcileTrigger[0].methods)) 'Reconcile Function must not expose DELETE.'
+
+$tenantCatalogFunctionJson = Get-Content -LiteralPath $tenantCatalogFunctionJsonPath -Raw | ConvertFrom-Json
+$tenantCatalogTrigger = @($tenantCatalogFunctionJson.bindings | Where-Object type -eq 'httpTrigger')
+Assert-True ($tenantCatalogTrigger.Count -eq 1) 'Tenant catalog Function must expose exactly one HTTP trigger.'
+Assert-True ([string]$tenantCatalogTrigger[0].route -eq 'devicelink/tenants') 'Unexpected tenant catalog Function route.'
+Assert-True ('get' -in @($tenantCatalogTrigger[0].methods)) 'Tenant catalog Function must allow GET.'
+$tenantCatalogRun = Get-Content -LiteralPath $tenantCatalogRunPath -Raw
+foreach ($needle in @('X-WindowsDeviceLink-Key','Get-WindowsDeviceLinkAllowedTenants','Get-WindowsDeviceLinkTenantNames','Get-WindowsDeviceLinkBackendMetadata','apiVersion','minimumModuleVersion','capabilities','tenantCount')) {
+    Assert-True ($tenantCatalogRun.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Tenant catalog Function is missing '$needle'."
+}
 
 $run = Get-Content -LiteralPath $runPath -Raw
 $sharedBackendForPreassociate = Get-Content -LiteralPath $sharedBackendPath -Raw
@@ -161,6 +174,8 @@ foreach ($needle in @(
     'devicelink/lookup',
     'Reconcile-WindowsDeviceLink',
     'devicelink/reconcile',
+    'Get-WindowsDeviceLinkTenants',
+    'devicelink/tenants',
     '4633458b-17de-408a-b874-0445c86b69e6'
 )) {
     Assert-True ($armText.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "ARM template is missing expected resource/configuration '$needle'."

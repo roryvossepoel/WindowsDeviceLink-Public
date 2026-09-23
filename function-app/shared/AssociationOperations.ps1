@@ -1,6 +1,6 @@
 function Get-WindowsDeviceLinkExactSerialMatches {
     param(
-        [Parameter(Mandatory)][object[]]$Records,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Records,
         [Parameter(Mandatory)][string]$SerialNumber
     )
 

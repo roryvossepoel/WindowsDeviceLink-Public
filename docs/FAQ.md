@@ -63,6 +63,18 @@ The JSON format is intentionally simple:
 
 `-TenantsUri` accepts only an absolute HTTPS URI. `-TenantsPath` reads the same JSON schema from a local file. Tenant values must be valid GUIDs. The file should contain tenant display names and tenant IDs only; do not place credentials or secrets in it. When multiple sources are supplied, precedence is `TenantsUri` -> `TenantsPath` -> explicit `-Tenants`.
 
+The Function App is not required for this selector. Resolve the same catalog in CLI
+scripts with:
+
+```powershell
+$tenant = Get-WindowsDeviceLinkTenantCatalog `
+    -Path 'E:\Config\tenants.json' `
+    -Name 'Customer A'
+```
+
+Then pass `$tenant.TenantId` to the desired direct Graph command. This does not provide
+cross-tenant lookup or Move orchestration.
+
 The GUI delegates operations to the existing WindowsDeviceLink cmdlets and is available on Windows 11 and compatible Windows PE environments.
 
 In Windows PE, provide the DeviceLink runtime when it is not available from the module runtime location:
@@ -91,10 +103,12 @@ For local + tenant-side Device Association state:
 ```powershell
 Get-WindowsDeviceLinkStatus `
     -Online `
-    -Method DeviceCode `
-    -TenantId '<tenant-id>' |
+    -Method DeviceCode |
     Format-List *
 ```
+
+TenantId is intentionally omitted in the normal Direct-mode example. Add it only when
+the authentication flow must target one tenant explicitly.
 
 For readiness before a completion operation:
 

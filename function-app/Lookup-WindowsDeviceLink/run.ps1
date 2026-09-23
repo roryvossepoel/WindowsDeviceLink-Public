@@ -36,7 +36,7 @@ function Get-HeaderValue {
 
 function Get-ExactSerialMatches {
     param(
-        [Parameter(Mandatory)][object[]]$Records,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Records,
         [Parameter(Mandatory)][string]$SerialNumber
     )
 
@@ -165,6 +165,7 @@ $searchedTenants = New-Object System.Collections.Generic.List[object]
 foreach ($tenantId in $tenantsToSearch) {
     $tenantName = if ($tenantNames.ContainsKey($tenantId)) { [string]$tenantNames[$tenantId] } else { $null }
     $token = $null
+    $stage = 'GraphToken'
 
     try {
         $token = Get-WindowsDeviceLinkBackendGraphToken -TenantId $tenantId -ClientId $clientId
@@ -172,6 +173,7 @@ foreach ($tenantId in $tenantsToSearch) {
             throw 'Microsoft identity platform returned no access token.'
         }
 
+        $stage = 'GraphLookup'
         $escapedSerial = $serialNumber.Replace("'","''")
         $filter = [uri]::EscapeDataString("serialNumber eq '$escapedSerial'")
         $filteredUri = "https://graph.microsoft.com/beta/deviceManagement/tenantAssociatedDevices?%24filter=$filter"
@@ -183,6 +185,7 @@ foreach ($tenantId in $tenantsToSearch) {
         $lookupMode = 'ServerFilter'
 
         if ($records.Count -eq 0) {
+            $stage = 'GraphLookupFallback'
             $allUri = 'https://graph.microsoft.com/beta/deviceManagement/tenantAssociatedDevices'
             $all = @(
                 Invoke-WindowsDeviceLinkGraphCollection -Uri $allUri -AccessToken $token
@@ -204,18 +207,17 @@ foreach ($tenantId in $tenantsToSearch) {
         })
     }
     catch {
-        $statusCode = $null
-        try {
-            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-                $statusCode = [int]$_.Exception.Response.StatusCode
-            }
-        } catch {}
+        $diagnostic = Get-WindowsDeviceLinkUpstreamFailure -ErrorRecord $_
 
         $tenantErrors.Add([ordered]@{
             tenantId = $tenantId
             tenantName = $tenantName
-            statusCode = $statusCode
+            statusCode = $diagnostic.statusCode
             error = 'TenantLookupFailed'
+            stage = $stage
+            upstreamErrorCode = $diagnostic.upstreamErrorCode
+            aadstsCodes = $diagnostic.aadstsCodes
+            upstreamCorrelationId = $diagnostic.upstreamCorrelationId
         })
 
         $searchedTenants.Add([ordered]@{
@@ -226,7 +228,7 @@ foreach ($tenantId in $tenantsToSearch) {
             matchCount = 0
         })
 
-        Write-Warning "DeviceLink lookup failed for TenantId=$tenantId RequestId=$requestId StatusCode=$statusCode"
+        Write-Warning ("DeviceLink lookup failed for TenantId={0} RequestId={1} Stage={2} StatusCode={3} UpstreamCode={4} AadstsCodes={5} UpstreamCorrelationId={6}" -f $tenantId,$requestId,$stage,$diagnostic.statusCode,$diagnostic.upstreamErrorCode,($diagnostic.aadstsCodes -join ','),$diagnostic.upstreamCorrelationId)
     }
     finally {
         $token = $null
@@ -240,10 +242,10 @@ Write-JsonResponse -StatusCode 200 -Body @{
     requestId = $requestId
     serialNumber = $serialNumber
     searchedTenantCount = $tenantsToSearch.Count
-    successfulTenantCount = @($searchedTenants | Where-Object success).Count
+    successfulTenantCount = $searchedTenants.Count - $tenantErrors.Count
     failedTenantCount = $tenantErrors.Count
     matchCount = $matches.Count
-    matches = @($matches)
-    tenants = @($searchedTenants)
-    tenantErrors = @($tenantErrors)
+    matches = $matches.ToArray()
+    tenants = $searchedTenants.ToArray()
+    tenantErrors = $tenantErrors.ToArray()
 }

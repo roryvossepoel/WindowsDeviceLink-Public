@@ -2,7 +2,7 @@ function Resolve-WindowsDeviceLinkBackendEndpoint {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][ValidateNotNull()][uri]$BackendUri,
-        [Parameter(Mandatory)][ValidateSet('lookup','preassociate','reconcile')][string]$Route
+        [Parameter(Mandatory)][ValidateSet('tenants','lookup','preassociate','reconcile')][string]$Route
     )
 
     if (-not $BackendUri.IsAbsoluteUri -or $BackendUri.Scheme -ne 'https') {

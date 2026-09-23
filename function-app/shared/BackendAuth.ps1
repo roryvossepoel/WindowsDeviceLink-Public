@@ -2,6 +2,14 @@ using namespace System.Security.Cryptography
 using namespace System.Security.Cryptography.X509Certificates
 using namespace System.Text
 
+function Get-WindowsDeviceLinkBackendMetadata {
+    [ordered]@{
+        apiVersion = '1.0'
+        minimumModuleVersion = '0.10.0'
+        capabilities = @('TenantCatalog','MultitenantLookup','Reconcile')
+    }
+}
+
 function Test-WindowsDeviceLinkSharedSecret {
     param(
         [Parameter(Mandatory)][string]$Expected,
@@ -151,6 +159,69 @@ function Get-WindowsDeviceLinkTenantNames {
     }
     catch {
         throw 'WINDOWSDEVICELINK_TENANT_NAMES_JSON is not valid JSON.'
+    }
+}
+
+function Get-WindowsDeviceLinkUpstreamFailure {
+    param(
+        [Parameter(Mandatory)][System.Management.Automation.ErrorRecord]$ErrorRecord
+    )
+
+    # Never return exception messages, response bodies, tokens or assertions.
+    $statusCode = $null
+    $upstreamErrorCode = $null
+    $aadstsCodes = @()
+    $upstreamCorrelationId = $null
+    try {
+        if ($ErrorRecord.Exception.Response -and $ErrorRecord.Exception.Response.StatusCode) {
+            $statusCode = [int]$ErrorRecord.Exception.Response.StatusCode
+        }
+    } catch {}
+
+    try {
+        $raw = [string]$ErrorRecord.ErrorDetails.Message
+        if (-not [string]::IsNullOrWhiteSpace($raw) -and $raw.Length -le 65536) {
+            $detail = $raw | ConvertFrom-Json -ErrorAction Stop
+            $candidate = if ($detail.error -is [string]) { $detail.error } else { [string]$detail.error.code }
+            # Only known protocol codes may reach logs or API responses.
+            if ($candidate -in @(
+                'invalid_request','invalid_client','invalid_grant','invalid_scope',
+                'unauthorized_client','unsupported_grant_type','invalid_resource',
+                'interaction_required','temporarily_unavailable','server_error',
+                'InvalidAuthenticationToken','Authentication_MissingOrMalformed',
+                'Authorization_RequestDenied','AccessDenied','Forbidden',
+                'BadRequest','Request_BadRequest','ResourceNotFound',
+                'Request_ResourceNotFound','TooManyRequests','ServiceNotAvailable',
+                'InternalServerError','UnknownError','NotSupported'
+            )) {
+                $upstreamErrorCode = [string]$candidate
+            }
+
+            $aadstsCodes = @(
+                foreach ($code in @($detail.error_codes)) {
+                    if ([string]$code -match '^[0-9]{3,10}$') { 'AADSTS' + [string]$code }
+                }
+            )
+            if ($aadstsCodes.Count -eq 0 -and [string]$detail.error_description -match '\bAADSTS([0-9]{3,10})\b') {
+                $aadstsCodes = @('AADSTS' + $Matches[1])
+            }
+
+            $correlation = [string]$detail.correlation_id
+            if (-not $correlation -and $detail.error -isnot [string]) {
+                $correlation = [string]$detail.error.innerError.'request-id'
+            }
+            $parsedId = [guid]::Empty
+            if ([guid]::TryParse($correlation, [ref]$parsedId)) {
+                $upstreamCorrelationId = $parsedId.ToString()
+            }
+        }
+    } catch {}
+
+    [pscustomobject]@{
+        statusCode = $statusCode
+        upstreamErrorCode = $upstreamErrorCode
+        aadstsCodes = $aadstsCodes
+        upstreamCorrelationId = $upstreamCorrelationId
     }
 }
 
