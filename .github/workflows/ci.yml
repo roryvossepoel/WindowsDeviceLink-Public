@@ -15,6 +15,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-runtime:
+    name: PowerShell backend runtime regression
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate backend runtime with mocked HTTP
+        shell: pwsh
+        run: ./tests/Azure-Backend-Runtime-Validation.ps1
+
   regression:
     name: Windows PowerShell 5.1 regression
     runs-on: windows-latest
@@ -81,6 +91,18 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           .\tests\Backend-Initialization-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
+      - name: Validate centralized tenant assignment orchestration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Tenant-Assignment-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
+      - name: Validate backend-independent tenant catalog
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Tenant-Catalog-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
       - name: Validate lifecycle repair planning safety
         shell: powershell

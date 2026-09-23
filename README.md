@@ -27,12 +27,86 @@ WindowsDeviceLink can:
 - **Installing on Windows 11 or WinPE?** Read the [installation guide](docs/INSTALLATION.md).
 - **Using WinPE before Windows installation?** Read the [WinPE workflow and support boundaries](docs/WINPE-WORKFLOW.md).
 - **Using the Azure Function backend?** Read [Azure Function backend](docs/AZURE-BACKEND.md).
+- **Choosing Direct or Backend mode?** Read [tenant assignment modes](docs/TENANT-ASSIGNMENT-MODES.md).
 
 ## Current version
 
-The current preview release line is `0.9.0-preview1`.
+The current development release line is `0.10.0-preview1`.
 
-This release adds `Show-WindowsDeviceLink`, a compact Windows operator GUI for local/cloud inspection, tenant selection, CSV export, pre-association, full association, cloud/local/full offboarding, and live activity logging. Interactive authentication is the default and alternative supported methods can be selected through command parameters.
+WindowsDeviceLink has two explicit execution routes:
+
+- **Direct mode** talks directly to Microsoft Graph. TenantId is optional for normal
+  interactive or device-code use; when omitted, the sign-in context determines the tenant.
+- **Backend mode** uses the optional Function App for complete multitenant lookup and
+  guarded New, no-op, or Move orchestration.
+
+The GUI uses one operator view: Device, Connection, Local association, and Cloud
+association are shown together. Select a target tenant and choose **Register device**. In Backend mode
+that one action performs the complete lookup, decision, identity renewal, registration,
+and verification workflow. Diagnostic, export, recovery, and offboarding actions remain
+available below the primary assignment action.
+
+The simplest Direct-mode command does not require a tenant ID:
+
+```powershell
+Set-WindowsDeviceLinkTenant -Method DeviceCode
+```
+
+Or open the GUI; full Windows defaults to Interactive and Windows PE to DeviceCode:
+
+```powershell
+Show-WindowsDeviceLink
+```
+
+Specify a tenant only when it must be selected explicitly:
+
+```powershell
+Set-WindowsDeviceLinkTenant `
+    -Method DeviceCode `
+    -TenantId '<tenant-id>'
+```
+
+Backend mode is activated explicitly by supplying its URI and credential:
+
+```powershell
+$apiKey = Read-Host 'WindowsDeviceLink API key' -AsSecureString
+Show-WindowsDeviceLink `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey
+```
+
+The equivalent Backend-mode command-line assignment is:
+
+```powershell
+Set-WindowsDeviceLinkTenant `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey `
+    -TargetTenantId '<tenant-id>'
+```
+
+Function App usage is optional. For controlled environments that only need an
+operator-selectable tenant list, the same friendly-name JSON can be used directly by
+the UI and CLI:
+
+```json
+{
+  "Gemeente Kerkrade": "1d862ca4-e053-473a-935e-69df86c33b3e",
+  "Gemeente Landgraaf": "4d39a49b-0d1c-4020-b895-c33dc4fae2a1"
+}
+```
+
+```powershell
+$tenant = Get-WindowsDeviceLinkTenantCatalog `
+    -Path 'E:\Config\tenants.json' `
+    -Name 'Gemeente Kerkrade'
+
+Get-WindowsDeviceLink |
+    Register-WindowsDeviceLink `
+        -Method DeviceCode `
+        -TenantId $tenant.TenantId
+```
+
+This Direct-mode catalog selects a tenant but does not search or move records across tenants.
 
 ## Mental model
 
@@ -287,6 +361,7 @@ Get-WindowsDeviceLink |
 
 See:
 
+- [Direct and Backend modes](docs/TENANT-ASSIGNMENT-MODES.md)
 - [Azure Function backend](docs/AZURE-BACKEND.md)
 - [Function deployment](infrastructure/function-app/README.md)
 - [App registration](docs/APP-REGISTRATION.md)
@@ -308,6 +383,9 @@ See:
 | `Get-WindowsDeviceLinkRepairPlan` | Return a non-destructive repair recommendation for observed lifecycle state. |
 | `Get-WindowsDeviceLinkStatus` | Combine runtime, local identity, firmware and optional tenant-side association diagnostics. |
 | `Initialize-WindowsDeviceLink` | Safely initialize pre-association and optionally full association with explicit `-FullAssociation`. |
+| `Get-WindowsDeviceLinkBackendTenant` | Read the authenticated Function backend tenant catalog. |
+| `Get-WindowsDeviceLinkTenantCatalog` | Read and resolve a local, HTTPS, or in-memory tenant-name catalog without a Function App. |
+| `Set-WindowsDeviceLinkTenant` | Apply New/no-op in Direct mode, or New/no-op/verified Move in Backend mode. |
 | `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association directly or through a webhook. |
 | `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
@@ -344,7 +422,7 @@ See:
 
 ## Scope
 
-Preview release line: `0.9.0-preview1`.
+Preview release line: `0.10.0-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, the optional full-Windows operator GUI, multiple authentication methods, webhook transport and the optional Azure Function reference backend.
 

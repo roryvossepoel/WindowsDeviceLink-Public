@@ -54,14 +54,17 @@ $expectedFunctions = @(
     'Export-WindowsDeviceLinkCsv'
     'Get-WindowsDeviceLink'
     'Get-WindowsDeviceLinkAssociation'
+    'Get-WindowsDeviceLinkBackendTenant'
     'Get-WindowsDeviceLinkFirmwareState'
     'Get-WindowsDeviceLinkLocalAssociation'
     'Get-WindowsDeviceLinkRepairPlan'
     'Get-WindowsDeviceLinkStatus'
+    'Get-WindowsDeviceLinkTenantCatalog'
     'Initialize-WindowsDeviceLink'
     'Register-WindowsDeviceLink'
     'Remove-WindowsDeviceLinkAssociation'
     'Reset-WindowsDeviceLinkFirmwareState'
+    'Set-WindowsDeviceLinkTenant'
     'Show-WindowsDeviceLink'
     'Test-WindowsDeviceLinkAssociationJwt'
     'Test-WindowsDeviceLinkDiscovery'
@@ -103,6 +106,11 @@ foreach ($name in @('Get-WindowsDeviceLinkLocalAssociation','Get-WindowsDeviceLi
     Assert-True (-not $command.Parameters.ContainsKey('WhatIf')) "$name must remain read-only and must not expose -WhatIf."
     Assert-True (-not $command.Parameters.ContainsKey('Confirm')) "$name must remain read-only and must not expose -Confirm."
 }
+foreach ($name in @('Get-WindowsDeviceLinkBackendTenant','Get-WindowsDeviceLinkTenantCatalog')) {
+    $command = Get-Command $name
+    Assert-True (-not $command.Parameters.ContainsKey('WhatIf')) "$name must remain read-only."
+    Assert-True (-not $command.Parameters.ContainsKey('Confirm')) "$name must remain read-only."
+}
 Write-Host 'PASS: planner, preflight, JWT validation, discovery, and runtime probe remain read-only'
 
 $writeCommands = @(
@@ -111,6 +119,7 @@ $writeCommands = @(
     'Register-WindowsDeviceLink'
     'Remove-WindowsDeviceLinkAssociation'
     'Reset-WindowsDeviceLinkFirmwareState'
+    'Set-WindowsDeviceLinkTenant'
 )
 foreach ($name in $writeCommands) {
     $command = Get-Command $name
@@ -126,6 +135,8 @@ $secureParameters = @(
     @{ Command='Initialize-WindowsDeviceLink'; Parameter='AccessToken' },
     @{ Command='Register-WindowsDeviceLink'; Parameter='AccessToken' },
     @{ Command='Remove-WindowsDeviceLinkAssociation'; Parameter='AccessToken' }
+    @{ Command='Get-WindowsDeviceLinkBackendTenant'; Parameter='BackendApiKey' }
+    @{ Command='Set-WindowsDeviceLinkTenant'; Parameter='BackendApiKey' }
 )
 foreach ($item in $secureParameters) {
     $command = Get-Command $item.Command
@@ -149,6 +160,15 @@ foreach ($name in @('Register-WindowsDeviceLink','Get-WindowsDeviceLinkAssociati
     Assert-True ($scriptText -notmatch [regex]::Escape('-TenantId is required for -Method Interactive.')) "$name unexpectedly requires -TenantId for Interactive authentication."
 }
 Write-Host 'PASS: Interactive authentication keeps TenantId optional'
+
+$setTenantCommand = Get-Command Set-WindowsDeviceLinkTenant -Module WindowsDeviceLink
+Assert-True ($setTenantCommand.Parameters.ContainsKey('Method')) 'Set-WindowsDeviceLinkTenant is missing Direct mode -Method.'
+$directTenantAttribute = @($setTenantCommand.Parameters['TenantId'].Attributes | Where-Object {
+    $_ -is [System.Management.Automation.ParameterAttribute] -and $_.ParameterSetName -eq 'Direct'
+}) | Select-Object -First 1
+Assert-True ($null -ne $directTenantAttribute -and -not $directTenantAttribute.Mandatory) 'Set-WindowsDeviceLinkTenant Direct mode must keep TenantId optional.'
+Assert-True ($setTenantCommand.Parameters['BackendUri'].ParameterSets.Keys.Count -eq 2) 'Set-WindowsDeviceLinkTenant BackendUri must be isolated to the two Backend parameter sets.'
+Write-Host 'PASS: tenant assignment separates Direct and Backend mode without forcing Direct TenantId'
 
 # Removal without an explicit selector intentionally targets the current physical
 # device by locally resolving the BIOS serial number. Explicit selectors still win.

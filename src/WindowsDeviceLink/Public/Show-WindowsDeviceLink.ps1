@@ -19,6 +19,11 @@ function Show-WindowsDeviceLink {
     Use -TenantsPath to load the same JSON format from a local file.
     Precedence is: TenantsUri, then TenantsPath, then explicit -Tenants values.
 
+    Backend mode retrieves its authoritative tenant catalog from the Function App.
+    The dashboard presents device, local-association, and cloud-association state in
+    one view. Register performs the complete guarded assignment workflow; diagnostic,
+    export, recovery, and offboarding actions remain available below it.
+
     .EXAMPLE
     Show-WindowsDeviceLink
 
@@ -81,6 +86,15 @@ function Show-WindowsDeviceLink {
 
         [ValidateNotNullOrEmpty()]
         [string]$WindowsManagementServicePath
+
+        ,[ValidateNotNull()]
+        [uri]$BackendUri
+
+        ,[ValidateNotNull()]
+        [securestring]$BackendApiKey
+
+        ,[ValidateSet('Simple','Advanced')]
+        [string]$ViewMode = 'Simple'
     )
 
     $outerBoundParameters = @{}
@@ -89,8 +103,18 @@ function Show-WindowsDeviceLink {
     }
 
     $isWinPE = Test-Path -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\MiniNT'
+    $backendMode = $outerBoundParameters.ContainsKey('BackendUri') -or $outerBoundParameters.ContainsKey('BackendApiKey')
+    if ($backendMode -and (-not $outerBoundParameters.ContainsKey('BackendUri') -or -not $outerBoundParameters.ContainsKey('BackendApiKey'))) {
+        throw '-BackendUri and -BackendApiKey must be supplied together.'
+    }
+    if ($backendMode -and ($Tenants -or $outerBoundParameters.ContainsKey('TenantsUri') -or $outerBoundParameters.ContainsKey('TenantsPath'))) {
+        throw 'Backend mode obtains its tenant catalog from the Function App; do not combine it with -Tenants, -TenantsUri, or -TenantsPath.'
+    }
 
-    if (-not $outerBoundParameters.ContainsKey('Method')) {
+    if ($backendMode -and $outerBoundParameters.ContainsKey('Method')) {
+        throw 'Backend mode performs Graph operations through the Function App; do not combine it with -Method.'
+    }
+    if (-not $backendMode -and -not $outerBoundParameters.ContainsKey('Method')) {
         $Method = if ($isWinPE) { 'DeviceCode' } else { 'Interactive' }
     }
 
@@ -122,6 +146,21 @@ function Show-WindowsDeviceLink {
     $form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
     $form.BackColor = [System.Drawing.Color]::FromArgb(243,243,243)
 
+    $formIcon = $null
+    if ($loadedModule -and -not [string]::IsNullOrWhiteSpace([string]$loadedModule.ModuleBase)) {
+        $iconPath = Join-Path ([string]$loadedModule.ModuleBase) 'Assets\WindowsDeviceLink.ico'
+        if (Test-Path -LiteralPath $iconPath) {
+            try {
+                $formIcon = [System.Drawing.Icon]::new($iconPath)
+                $form.Icon = $formIcon
+            }
+            catch {
+                # An icon is cosmetic and must never block the operator workflow.
+                $formIcon = $null
+            }
+        }
+    }
+
     $content = New-Object System.Windows.Forms.Panel
     $content.Dock = [System.Windows.Forms.DockStyle]::Fill
     $content.AutoScroll = $false
@@ -133,6 +172,40 @@ function Show-WindowsDeviceLink {
     $toolTip.InitialDelay = 400
     $toolTip.ReshowDelay = 200
     $toolTip.ShowAlways = $true
+
+    $colorPrimary = [System.Drawing.Color]::FromArgb(29,52,78)
+    $colorAccent = [System.Drawing.Color]::FromArgb(202,153,55)
+    $colorSuccess = [System.Drawing.Color]::FromArgb(51,153,78)
+    $colorNeutral = [System.Drawing.Color]::FromArgb(166,166,166)
+    $colorConnectionAccent = [System.Drawing.Color]::FromArgb(92,105,139)
+    $colorLocalAccent = [System.Drawing.Color]::FromArgb(63,127,142)
+    $colorDeviceTint = [System.Drawing.Color]::FromArgb(246,249,252)
+    $colorConnectionTint = [System.Drawing.Color]::FromArgb(247,247,252)
+    $colorLocalTint = [System.Drawing.Color]::FromArgb(244,249,250)
+    $colorCloudTint = [System.Drawing.Color]::FromArgb(245,250,246)
+    $colorWarningTint = [System.Drawing.Color]::FromArgb(253,250,243)
+
+    function New-GuiFont {
+        param(
+            [string]$Family,
+            [float]$Size = 9,
+            [System.Drawing.FontStyle]$Style = [System.Drawing.FontStyle]::Regular
+        )
+
+        $resolvedFamily = if (-not [string]::IsNullOrWhiteSpace($Family)) {
+            $Family
+        }
+        elseif ($Style -eq [System.Drawing.FontStyle]::Regular) {
+            'Tahoma'
+        }
+        else {
+            'Segoe UI'
+        }
+
+        return [System.Drawing.Font]::new(
+            $resolvedFamily,$Size,$Style,[System.Drawing.GraphicsUnit]::Point
+        )
+    }
 
 
     function New-Card {
@@ -154,7 +227,7 @@ function Show-WindowsDeviceLink {
         if ($Title) {
             $label = New-Object System.Windows.Forms.Label
             $label.Text = $Title
-            $label.Font = New-Object System.Drawing.Font('Segoe UI',10,[System.Drawing.FontStyle]::Bold)
+            $label.Font = New-GuiFont -Size 10 -Style Bold
             $label.Location = [System.Drawing.Point]::new(14,9)
             $label.AutoSize = $true
             $panel.Controls.Add($label)
@@ -168,23 +241,27 @@ function Show-WindowsDeviceLink {
             [System.Windows.Forms.Control]$Parent,
             [string]$Caption,
             [int]$Y,
-            [int]$CaptionWidth = 112
+            [int]$CaptionWidth = 112,
+            [int]$X = 14,
+            [int]$ValueWidth = 350
         )
 
         $captionLabel = New-Object System.Windows.Forms.Label
         $captionLabel.Text = $Caption
-        $captionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+        $captionLabel.Font = New-GuiFont -Size 8.5 -Style Regular
         $captionLabel.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
-        $captionLabel.Location = [System.Drawing.Point]::new(14,$Y)
+        $captionLabel.Location = [System.Drawing.Point]::new($X,$Y)
         $captionLabel.Size = [System.Drawing.Size]::new($CaptionWidth,20)
+        $captionLabel.Tag = "Caption:$Caption"
         $Parent.Controls.Add($captionLabel)
 
         $valueLabel = New-Object System.Windows.Forms.Label
         $valueLabel.Text = '-'
-        $valueLabel.Font = New-Object System.Drawing.Font('Segoe UI',9,[System.Drawing.FontStyle]::Bold)
-        $valueLabel.Location = [System.Drawing.Point]::new(($CaptionWidth + 20),($Y - 1))
-        $valueLabel.Size = [System.Drawing.Size]::new(350,22)
+        $valueLabel.Font = New-GuiFont -Size 9 -Style Bold
+        $valueLabel.Location = [System.Drawing.Point]::new(($X + $CaptionWidth + 6),($Y - 1))
+        $valueLabel.Size = [System.Drawing.Size]::new($ValueWidth,22)
         $valueLabel.AutoEllipsis = $true
+        $valueLabel.Tag = "Value:$Caption"
         $Parent.Controls.Add($valueLabel)
 
         $valueLabel
@@ -207,14 +284,14 @@ function Show-WindowsDeviceLink {
 
         $titleLabel = New-Object System.Windows.Forms.Label
         $titleLabel.Text = $Title
-        $titleLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.3,[System.Drawing.FontStyle]::Bold)
+        $titleLabel.Font = New-GuiFont -Size 8.3 -Style Bold
         $titleLabel.Location = [System.Drawing.Point]::new(14,5)
         $titleLabel.AutoSize = $true
         $row.Controls.Add($titleLabel)
 
         $descriptionLabel = New-Object System.Windows.Forms.Label
         $descriptionLabel.Text = $Description
-        $descriptionLabel.Font = New-Object System.Drawing.Font('Segoe UI',8.2)
+        $descriptionLabel.Font = New-GuiFont -Size 8.2 -Style Regular
         $descriptionLabel.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
         $descriptionLabel.Location = [System.Drawing.Point]::new(14,23)
         $descriptionLabel.AutoSize = $true
@@ -229,11 +306,11 @@ function Show-WindowsDeviceLink {
         for ($i = $count - 1; $i -ge 0; $i--) {
             $button = New-Object System.Windows.Forms.Button
             $button.Text = $Buttons[$i]
-            $button.Font = New-Object System.Drawing.Font('Segoe UI',8.6)
+            $button.Font = New-GuiFont -Size 8.6 -Style Regular
             $button.Size = [System.Drawing.Size]::new($buttonWidth,28)
             $right -= $buttonWidth
             $button.Location = [System.Drawing.Point]::new($right,9)
-            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
             $button.UseVisualStyleBackColor = $true
             $row.Controls.Add($button)
             $buttonList.Insert(0,$button)
@@ -254,94 +331,35 @@ function Show-WindowsDeviceLink {
 
     $effectiveTenants = @{}
 
+    if ($backendMode) {
+        $backendTenants = @(Get-WindowsDeviceLinkBackendTenant -BackendUri $BackendUri -BackendApiKey $BackendApiKey)
+        if ($backendTenants.Count -eq 0) { throw 'The Function backend returned no allowed tenants.' }
+        foreach ($tenant in $backendTenants) {
+            $effectiveTenants[[string]$tenant.Name] = [string]$tenant.TenantId
+        }
+    }
+
     if ($outerBoundParameters.ContainsKey('TenantsUri')) {
-        if (-not $TenantsUri.IsAbsoluteUri -or $TenantsUri.Scheme -ne 'https') {
-            throw '-TenantsUri must be an absolute HTTPS URI.'
-        }
-
-        try {
-            $remoteTenantObject = Invoke-RestMethod -Uri $TenantsUri.AbsoluteUri -Method Get -TimeoutSec 15 -ErrorAction Stop
-        }
-        catch {
-            throw "Unable to load tenant JSON from '$($TenantsUri.AbsoluteUri)': $($_.Exception.Message)"
-        }
-
-        if ($null -eq $remoteTenantObject -or $remoteTenantObject -is [System.Array]) {
-            throw 'The tenant JSON must be a JSON object that maps friendly tenant names to tenant GUIDs.'
-        }
-
-        foreach ($property in @($remoteTenantObject.PSObject.Properties)) {
-            $name = [string]$property.Name
-            $id = [string]$property.Value
-            $parsedTenantId = [guid]::Empty
-
-            if ([string]::IsNullOrWhiteSpace($name) -or
-                [string]::IsNullOrWhiteSpace($id) -or
-                -not [guid]::TryParse($id.Trim(),[ref]$parsedTenantId)) {
-                throw "Invalid tenant entry '$name' in '$($TenantsUri.AbsoluteUri)'. Each value must be a tenant GUID."
-            }
-
-            $effectiveTenants[$name.Trim()] = $parsedTenantId.ToString()
-        }
-
-        if ($effectiveTenants.Count -eq 0) {
-            throw "The tenant JSON at '$($TenantsUri.AbsoluteUri)' did not contain any tenant entries."
+        foreach ($tenant in @(Get-WindowsDeviceLinkTenantCatalog -Uri $TenantsUri)) {
+            $effectiveTenants[[string]$tenant.Name] = [string]$tenant.TenantId
         }
     }
 
     if ($outerBoundParameters.ContainsKey('TenantsPath')) {
-        if (-not (Test-Path -LiteralPath $TenantsPath -PathType Leaf)) {
-            throw "Tenant JSON file '$TenantsPath' was not found."
-        }
-
-        try {
-            $localTenantObject = Get-Content -LiteralPath $TenantsPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
-        }
-        catch {
-            throw "Unable to load tenant JSON from '$TenantsPath': $($_.Exception.Message)"
-        }
-
-        if ($null -eq $localTenantObject -or $localTenantObject -is [System.Array]) {
-            throw 'The tenant JSON must be a JSON object that maps friendly tenant names to tenant GUIDs.'
-        }
-
-        foreach ($property in @($localTenantObject.PSObject.Properties)) {
-            $name = [string]$property.Name
-            $id = [string]$property.Value
-            $parsedTenantId = [guid]::Empty
-
-            if ([string]::IsNullOrWhiteSpace($name) -or
-                [string]::IsNullOrWhiteSpace($id) -or
-                -not [guid]::TryParse($id.Trim(),[ref]$parsedTenantId)) {
-                throw "Invalid tenant entry '$name' in '$TenantsPath'. Each value must be a tenant GUID."
-            }
-
-            $effectiveTenants[$name.Trim()] = $parsedTenantId.ToString()
-        }
-
-        if ($localTenantObject.PSObject.Properties.Count -eq 0) {
-            throw "The tenant JSON file '$TenantsPath' did not contain any tenant entries."
+        foreach ($tenant in @(Get-WindowsDeviceLinkTenantCatalog -Path $TenantsPath)) {
+            $effectiveTenants[[string]$tenant.Name] = [string]$tenant.TenantId
         }
     }
 
     if ($Tenants) {
-        foreach ($name in @($Tenants.Keys)) {
-            $id = [string]$Tenants[$name]
-            $parsedTenantId = [guid]::Empty
-
-            if ([string]::IsNullOrWhiteSpace([string]$name) -or
-                [string]::IsNullOrWhiteSpace($id) -or
-                -not [guid]::TryParse($id.Trim(),[ref]$parsedTenantId)) {
-                throw "Invalid -Tenants entry '$name'. Each value must be a tenant GUID."
-            }
-
-            $effectiveTenants[[string]$name] = $parsedTenantId.ToString()
+        foreach ($tenant in @(Get-WindowsDeviceLinkTenantCatalog -TenantMap $Tenants)) {
+            $effectiveTenants[[string]$tenant.Name] = [string]$tenant.TenantId
         }
     }
 
     $tenantChoiceLookup = @{}
     $tenantChoices = New-Object System.Collections.Generic.List[string]
-    $autoLabel = if ($outerBoundParameters.ContainsKey('TenantId')) { 'Default tenant parameter' } else { 'Automatic / detected tenant' }
+    $autoLabel = if ($backendMode) { 'Select target tenant...' } elseif ($outerBoundParameters.ContainsKey('TenantId')) { 'Explicit tenant parameter' } else { 'Tenant determined by sign-in' }
     $tenantChoiceLookup[$autoLabel] = $null
     $tenantChoices.Add($autoLabel)
 
@@ -357,6 +375,10 @@ function Show-WindowsDeviceLink {
         }
     }
 
+    # A true Direct single-tenant workflow has no choice to present. The
+    # authenticated sign-in context (or explicit TenantId) remains authoritative.
+    $showTenantSelector = $backendMode -or $effectiveTenants.Count -gt 0
+
     function Get-SelectedTenantId {
         if ($tenantSelector.SelectedItem) {
             $selected = [string]$tenantSelector.SelectedItem
@@ -370,6 +392,19 @@ function Show-WindowsDeviceLink {
         }
 
         $null
+    }
+
+    function Get-TenantDisplayName {
+        param([string]$TenantId)
+
+        if ([string]::IsNullOrWhiteSpace($TenantId)) { return 'Unavailable' }
+        foreach ($name in $effectiveTenants.Keys) {
+            if ([string]$effectiveTenants[$name] -ieq $TenantId) {
+                return [string]$name
+            }
+        }
+
+        return $TenantId
     }
 
     function Get-GuiAuthParameters {
@@ -396,6 +431,11 @@ function Show-WindowsDeviceLink {
         $parameters
     }
 
+    function Get-GuiBackendParameters {
+        if (-not $backendMode) { throw 'This action requires -BackendUri and -BackendApiKey.' }
+        @{ BackendUri=$BackendUri; BackendApiKey=$BackendApiKey }
+    }
+
 
     function Get-GuiRuntimeParameters {
         $parameters = @{}
@@ -412,72 +452,139 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiSupport = $null
 
     $deviceCard = New-Card -Title 'Device' -X 14 -Y 12 -Width 508 -Height 126
-    $associationCard = New-Card -Title 'Association' -X 536 -Y 12 -Width 508 -Height 126
+    $connectionCard = New-Card -Title 'Connection' -X 536 -Y 12 -Width 508 -Height 126
+    $associationCard = New-Card -Title 'Local association' -X 14 -Y 150 -Width 508 -Height 126
+    $cloudCard = New-Card -Title 'Cloud association' -X 536 -Y 150 -Width 508 -Height 126
+    $deviceCard.BackColor = $colorDeviceTint
+    $connectionCard.BackColor = $colorConnectionTint
+    $associationCard.BackColor = $colorLocalTint
+    $cloudCard.BackColor = $colorConnectionTint
 
-    $ui.DeviceName = New-ValuePair -Parent $deviceCard -Caption 'Device' -Y 34
-    $ui.Serial     = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 56
-    $ui.Environment = New-ValuePair -Parent $deviceCard -Caption 'Environment' -Y 78
-    $ui.Auth       = New-ValuePair -Parent $deviceCard -Caption 'Authentication' -Y 100
+    $deviceAccent = New-Object System.Windows.Forms.Panel
+    $deviceAccent.BackColor = $colorPrimary
+    $deviceAccent.Location = [System.Drawing.Point]::new(0,0)
+    $deviceAccent.Size = [System.Drawing.Size]::new(4,126)
+    $deviceCard.Controls.Add($deviceAccent)
 
-    $ui.Firmware   = New-ValuePair -Parent $associationCard -Caption 'Firmware' -Y 34
-    $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'Local state' -Y 56
-    $ui.TenantId   = New-ValuePair -Parent $associationCard -Caption 'Tenant ID' -Y 78
-    $ui.Source     = New-ValuePair -Parent $associationCard -Caption 'Source' -Y 100
+    $connectionAccent = New-Object System.Windows.Forms.Panel
+    $connectionAccent.BackColor = $colorConnectionAccent
+    $connectionAccent.Location = [System.Drawing.Point]::new(0,0)
+    $connectionAccent.Size = [System.Drawing.Size]::new(4,126)
+    $connectionCard.Controls.Add($connectionAccent)
 
-    $cloudCard = New-Card -Title 'Cloud association' -X 14 -Y 150 -Width 1030 -Height 84
-    $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 80
+    $localAccent = New-Object System.Windows.Forms.Panel
+    $localAccent.BackColor = $colorLocalAccent
+    $localAccent.Location = [System.Drawing.Point]::new(0,0)
+    $localAccent.Size = [System.Drawing.Size]::new(4,126)
+    $associationCard.Controls.Add($localAccent)
+
+    $ui.CloudAccent = New-Object System.Windows.Forms.Panel
+    $ui.CloudAccent.BackColor = $colorNeutral
+    $ui.CloudAccent.Location = [System.Drawing.Point]::new(0,0)
+    $ui.CloudAccent.Size = [System.Drawing.Size]::new(4,126)
+    $cloudCard.Controls.Add($ui.CloudAccent)
+
+    $ui.Manufacturer = New-ValuePair -Parent $deviceCard -Caption 'Manufacturer' -Y 34 -CaptionWidth 90 -ValueWidth 350
+    $ui.Model        = New-ValuePair -Parent $deviceCard -Caption 'Model' -Y 56 -CaptionWidth 90 -ValueWidth 350
+    $ui.Serial       = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 78 -CaptionWidth 90 -ValueWidth 350
+    $ui.OperatingSystem = New-ValuePair -Parent $deviceCard -Caption 'Operating system' -Y 100 -CaptionWidth 90 -ValueWidth 350
+
+    $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 90 -ValueWidth 350
+    $ui.Authentication = New-ValuePair -Parent $connectionCard -Caption 'Authentication' -Y 56 -CaptionWidth 90 -ValueWidth 350
+    $ui.Endpoint       = New-ValuePair -Parent $connectionCard -Caption 'Endpoint' -Y 78 -CaptionWidth 90 -ValueWidth 350
+    $ui.TenantScope    = New-ValuePair -Parent $connectionCard -Caption 'Tenant scope' -Y 100 -CaptionWidth 90 -ValueWidth 350
+
+    $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'State' -Y 34 -CaptionWidth 72 -ValueWidth 215
+    $ui.Firmware   = New-ValuePair -Parent $associationCard -Caption 'Firmware' -Y 56 -CaptionWidth 72 -ValueWidth 215
+    $ui.LinkId     = New-ValuePair -Parent $associationCard -Caption 'Link ID' -Y 78 -CaptionWidth 72 -ValueWidth 215
+    $ui.LocalCreated = New-ValuePair -Parent $associationCard -Caption 'Created' -Y 100 -CaptionWidth 72 -ValueWidth 215
+
+    $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 88 -ValueWidth 205
     $ui.CloudState.Text = 'Not checked'
-    $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant ID' -Y 56 -CaptionWidth 80
-    $ui.CloudTenant.Text = 'Unavailable'
+    $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant' -Y 56 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudTenant.Text = 'Not checked yet'
+    $ui.CloudId = New-ValuePair -Parent $cloudCard -Caption 'Association ID' -Y 78 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudId.Text = 'Not checked yet'
+    $ui.CloudChecked = New-ValuePair -Parent $cloudCard -Caption 'Last checked' -Y 100 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudChecked.Text = 'Not yet'
 
-    $cloudIdCaption = New-Object System.Windows.Forms.Label
-    $cloudIdCaption.Text = 'Association ID'
-    $cloudIdCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
-    $cloudIdCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
-    $cloudIdCaption.Location = [System.Drawing.Point]::new(500,34)
-    $cloudIdCaption.Size = [System.Drawing.Size]::new(96,20)
-    $cloudCard.Controls.Add($cloudIdCaption)
+    $actionsTitle = New-Object System.Windows.Forms.Label
+    $actionsTitle.Text = 'Actions'
+    $actionsTitle.Font = New-GuiFont -Size 11.5 -Style Bold
+    $actionsTitle.Location = [System.Drawing.Point]::new(16,150)
+    $actionsTitle.AutoSize = $true
+    $content.Controls.Add($actionsTitle)
 
-    $ui.CloudId = New-Object System.Windows.Forms.Label
-    $ui.CloudId.Text = 'Unavailable'
-    $ui.CloudId.Font = New-Object System.Drawing.Font('Segoe UI',8.3,[System.Drawing.FontStyle]::Bold)
-    $ui.CloudId.Location = [System.Drawing.Point]::new(600,33)
-    $ui.CloudId.Size = [System.Drawing.Size]::new(380,22)
-    $ui.CloudId.AutoEllipsis = $true
-    $cloudCard.Controls.Add($ui.CloudId)
+    $actionsPanel = New-Card -Title '' -X 14 -Y 176 -Width 1030 -Height 196
+
+    $assignmentRow = New-Object System.Windows.Forms.Panel
+    $assignmentRow.Location = [System.Drawing.Point]::new(0,0)
+    $assignmentRow.Size = [System.Drawing.Size]::new(1030,58)
+    $assignmentRow.BackColor = [System.Drawing.Color]::White
+    $actionsPanel.Controls.Add($assignmentRow)
+
+    $assignmentTitle = New-Object System.Windows.Forms.Label
+    $assignmentTitle.Text = 'Tenant assignment'
+    $assignmentTitle.Font = New-GuiFont -Size 8.5 -Style Bold
+    $assignmentTitle.Location = [System.Drawing.Point]::new(14,7)
+    $assignmentTitle.AutoSize = $true
+    $assignmentRow.Controls.Add($assignmentTitle)
+
+    $assignmentDescription = New-Object System.Windows.Forms.Label
+    $assignmentDescription.Text = 'Select the destination. Register checks, renews, assigns, and verifies automatically.'
+    $assignmentDescription.Font = New-GuiFont -Size 8.2 -Style Regular
+    $assignmentDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
+    $assignmentDescription.Location = [System.Drawing.Point]::new(14,27)
+    $assignmentDescription.AutoSize = $true
+    $assignmentRow.Controls.Add($assignmentDescription)
 
     $tenantCaption = New-Object System.Windows.Forms.Label
-    $tenantCaption.Text = 'Tenant'
-    $tenantCaption.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
+    $tenantCaption.Text = 'Target tenant'
+    $tenantCaption.Font = New-GuiFont -Size 8.5 -Style Regular
     $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
-    $tenantCaption.Location = [System.Drawing.Point]::new(500,56)
-    $tenantCaption.Size = [System.Drawing.Size]::new(96,18)
-    $cloudCard.Controls.Add($tenantCaption)
+    $tenantCaption.Location = [System.Drawing.Point]::new(548,20)
+    $tenantCaption.Size = [System.Drawing.Size]::new(88,18)
+    $assignmentRow.Controls.Add($tenantCaption)
 
     $tenantSelector = New-Object System.Windows.Forms.ComboBox
     $tenantSelector.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    $tenantSelector.Font = New-Object System.Drawing.Font('Segoe UI',8.5)
-    $tenantSelector.Location = [System.Drawing.Point]::new(600,53)
-    $tenantSelector.Size = [System.Drawing.Size]::new(380,24)
+    $tenantSelector.Font = New-GuiFont -Size 8.5 -Style Regular
+    $tenantSelector.Location = [System.Drawing.Point]::new(636,17)
+    $tenantSelector.Size = [System.Drawing.Size]::new(238,24)
     foreach ($choice in $tenantChoices) {
         [void]$tenantSelector.Items.Add($choice)
     }
     $tenantSelector.SelectedIndex = 0
-    $cloudCard.Controls.Add($tenantSelector)
+    $tenantCaption.Visible = $showTenantSelector
+    $tenantSelector.Visible = $showTenantSelector
+    if (-not $showTenantSelector) {
+        $assignmentDescription.Text = if ($outerBoundParameters.ContainsKey('TenantId')) {
+            'The destination tenant is fixed by the supplied tenant ID. Register checks, renews, assigns, and verifies.'
+        }
+        else {
+            'The destination tenant is determined by sign-in. Register checks, renews, assigns, and verifies.'
+        }
+    }
+    $assignmentRow.Controls.Add($tenantSelector)
 
-    $actionsTitle = New-Object System.Windows.Forms.Label
-    $actionsTitle.Text = 'Actions'
-    $actionsTitle.Font = New-Object System.Drawing.Font('Segoe UI',11.5,[System.Drawing.FontStyle]::Bold)
-    $actionsTitle.Location = [System.Drawing.Point]::new(16,246)
-    $actionsTitle.AutoSize = $true
-    $content.Controls.Add($actionsTitle)
+    $btnAssign = New-Object System.Windows.Forms.Button
+    $btnAssign.Text = 'Register device'
+    $btnAssign.Font = New-GuiFont -Size 8.6 -Style Regular
+    $btnAssign.Size = [System.Drawing.Size]::new(112,28)
+    $btnAssign.Location = [System.Drawing.Point]::new(902,15)
+    $btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+    $btnAssign.UseVisualStyleBackColor = $true
+    $assignmentRow.Controls.Add($btnAssign)
 
-    $actionsPanel = New-Card -Title '' -X 14 -Y 272 -Width 1030 -Height 232
-    $rowRefresh = New-ActionRow -Parent $actionsPanel -Title 'Refresh' -Description 'Refresh local DeviceLink and firmware information.' -Y 0 -Buttons @('Refresh')
-    $rowOnline  = New-ActionRow -Parent $actionsPanel -Title 'Check online' -Description 'Query the tenant-side Device Association using the selected tenant context.' -Y 46 -Buttons @('Check online')
-    $rowExport  = New-ActionRow -Parent $actionsPanel -Title 'Export DeviceLink CSV' -Description 'Export the Microsoft-generated .devicelink.csv.' -Y 92 -Buttons @('Export CSV')
-    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Onboarding' -Description 'Create only the pre-association, or perform the full association flow.' -Y 138 -Buttons @('Pre-associate','Full associate')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove cloud state, local state, or both.' -Y 184 -Buttons @('Cloud','Local','Full')
+    $assignmentSeparator = New-Object System.Windows.Forms.Panel
+    $assignmentSeparator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
+    $assignmentSeparator.Location = [System.Drawing.Point]::new(14,57)
+    $assignmentSeparator.Size = [System.Drawing.Size]::new(1002,1)
+    $assignmentRow.Controls.Add($assignmentSeparator)
+
+    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Refresh the local association or cloud association, or export the DeviceLink CSV.' -Y 58 -Buttons @('Refresh local','Refresh cloud','Export CSV')
+    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Direct onboarding' -Description 'Create only the pre-association, or perform the full association flow.' -Y 104 -Buttons @('Pre-associate','Full associate')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Recovery and offboarding' -Description 'Reset local state, remove cloud state, or remove both.' -Y 150 -Buttons @('Cloud','Reset local','Full')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -506,16 +613,17 @@ function Show-WindowsDeviceLink {
         $button
     }
 
-    $btnRefresh = Get-ActionButtonByText -Row $rowRefresh.Panel -Text 'Refresh'
-    $btnOnline = Get-ActionButtonByText -Row $rowOnline.Panel -Text 'Check online'
-    $btnExport = Get-ActionButtonByText -Row $rowExport.Panel -Text 'Export CSV'
+    $btnRefresh = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh local'
+    $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
+    $btnExport = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Export CSV'
     $btnPreassociate = Get-ActionButtonByText -Row $rowOnboard.Panel -Text 'Pre-associate'
     $btnFullAssociate = Get-ActionButtonByText -Row $rowOnboard.Panel -Text 'Full associate'
     $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Cloud'
-    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Local'
+    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Reset local'
     $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Full'
 
     $allActionButtons = @(
+        $btnAssign,
         $btnRefresh,
         $btnOnline,
         $btnExport,
@@ -526,18 +634,22 @@ function Show-WindowsDeviceLink {
         $btnFullOffboard
     )
 
+    $rowOnboard.Panel.Visible = -not $backendMode
+    $rowOffboard.Panel.Top = if ($backendMode) { 104 } else { 150 }
+    $actionsPanel.Height = if ($backendMode) { 150 } else { 196 }
+
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
-    $activityTitle.Font = New-Object System.Drawing.Font('Segoe UI',11,[System.Drawing.FontStyle]::Bold)
+    $activityTitle.Font = New-GuiFont -Size 11 -Style Bold
     $activityTitle.Location = [System.Drawing.Point]::new(16,518)
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
 
     $btnClearActivity = New-Object System.Windows.Forms.Button
     $btnClearActivity.Text = 'Clear'
-    $btnClearActivity.Font = New-Object System.Drawing.Font('Segoe UI',8.3)
+    $btnClearActivity.Font = New-GuiFont -Size 8.3 -Style Regular
     $btnClearActivity.Size = [System.Drawing.Size]::new(64,24)
-    $btnClearActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::System
+    $btnClearActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $content.Controls.Add($btnClearActivity)
 
     $activityCard = New-Card -Title '' -X 14 -Y 544 -Width 1030 -Height 118
@@ -549,7 +661,7 @@ function Show-WindowsDeviceLink {
     $consoleBox.ReadOnly = $true
     $consoleBox.ScrollBars = [System.Windows.Forms.ScrollBars]::Vertical
     $consoleBox.WordWrap = $false
-    $consoleBox.Font = New-Object System.Drawing.Font('Consolas',8)
+    $consoleBox.Font = New-GuiFont -Family 'Consolas' -Size 8 -Style Regular
     $consoleBox.BackColor = [System.Drawing.Color]::FromArgb(250,250,250)
     $consoleBox.BorderStyle = [System.Windows.Forms.BorderStyle]::None
     $activityCard.Controls.Add($consoleBox)
@@ -747,15 +859,20 @@ function Show-WindowsDeviceLink {
         $btnRefresh.Enabled = $true
         $btnOnline.Enabled = $runtimeReady
         $btnExport.Enabled = $runtimeReady
-        $btnPreassociate.Enabled = $runtimeReady -and -not $cloudAlreadyPresent
-        $btnFullAssociate.Enabled = $canFullAssociation -and -not $alreadyFullyAssociated
-        $btnCloudOffboard.Enabled = -not $cloudKnownAbsent
+        $backendReadyToRegister = -not $backendMode -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
+        $btnAssign.Enabled = $runtimeReady -and $backendReadyToRegister
+        $btnPreassociate.Enabled = -not $backendMode -and $runtimeReady -and -not $cloudAlreadyPresent
+        $btnFullAssociate.Enabled = -not $backendMode -and $canFullAssociation -and -not $alreadyFullyAssociated
+        $btnCloudOffboard.Enabled = -not $backendMode -and -not $cloudKnownAbsent
         $btnLocalOffboard.Enabled = $true
-        $btnFullOffboard.Enabled = $runtimeReady
+        $btnFullOffboard.Enabled = -not $backendMode -and $runtimeReady
 
         $toolTip.SetToolTip($btnPreassociate, 'Create the tenant-side Device Association pre-association.')
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
         $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and perform full Device Association on this device.')
+        $toolTip.SetToolTip($btnAssign, 'Register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
+        if (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when none is selected.') }
+        elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
 
         if ($cloudAlreadyPresent) {
             $toolTip.SetToolTip($btnPreassociate, 'The cloud association already exists; pre-association is not required.')
@@ -774,10 +891,13 @@ function Show-WindowsDeviceLink {
                 $btnFullAssociate,
                 'Full association is not currently supported in Windows PE. Pre-associate the device and let Windows complete Device Association during OOBE.'
             )
-            $toolTip.SetToolTip(
-                $btnOnline,
+            $onlineToolTip = if ($backendMode) {
+                'Windows PE online operations are performed through the configured Function backend.'
+            }
+            else {
                 "Windows PE online operations use authentication method '$Method'. Interactive browser authentication is not supported in WinPE."
-            )
+            }
+            $toolTip.SetToolTip($btnOnline,$onlineToolTip)
         }
 
         if (-not $runtimeReady -and $support) {
@@ -788,7 +908,7 @@ function Show-WindowsDeviceLink {
                 [string]$support.Reason
             }
 
-            foreach ($button in @($btnOnline,$btnExport,$btnPreassociate,$btnFullOffboard)) {
+            foreach ($button in @($btnAssign,$btnOnline,$btnExport,$btnPreassociate,$btnFullOffboard)) {
                 $toolTip.SetToolTip($button,$runtimeReason)
             }
         }
@@ -811,7 +931,7 @@ function Show-WindowsDeviceLink {
         }
         else {
             $actionsPanel.Enabled = $true
-            $tenantSelector.Enabled = $true
+            $tenantSelector.Enabled = $showTenantSelector
             Set-GuiCapabilities
         }
 
@@ -849,7 +969,8 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiSupport = $support
         $script:WdlGuiLocalAssociation = $local
 
-        $ui.DeviceName.Text = "$($cs.Manufacturer) $($cs.Model)".Trim()
+        $ui.Manufacturer.Text = [string]$cs.Manufacturer
+        $ui.Model.Text = [string]$cs.Model
         $ui.Serial.Text = [string]$bios.SerialNumber
 
         if ($support.Environment -eq 'WindowsPE') {
@@ -865,7 +986,7 @@ function Show-WindowsDeviceLink {
             $environmentText = [string]$support.Environment
         }
 
-        $ui.Environment.Text = $environmentText
+        $ui.OperatingSystem.Text = $environmentText
 
         $environmentToolTip = if ($support.Supported) {
             @(
@@ -880,14 +1001,26 @@ function Show-WindowsDeviceLink {
                 "Runtime unavailable: $($support.Reason)"
             ) -join [Environment]::NewLine
         }
-        $toolTip.SetToolTip($ui.Environment,$environmentToolTip)
+        $toolTip.SetToolTip($ui.OperatingSystem,$environmentToolTip)
 
         if (-not $support.Supported) {
             Write-GuiConsole -Message "DeviceLink runtime unavailable: $($support.Reason)"
         }
 
         $selectedTenant = Get-SelectedTenantId
-        $ui.Auth.Text = if ($selectedTenant) { "$Method | $selectedTenant" } else { $Method }
+        if ($backendMode) {
+            $ui.ConnectionMode.Text = 'Backend'
+            $ui.Authentication.Text = 'Function API key'
+            $ui.Endpoint.Text = [string]$BackendUri.Host
+            $ui.TenantScope.Text = "$($effectiveTenants.Count) available tenants"
+            $toolTip.SetToolTip($ui.Endpoint,[string]$BackendUri.AbsoluteUri)
+        }
+        else {
+            $ui.ConnectionMode.Text = 'Direct'
+            $ui.Authentication.Text = [string]$Method
+            $ui.Endpoint.Text = 'Microsoft Graph'
+            $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
+        }
 
         $ui.Firmware.Text = [string]$local.FirmwareState
 
@@ -899,35 +1032,15 @@ function Show-WindowsDeviceLink {
             default { [string]$local.LocalAssociationState }
         }
         $ui.LocalState.Text = $friendlyLocalState
-
-        $ui.TenantId.Text = if ($local.TenantId) { [string]$local.TenantId } else { 'Unavailable' }
-
-        $technicalSource = if ([string]$local.TrustLevel -eq 'Unavailable' -and [string]$local.Source -eq 'Unavailable') {
-            'Unavailable'
+        $localLinkId = if ($local.LinkId) { [string]$local.LinkId } else { $null }
+        $ui.LinkId.Text = if ($localLinkId) { $localLinkId } else { 'Unavailable' }
+        $ui.LocalCreated.Text = if ($local.FirmwareCreationTimeUtc) {
+            try { ([datetime]$local.FirmwareCreationTimeUtc).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss UTC') }
+            catch { [string]$local.FirmwareCreationTimeUtc }
         }
-        elseif ([string]::IsNullOrWhiteSpace([string]$local.TrustLevel)) {
-            [string]$local.Source
-        }
-        elseif ([string]::IsNullOrWhiteSpace([string]$local.Source)) {
-            [string]$local.TrustLevel
-        }
-        else {
-            "$($local.TrustLevel) | $($local.Source)"
-        }
-
-        $friendlySource = switch ([string]$local.TrustLevel) {
-            'CorrelatedLocalSources' { 'Registry + JWT' }
-            'LocalRegistryHint' { 'Registry' }
-            'StructurallyObservedJwtClaim' { 'JWT' }
-            'Conflict' { 'Conflict' }
-            'Unavailable' { 'Unavailable' }
-            default { $technicalSource }
-        }
-
-        $ui.Source.Text = $friendlySource
-
-        $toolTip.SetToolTip($ui.TenantId, [string]$ui.TenantId.Text)
-        $toolTip.SetToolTip($ui.Source, $technicalSource)
+        else { 'Unavailable' }
+        $toolTip.SetToolTip($ui.LinkId, $(if ($localLinkId) { $localLinkId } else { 'Unavailable' }))
+        $toolTip.SetToolTip($ui.LocalCreated, [string]$ui.LocalCreated.Text)
 
         Set-GuiCapabilities
         Set-GuiStatus "Local state refreshed | $($local.FirmwareState)"
@@ -955,29 +1068,41 @@ function Show-WindowsDeviceLink {
             [switch]$WriteCommand
         )
 
-        $parameters = Get-GuiAuthParameters
-        $runtimeParameters = Get-GuiRuntimeParameters
-        foreach ($key in $runtimeParameters.Keys) {
-            $parameters[$key] = $runtimeParameters[$key]
+        if ($backendMode) {
+            $credential = New-Object System.Management.Automation.PSCredential('api-key',$BackendApiKey)
+            $plainKey = $null
+            try {
+                $plainKey = $credential.GetNetworkCredential().Password
+                $parameters = @{ BackendUri=$BackendUri; BackendApiKey=$plainKey }
+                $runtimeParameters = Get-GuiRuntimeParameters
+                foreach ($key in $runtimeParameters.Keys) { $parameters[$key]=$runtimeParameters[$key] }
+                if ($WriteCommand) { Write-GuiConsole -Message 'Get-WindowsDeviceLinkStatus through Backend mode' -Command }
+                $cloud = Get-WindowsDeviceLinkBackendStatus @parameters
+            }
+            finally { $plainKey=$null; $credential=$null }
         }
-        $parameters.Online = $true
-
-        if ($WriteCommand) {
-            Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command
+        else {
+            $parameters = Get-GuiAuthParameters
+            $runtimeParameters = Get-GuiRuntimeParameters
+            foreach ($key in $runtimeParameters.Keys) { $parameters[$key]=$runtimeParameters[$key] }
+            $parameters.Online = $true
+            if ($WriteCommand) { Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command }
+            $cloudResults = @(Invoke-GuiInformationCommand -ScriptBlock { Get-WindowsDeviceLinkStatus @parameters })
+            $cloud = $cloudResults | Select-Object -Last 1
         }
-
-        $cloudResults = @(Invoke-GuiInformationCommand -ScriptBlock {
-            Get-WindowsDeviceLinkStatus @parameters
-        })
-        $cloud = $cloudResults | Select-Object -Last 1
         $script:WdlGuiCloudStatus = $cloud
 
         $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
-        $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
-        $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
+        $ui.CloudTenant.Text = if ($cloud.TenantId) { Get-TenantDisplayName -TenantId ([string]$cloud.TenantId) } else { 'None' }
+        $cloudAssociationId = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { $null }
+        $ui.CloudId.Text = if ($cloudAssociationId) { $cloudAssociationId } else { 'None' }
+        $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
+        $ui.CloudAccent.BackColor = if ($cloud.AssociationPresent) { $colorSuccess } else { $colorNeutral }
+        $cloudCard.BackColor = if ($cloud.AssociationPresent) { $colorCloudTint } else { $colorConnectionTint }
 
-        $toolTip.SetToolTip($ui.CloudTenant, [string]$ui.CloudTenant.Text)
-        $toolTip.SetToolTip($ui.CloudId, [string]$ui.CloudId.Text)
+        $cloudTenantIdText = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
+        $toolTip.SetToolTip($ui.CloudTenant,$cloudTenantIdText)
+        $toolTip.SetToolTip($ui.CloudId, $(if ($cloudAssociationId) { $cloudAssociationId } else { 'None' }))
 
         return $cloud
     }
@@ -1003,6 +1128,57 @@ function Show-WindowsDeviceLink {
         }
         catch {
             Set-GuiStatus 'Cloud lookup failed'
+            Show-GuiError $_.Exception.Message
+        }
+        finally { Set-GuiBusy -Busy $false }
+    }
+
+    function Invoke-GuiTenantAssignment {
+        if ($script:WdlGuiBusy) { return }
+        $targetId = Get-SelectedTenantId
+        if ($backendMode -and [string]::IsNullOrWhiteSpace($targetId)) { Show-GuiError 'Select a target tenant first.'; return }
+        $targetLabel = if ($targetId) { [string]$tenantSelector.SelectedItem } else { 'Tenant determined by sign-in' }
+        $sourceText = if ($script:WdlGuiCloudStatus -and $script:WdlGuiCloudStatus.TenantId) { [string]$script:WdlGuiCloudStatus.TenantId } else { 'determined automatically' }
+        $modeText = if ($backendMode) {
+            'Backend mode can perform a verified Move when another configured tenant currently contains the device.'
+        } else {
+            'Direct mode checks only the chosen sign-in tenant and can perform New or no-op; it cannot prove absence from other tenants.'
+        }
+        $message = @("Current cloud tenant: $sourceText","Target tenant: $targetLabel",'',$modeText,'','Continue?') -join [Environment]::NewLine
+        if (-not $backendMode -and -not (Confirm-GuiAction -Title 'Register tenant assignment' -Message $message)) { return }
+
+        Set-GuiBusy -Busy $true -StatusText $(if ($backendMode) { 'Checking cloud state and registering device...' } else { 'Applying tenant assignment...' })
+        try {
+            $parameters = if ($backendMode) { Get-GuiBackendParameters } else { Get-GuiAuthParameters }
+            if ($backendMode) { $parameters.TargetTenantId = [guid]$targetId }
+            $parameters.Confirm = $false
+            $runtimeParameters = Get-GuiRuntimeParameters
+            foreach ($key in $runtimeParameters.Keys) { $parameters[$key]=$runtimeParameters[$key] }
+            $commandText = if ($backendMode) { "Set-WindowsDeviceLinkTenant -BackendUri <configured> -TargetTenantId $targetId" } elseif ($targetId) { "Set-WindowsDeviceLinkTenant -Method $Method -TenantId $targetId" } else { "Set-WindowsDeviceLinkTenant -Method $Method" }
+            Write-GuiConsole -Message $commandText -Command
+            $results = @(Invoke-GuiInformationCommand -ScriptBlock { Set-WindowsDeviceLinkTenant @parameters })
+            $result = $results | Select-Object -Last 1
+            Write-GuiObject $result
+            Refresh-LocalView
+            if ($backendMode) {
+                $cloud = Refresh-CloudView
+            }
+            else {
+                $cloud = $result.Details.AfterStatus
+                $script:WdlGuiCloudStatus = $cloud
+                $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
+                $ui.CloudTenant.Text = if ($cloud.TenantId) { Get-TenantDisplayName -TenantId ([string]$cloud.TenantId) } else { 'None' }
+                $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'None' }
+                $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
+                $ui.CloudAccent.BackColor = if ($cloud.AssociationPresent) { $colorSuccess } else { $colorNeutral }
+                $cloudCard.BackColor = if ($cloud.AssociationPresent) { $colorCloudTint } else { $colorConnectionTint }
+            }
+            Write-GuiObject $cloud
+            Set-GuiStatus ([string]$result.Message)
+        }
+        catch {
+            Set-GuiStatus 'Tenant assignment failed or requires verification'
+            if ($backendMode) { try { $cloud = Refresh-CloudView; Write-GuiObject $cloud } catch {} }
             Show-GuiError $_.Exception.Message
         }
         finally { Set-GuiBusy -Busy $false }
@@ -1048,14 +1224,14 @@ function Show-WindowsDeviceLink {
 
         $pathLabel = New-Object System.Windows.Forms.Label
         $pathLabel.Text = 'Output folder'
-        $pathLabel.Font = New-Object System.Drawing.Font('Segoe UI',9)
+        $pathLabel.Font = New-GuiFont -Size 9 -Style Regular
         $pathLabel.Location = [System.Drawing.Point]::new(14,14)
         $pathLabel.AutoSize = $true
         $pathForm.Controls.Add($pathLabel)
 
         $pathBox = New-Object System.Windows.Forms.TextBox
         $pathBox.Text = $defaultPath
-        $pathBox.Font = New-Object System.Drawing.Font('Consolas',9)
+        $pathBox.Font = New-GuiFont -Family 'Consolas' -Size 9 -Style Regular
         $pathBox.Location = [System.Drawing.Point]::new(16,40)
         $pathBox.Size = [System.Drawing.Size]::new(472,24)
         $pathForm.Controls.Add($pathBox)
@@ -1173,8 +1349,11 @@ function Show-WindowsDeviceLink {
                 $cloud = $result.AfterStatus
                 $script:WdlGuiCloudStatus = $cloud
                 $ui.CloudState.Text = [string]$cloud.AssociationState
-                $ui.CloudTenant.Text = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
-                $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'Unavailable' }
+                $ui.CloudTenant.Text = if ($cloud.TenantId) { Get-TenantDisplayName -TenantId ([string]$cloud.TenantId) } else { 'None' }
+                $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'None' }
+                $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
+                $ui.CloudAccent.BackColor = if ($cloud.AssociationPresent) { $colorSuccess } else { $colorNeutral }
+                $cloudCard.BackColor = if ($cloud.AssociationPresent) { $colorCloudTint } else { $colorConnectionTint }
             }
 
             $statusText = 'Pre-association completed'
@@ -1285,8 +1464,11 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = 'Unavailable'
-            $ui.CloudId.Text = 'Unavailable'
+            $ui.CloudTenant.Text = 'Not checked yet'
+            $ui.CloudId.Text = 'Not checked yet'
+            $ui.CloudChecked.Text = 'Not yet'
+            $ui.CloudAccent.BackColor = $colorNeutral
+            $cloudCard.BackColor = $colorConnectionTint
 
             Refresh-LocalView
             Set-GuiStatus 'Cloud offboarding completed'
@@ -1298,8 +1480,11 @@ function Show-WindowsDeviceLink {
                 Write-GuiConsole -Message $noChangeMessage
                 $script:WdlGuiCloudStatus = $null
                 $ui.CloudState.Text = 'Not associated'
-                $ui.CloudTenant.Text = 'Unavailable'
-                $ui.CloudId.Text = 'Unavailable'
+                $ui.CloudTenant.Text = 'None'
+                $ui.CloudId.Text = 'None'
+                $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
+                $ui.CloudAccent.BackColor = $colorNeutral
+                $cloudCard.BackColor = $colorConnectionTint
                 Refresh-LocalView
                 Set-GuiStatus $noChangeMessage
                 [void][System.Windows.Forms.MessageBox]::Show(
@@ -1441,8 +1626,11 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = 'Unavailable'
-            $ui.CloudId.Text = 'Unavailable'
+            $ui.CloudTenant.Text = 'Not checked yet'
+            $ui.CloudId.Text = 'Not checked yet'
+            $ui.CloudChecked.Text = 'Not yet'
+            $ui.CloudAccent.BackColor = $colorNeutral
+            $cloudCard.BackColor = $colorConnectionTint
 
             Refresh-LocalView
             Set-GuiStatus 'Full offboarding completed'
@@ -1458,6 +1646,7 @@ function Show-WindowsDeviceLink {
     }
 
     $btnRefresh.Add_Click({ Invoke-GuiRefresh })
+    $btnAssign.Add_Click({ Invoke-GuiTenantAssignment })
     $btnOnline.Add_Click({ Invoke-GuiOnline })
     $btnExport.Add_Click({ Invoke-GuiExport })
     $btnPreassociate.Add_Click({ Invoke-GuiPreassociate })
@@ -1469,7 +1658,10 @@ function Show-WindowsDeviceLink {
     $tenantSelector.Add_SelectedIndexChanged({
         if (-not $script:WdlGuiBusy) {
             $selectedTenant = Get-SelectedTenantId
-            $ui.Auth.Text = if ($selectedTenant) { "$Method | $selectedTenant" } else { $Method }
+            if (-not $backendMode) {
+                $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
+            }
+            Set-GuiCapabilities
         }
     })
 
@@ -1489,9 +1681,28 @@ function Show-WindowsDeviceLink {
 
     $form.Add_Shown({
         $environmentName = if ($isWinPE) { 'Windows PE' } else { 'Windows' }
-        Write-GuiConsole -Message "WindowsDeviceLink dashboard opened in $environmentName. Authentication method: $Method."
+        $connectionText = if ($backendMode) { 'Backend mode' } else { "Direct mode; authentication method: $Method" }
+        Write-GuiConsole -Message "WindowsDeviceLink dashboard opened in $environmentName. $connectionText."
         Set-GuiBusy -Busy $true -StatusText 'Loading local state...'
-        try { Refresh-LocalView }
+        try {
+            Refresh-LocalView
+            try {
+                Set-GuiStatus 'Checking cloud association...'
+                $cloud = Refresh-CloudView -WriteCommand
+                Write-GuiObject $cloud
+                Set-GuiStatus 'Device and cloud state loaded'
+            }
+            catch {
+                $ui.CloudState.Text = 'Check failed'
+                $ui.CloudTenant.Text = 'Unavailable'
+                $ui.CloudId.Text = 'Unavailable'
+                $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
+                $ui.CloudAccent.BackColor = $colorAccent
+                $cloudCard.BackColor = $colorWarningTint
+                Write-GuiConsole -Message ("Automatic cloud check failed: " + $_.Exception.Message) -ErrorMessage
+                Set-GuiStatus 'Local state loaded; cloud check unavailable'
+            }
+        }
         catch { Show-GuiError $_.Exception.Message }
         finally { Set-GuiBusy -Busy $false }
     })
@@ -1501,30 +1712,39 @@ function Show-WindowsDeviceLink {
         $gap = 14
         $halfWidth = [Math]::Floor(($fullWidth - $gap) / 2)
 
-        if ($fullWidth -ge 900) {
-            $deviceCard.Location = [System.Drawing.Point]::new(14,12)
-            $deviceCard.Size = [System.Drawing.Size]::new([int]$halfWidth,126)
-            $associationCard.Location = [System.Drawing.Point]::new((14 + $halfWidth + $gap),12)
-            $associationCard.Size = [System.Drawing.Size]::new([int]$halfWidth,126)
-            $cloudY = 150
-        }
-        else {
-            $deviceCard.Location = [System.Drawing.Point]::new(14,12)
-            $deviceCard.Size = [System.Drawing.Size]::new([int]$fullWidth,126)
-            $associationCard.Location = [System.Drawing.Point]::new(14,150)
-            $associationCard.Size = [System.Drawing.Size]::new([int]$fullWidth,126)
-            $cloudY = 288
+        $deviceCard.Location = [System.Drawing.Point]::new(14,12)
+        $deviceCard.Size = [System.Drawing.Size]::new([int]$halfWidth,126)
+        $connectionCard.Location = [System.Drawing.Point]::new((14 + $halfWidth + $gap),12)
+        $connectionCard.Size = [System.Drawing.Size]::new([int]$halfWidth,126)
+
+        $associationCard.Location = [System.Drawing.Point]::new(14,150)
+        $associationCard.Size = [System.Drawing.Size]::new([int]$halfWidth,126)
+        $cloudCard.Location = [System.Drawing.Point]::new((14 + $halfWidth + $gap),150)
+        $cloudCard.Size = [System.Drawing.Size]::new([int]$halfWidth,126)
+        $cardsBottom = 276
+
+        foreach ($card in @($deviceCard,$connectionCard,$associationCard,$cloudCard)) {
+            foreach ($control in $card.Controls) {
+                if ([string]$control.Tag -like 'Value:*') {
+                    $control.Width = [Math]::Max(150,$halfWidth - $control.Left - 14)
+                }
+            }
         }
 
-        $cloudCard.Location = [System.Drawing.Point]::new(14,$cloudY)
-        $cloudCard.Width = $fullWidth
-
-        $actionsY = $cloudY + 96
+        $actionsY = $cardsBottom + 12
         $actionsTitle.Location = [System.Drawing.Point]::new(16,$actionsY)
         $actionsPanel.Location = [System.Drawing.Point]::new(14,($actionsY + 26))
         $actionsPanel.Width = $fullWidth
 
-        $activityY = $actionsY + 270
+        $assignmentRow.Width = $fullWidth
+        $btnAssign.Left = $fullWidth - 16 - $btnAssign.Width
+        if ($showTenantSelector) {
+            $tenantSelector.Left = $btnAssign.Left - 8 - $tenantSelector.Width
+            $tenantCaption.Left = $tenantSelector.Left - 88
+        }
+        $assignmentSeparator.Width = [Math]::Max(480,$fullWidth - 28)
+
+        $activityY = $actionsPanel.Bottom + 14
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
 
         # Align Clear to the same right edge used by the action buttons.
@@ -1537,8 +1757,14 @@ function Show-WindowsDeviceLink {
         $activityCard.Width = $fullWidth
         $consoleBox.Width = $fullWidth - 24
 
+        # Let Activity consume the remaining client area instead of leaving an
+        # unused band below the log on taller WinPE and Windows displays.
+        $activityHeight = [Math]::Max(118,$content.ClientSize.Height - $activityCard.Top - 12)
+        $activityCard.Height = $activityHeight
+        $consoleBox.Height = [Math]::Max(96,$activityHeight - 22)
 
-        foreach ($row in @($rowRefresh,$rowOnline,$rowExport,$rowOnboard,$rowOffboard)) {
+
+        foreach ($row in @($rowTools,$rowOnboard,$rowOffboard)) {
             $row.Panel.Width = $fullWidth
 
             $buttons = @($row.Buttons)
@@ -1580,6 +1806,7 @@ function Show-WindowsDeviceLink {
     finally {
         $toolTip.Dispose()
         $form.Dispose()
+        if ($formIcon) { $formIcon.Dispose() }
         Remove-Variable WdlGuiLocalAssociation -Scope Script -ErrorAction SilentlyContinue
         Remove-Variable WdlGuiCloudStatus -Scope Script -ErrorAction SilentlyContinue
         Remove-Variable WdlGuiBusy -Scope Script -ErrorAction SilentlyContinue

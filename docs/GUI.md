@@ -8,11 +8,36 @@
 
 ## Start the GUI
 
-On full Windows:
+Direct mode is the default. On full Windows the sign-in is Interactive; Windows PE
+defaults to DeviceCode. No tenant ID is required when the sign-in context should choose
+the tenant:
 
 ```powershell
 Show-WindowsDeviceLink
 ```
+
+Supply `-TenantId` only when Direct mode must target one tenant explicitly, or use a
+tenant catalog when an operator needs friendly choices.
+
+Backend mode is enabled explicitly for complete multitenant lookup and Move:
+
+```powershell
+$apiKey = Read-Host 'WindowsDeviceLink API key' -AsSecureString
+
+Show-WindowsDeviceLink `
+    -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
+    -BackendApiKey $apiKey
+```
+
+The GUI retrieves the allowed tenant catalog from the Function App and automatically
+checks the current cloud association when it opens. Device, Local association, and
+Cloud association are shown together. Select a target tenant and choose
+**Register device**; the action performs its own fresh cloud check before changing state.
+Diagnostic, export, recovery, and offboarding actions are available in the same view.
+
+Backend mode and Direct-mode Graph authentication are deliberately separate. Do not combine
+`-BackendUri`/`-BackendApiKey` with `-Method`, `-Tenants`, `-TenantsUri`, or
+`-TenantsPath`.
 
 On full Windows, `Interactive` authentication is used by default unless `-Method` is specified.
 
@@ -60,7 +85,24 @@ The GUI does not introduce a separate authentication implementation. Online acti
 
 ## Tenant selection
 
-### Single tenant
+### Backend mode
+
+The Function App provides tenant IDs and friendly names. The selected tenant is always
+an explicit target; the backend never selects one on the operator's behalf.
+
+The **Register** action performs one of these guarded outcomes after a complete
+multitenant lookup:
+
+| Current cloud state | Result |
+|---|---|
+| Not found in any configured tenant | Pre-associate in the selected tenant |
+| Already present in the selected tenant | No change |
+| Present in another configured tenant | Renew the local DeviceLink identity, then perform and verify the move |
+
+The same orchestration is available from the command line through
+`Set-WindowsDeviceLinkTenant`.
+
+### Direct mode with an explicit tenant
 
 Use `-TenantId` when the GUI should use one explicit tenant:
 
@@ -68,11 +110,15 @@ Use `-TenantId` when the GUI should use one explicit tenant:
 Show-WindowsDeviceLink -TenantId '<tenant-id>'
 ```
 
-The selector displays **Default tenant parameter**.
+The selector displays **Explicit tenant parameter**.
 
-When no explicit tenant is supplied, the selector displays **Automatic / detected tenant** and WindowsDeviceLink can use the current/local tenant context where the delegated operation supports it.
+When no explicit tenant is supplied, the selector displays **Tenant determined by sign-in**.
+The authenticated Microsoft Entra context is then authoritative.
 
 ### Friendly tenant list
+
+This mode does not require a Function App. The list only supplies display names and
+tenant IDs; authentication and Graph actions still use the selected direct method.
 
 ```powershell
 Show-WindowsDeviceLink -Tenants @{
@@ -116,6 +162,24 @@ TenantsUri -> TenantsPath -> Tenants
 
 Explicit `-Tenants` values therefore have the highest priority for duplicate names.
 
+The same JSON is available to command-line scripts:
+
+```powershell
+$tenant = Get-WindowsDeviceLinkTenantCatalog `
+    -Path 'E:\Config\tenants.json' `
+    -Name 'Gemeente Kerkrade'
+
+Get-WindowsDeviceLinkAssociation `
+    -SerialNumber '<serial-number>' `
+    -Method Interactive `
+    -TenantId $tenant.TenantId
+```
+
+This is tenant selection, not centralized orchestration. Direct mode does not search
+every catalog tenant and cannot safely infer or perform a cross-tenant Move. Select the
+correct tenant explicitly; use Backend mode when lookup and verified moves are
+required.
+
 ## Windows 11 and Windows PE
 
 | Capability | Windows 11 | Windows PE |
@@ -154,8 +218,9 @@ The DLL must come from an administrator-controlled compatible Windows source. Se
 
 ## Actions
 
-- **Refresh** — refresh local DeviceLink and firmware information.
-- **Check online** — query tenant-side Device Association state using the selected tenant context.
+- **Register** — apply New/no-op in Direct mode, or New/no-op/Move for an explicitly selected Backend-mode target.
+- **Refresh local** — refresh local DeviceLink identity and firmware information.
+- **Refresh cloud** — refresh tenant-side Device Association state using the selected tenant context.
 - **Export CSV** — export the Microsoft-generated DeviceLink CSV.
 - **Pre-associate** — create only the tenant-side pre-association.
 - **Full associate** — ensure pre-association exists and perform the full association flow on supported full Windows.
@@ -164,6 +229,17 @@ The DLL must come from an administrator-controlled compatible Windows source. Se
 - **Full offboard** — verify/remove cloud state first, then reset local DeviceLink firmware state.
 
 State-changing actions delegate to the existing guarded public cmdlets and retain their safety behavior.
+
+The dashboard uses a two-by-two status layout: Device and Connection above Local
+association and Cloud association. Device separates manufacturer, model, serial number,
+and operating system. Connection explains the active mode, authentication route,
+endpoint, and tenant scope. The Cloud association card keeps the current state, friendly
+tenant name, Association ID, and last-check time together. The Actions section contains
+the target tenant selector and the primary **Register device** action. In Backend mode,
+Register performs the complete
+lookup, decision, identity renewal, registration, and verification workflow itself.
+**Refresh cloud** remains available for an explicit diagnostic refresh. Direct-only
+onboarding actions are hidden while Backend mode is active.
 
 ## Activity log
 

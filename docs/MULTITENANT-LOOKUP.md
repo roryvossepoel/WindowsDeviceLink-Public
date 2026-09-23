@@ -145,6 +145,18 @@ Instead:
 
 This distinction is important: no match in a successfully searched tenant is different from a tenant that could not be searched.
 
+An absent device returns `matchCount: 0`, `matches: []`, and no tenant error when Graph returns successful empty collections. Only treat the device as absent across the configured tenants when `failedTenantCount` is zero and `successfulTenantCount` equals `searchedTenantCount`.
+
+Tenant errors also include safe diagnostic fields:
+
+- `stage`: `GraphToken`, `GraphLookup`, or `GraphLookupFallback`;
+- `statusCode`: the upstream HTTP status, when available;
+- `upstreamErrorCode`: a recognized OAuth or Graph error code;
+- `aadstsCodes`: numeric Entra error codes, such as `AADSTS700027`;
+- `upstreamCorrelationId`: the upstream correlation/request GUID, when available.
+
+These fields identify whether a failure occurred while obtaining a token or querying Graph. Raw upstream error descriptions and response bodies are not returned or logged. HTTP 200 and `success: true` indicate that the lookup response was assembled; callers must still inspect tenant coverage, including when every tenant failed.
+
 ## Friendly tenant names
 
 The deployment optionally accepts:
@@ -169,6 +181,16 @@ WINDOWSDEVICELINK_TENANT_NAMES_JSON
 ```
 
 Tenant names are display metadata only. Tenant IDs remain the routing and security boundary.
+
+Authenticated clients can retrieve the same authoritative catalog through:
+
+```text
+GET /api/devicelink/tenants
+```
+
+The GUI uses this endpoint to populate its selector. Command-line automation should
+normally pass `-TargetTenantId`; `-TargetTenantName` is available for operator
+convenience and must resolve to exactly one catalog entry.
 
 ## Security
 
