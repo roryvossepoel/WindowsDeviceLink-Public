@@ -56,13 +56,17 @@ POST /api/devicelink/reconcile
 
 No standalone DELETE endpoint is exposed. Deletion is an internal guarded step of a validated Move.
 
-## Deploy to Azure
+## Deployment status for 0.10.0-preview1
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
+The supported preview route is to configure the required Azure resources and deploy the
+supplied Function App package manually. This keeps the tested backend code available
+without treating an unvalidated landing-zone template as a production installer.
 
-The deployment creates the Function App and its supporting reference resources, including Key Vault, storage and Application Insights.
-
-See [../infrastructure/function-app/README.md](../infrastructure/function-app/README.md).
+The Bicep and generated ARM files under `infrastructure/function-app` are retained as
+experimental infrastructure code. They are not currently the recommended deployment
+route. A reproducible Deploy to Azure experience, including clean deployment, safe
+redeployment and secret preservation, is tracked in
+[issue #43](https://github.com/roryvossepoel/WindowsDeviceLink-Public/issues/43).
 
 ## Authentication
 
@@ -109,7 +113,7 @@ Get-WindowsDeviceLinkBackendTenant `
 Set-WindowsDeviceLinkTenant `
     -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
     -BackendApiKey $apiKey `
-    -TargetTenantName 'Gemeente Kerkrade'
+    -TargetTenantName 'Contoso'
 ```
 
 `Set-WindowsDeviceLinkTenant` resolves the friendly name against the authenticated
@@ -220,6 +224,9 @@ The Function backend:
 
 ## Hardening
 
-The Deploy to Azure template is deliberately a reference baseline. Depending on the environment, organizations can add controls such as Private Endpoints, access restrictions, API Management, VNet integration, WAF/reverse proxy controls and SIEM forwarding without changing the WindowsDeviceLink request contract.
+The experimental infrastructure template is a reference baseline only. Depending on
+the environment, organizations can add controls such as Private Endpoints, access
+restrictions, API Management, VNet integration, WAF/reverse proxy controls and SIEM
+forwarding without changing the WindowsDeviceLink request contract.
 
 See [SECURITY-HARDENING.md](SECURITY-HARDENING.md).

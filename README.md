@@ -90,15 +90,15 @@ the UI and CLI:
 
 ```json
 {
-  "Gemeente Kerkrade": "1d862ca4-e053-473a-935e-69df86c33b3e",
-  "Gemeente Landgraaf": "4d39a49b-0d1c-4020-b895-c33dc4fae2a1"
+  "Contoso": "11111111-1111-1111-1111-111111111111",
+  "Fabrikam": "22222222-2222-2222-2222-222222222222"
 }
 ```
 
 ```powershell
 $tenant = Get-WindowsDeviceLinkTenantCatalog `
     -Path 'E:\Config\tenants.json' `
-    -Name 'Gemeente Kerkrade'
+    -Name 'Contoso'
 
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
@@ -344,7 +344,11 @@ It provides:
 - safe New / Update / Move reconciliation;
 - backend-side Graph authentication and verification.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Froryvossepoel%2FWindowsDeviceLink-Public%2Fmain%2Finfrastructure%2Ffunction-app%2Fazuredeploy.json)
+For `0.10.0-preview1`, the supported preview route is to configure the Azure resources
+and deploy the supplied Function App package manually. The repository also contains
+experimental Bicep/ARM infrastructure code, but that route is not yet presented as a
+supported Deploy to Azure experience. Its hardening and end-to-end validation are
+tracked in [issue #43](https://github.com/roryvossepoel/WindowsDeviceLink-Public/issues/43).
 
 For cross-tenant use, a multitenant App Registration with certificate authentication is preferred. Client-secret authentication remains a fallback.
 

@@ -167,7 +167,7 @@ The same JSON is available to command-line scripts:
 ```powershell
 $tenant = Get-WindowsDeviceLinkTenantCatalog `
     -Path 'E:\Config\tenants.json' `
-    -Name 'Gemeente Kerkrade'
+    -Name 'Contoso'
 
 Get-WindowsDeviceLinkAssociation `
     -SerialNumber '<serial-number>' `

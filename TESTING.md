@@ -1,6 +1,6 @@
 # WindowsDeviceLink validation matrix
 
-Last updated: 2026-09-20
+Last updated: 2026-09-23
 
 The primary Windows Autopilot Device Preparation Device Association workflow has been validated on physical AMD64 hardware across Windows 11 and AMD64 Windows PE.
 
@@ -324,7 +324,12 @@ See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for the supported installatio
 
 ## Webhook validation
 
-The webhook/pre-association contract has been validated end-to-end on Windows 11. The current active backend is the Azure Function App; lookup and reconcile have static contract coverage and are being validated live across configured tenants.
+The webhook/pre-association contract has been validated end-to-end on Windows 11. The
+Azure Function backend tenant catalog, complete lookup, New/no-op and guarded Move paths
+have also been validated live across two configured test tenants. Bidirectional tenant
+moves were completed successfully from AMD64 Windows PE after the device-side workflow
+renewed the local DeviceLink identity, and the final target state was verified through
+the backend lookup path.
 
 See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
@@ -339,14 +344,22 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-`WindowsDeviceLink 0.8.0-preview1` is the previous preview release. The repository validation described above now covers the `0.9.0-preview1` candidate, including the operator GUI validated on physical AMD64 Windows 11 and AMD64 Windows PE hardware. The GUI lifecycle tests cover pre-association, full association, idempotency, cloud/local/full offboarding, stale local/cloud combinations, tenant-source correlation, DeviceCode token reuse and WinPE CSV export. The multitenant reconcile backend has passed static contract validation but still requires live Azure validation.
+The repository validation described above covers the `0.10.0-preview1` candidate,
+including the operator GUI on physical AMD64 Windows 11 and AMD64 Windows PE hardware.
+The GUI lifecycle tests cover pre-association, full association, idempotency,
+cloud/local/full offboarding, stale local/cloud combinations, tenant-source correlation,
+DeviceCode token reuse, WinPE CSV export, authenticated backend tenant selection, and
+bidirectional guarded tenant moves. The supplied Function App package is the supported
+preview backend delivery route; the Bicep/ARM Deploy to Azure path remains experimental.
 
 ## Remaining validation / future work
 
 - Trusted code signing; the initial SignPath Foundation application was reviewed but not approved because the project does not yet have enough external adoption/visibility signals. Revisit SignPath or another trusted signing path later.
 - Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
 - Retest and optimize the beta Device Association serial-number server-side lookup; the current client-side fallback is functionally correct.
-- Webhook transport in AMD64 WinPE.
-- Second target tenant through the Azure Function allow-list/routing configuration.
+- Complete the Direct-mode `0.10.0-preview1` smoke-test matrix without the Function App,
+  including implicit sign-in tenant, explicit tenant selection, local/HTTPS JSON catalog,
+  New and target-present no-op behavior in Windows 11 and AMD64 Windows PE.
+- Harden and validate the experimental Bicep/ARM Deploy to Azure route tracked in issue #43.
 - Additional Windows 11 / WinPE builds and OEMs/models.
 - Non-Global Microsoft clouds.

@@ -9,7 +9,7 @@ function Get-WindowsDeviceLinkTenantCatalog {
     .EXAMPLE
     Get-WindowsDeviceLinkTenantCatalog -Path 'E:\Config\tenants.json'
     .EXAMPLE
-    $tenant = Get-WindowsDeviceLinkTenantCatalog -Path 'E:\Config\tenants.json' -Name 'Gemeente Kerkrade'
+    $tenant = Get-WindowsDeviceLinkTenantCatalog -Path 'E:\Config\tenants.json' -Name 'Contoso'
     Get-WindowsDeviceLink | Register-WindowsDeviceLink -Method DeviceCode -TenantId $tenant.TenantId
     #>
     [CmdletBinding(DefaultParameterSetName='Path')]
