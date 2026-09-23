@@ -110,6 +110,9 @@ function Show-WindowsDeviceLink {
     if ($backendMode -and ($Tenants -or $outerBoundParameters.ContainsKey('TenantsUri') -or $outerBoundParameters.ContainsKey('TenantsPath'))) {
         throw 'Backend mode obtains its tenant catalog from the Function App; do not combine it with -Tenants, -TenantsUri, or -TenantsPath.'
     }
+    if (-not $backendMode -and $outerBoundParameters.ContainsKey('TenantId') -and ($Tenants -or $outerBoundParameters.ContainsKey('TenantsUri') -or $outerBoundParameters.ContainsKey('TenantsPath'))) {
+        throw 'Direct mode uses either one explicit -TenantId or a tenant catalog; do not combine them.'
+    }
 
     if ($backendMode -and $outerBoundParameters.ContainsKey('Method')) {
         throw 'Backend mode performs Graph operations through the Function App; do not combine it with -Method.'
@@ -359,7 +362,8 @@ function Show-WindowsDeviceLink {
 
     $tenantChoiceLookup = @{}
     $tenantChoices = New-Object System.Collections.Generic.List[string]
-    $autoLabel = if ($backendMode) { 'Select target tenant...' } elseif ($outerBoundParameters.ContainsKey('TenantId')) { 'Explicit tenant parameter' } else { 'Tenant determined by sign-in' }
+    $hasDirectTenantCatalog = -not $backendMode -and $effectiveTenants.Count -gt 0
+    $autoLabel = if ($backendMode -or $hasDirectTenantCatalog) { 'Select target tenant...' } elseif ($outerBoundParameters.ContainsKey('TenantId')) { 'Explicit tenant parameter' } else { 'Tenant determined by sign-in' }
     $tenantChoiceLookup[$autoLabel] = $null
     $tenantChoices.Add($autoLabel)
 
@@ -410,6 +414,10 @@ function Show-WindowsDeviceLink {
     function Get-GuiAuthParameters {
         $selectedTenant = Get-SelectedTenantId
 
+        if ($hasDirectTenantCatalog -and [string]::IsNullOrWhiteSpace($selectedTenant)) {
+            throw 'Select a target tenant before signing in or performing a cloud action.'
+        }
+
         if (-not $backendMode -and $Method -eq 'DeviceCode') {
             $cacheTenantMatches = -not $selectedTenant -or
                 ([string]$script:WdlGuiSessionTenantId -ieq [string]$selectedTenant)
@@ -440,7 +448,7 @@ function Show-WindowsDeviceLink {
                 $script:WdlGuiSessionAuthenticated = $true
                 $token = $null
                 $ui.Authentication.Text = "$Method - Signed in"
-                if ($btnSignIn) { $btnSignIn.Text = 'Sign in again' }
+                if ($btnSignIn) { $btnSignIn.Text = 'Switch account' }
                 Write-GuiConsole -Message 'Direct-mode session authenticated; the in-memory token will be reused for cloud actions.'
             }
 
@@ -922,23 +930,28 @@ function Show-WindowsDeviceLink {
         $alreadyFullyAssociated = $localFullyAssociated -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
-        $btnSignIn.Enabled = -not $backendMode
-        $btnOnline.Enabled = $runtimeReady
+        $directTenantReady = -not $hasDirectTenantCatalog -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
+        $btnSignIn.Enabled = -not $backendMode -and $directTenantReady
+        $btnOnline.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
         $btnExport.Enabled = $runtimeReady
-        $backendReadyToRegister = -not $backendMode -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
-        $btnAssign.Enabled = $runtimeReady -and $backendReadyToRegister
-        $btnPreassociate.Enabled = -not $backendMode -and $runtimeReady -and -not $cloudAlreadyPresent
-        $btnFullAssociate.Enabled = -not $backendMode -and $canFullAssociation -and -not $alreadyFullyAssociated
-        $btnCloudOffboard.Enabled = -not $backendMode -and -not $cloudKnownAbsent
+        $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
+        $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister
+        $btnPreassociate.Enabled = -not $backendMode -and $runtimeReady -and $directTenantReady -and -not $cloudAlreadyPresent
+        $btnFullAssociate.Enabled = -not $backendMode -and $canFullAssociation -and $directTenantReady -and -not $alreadyFullyAssociated
+        $btnCloudOffboard.Enabled = -not $backendMode -and $directTenantReady -and -not $cloudKnownAbsent
         $btnLocalOffboard.Enabled = $true
-        $btnFullOffboard.Enabled = -not $backendMode -and $runtimeReady
+        $btnFullOffboard.Enabled = -not $backendMode -and $runtimeReady -and $directTenantReady
 
         $toolTip.SetToolTip($btnPreassociate, 'Create the tenant-side Device Association pre-association.')
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
         $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and perform full Device Association on this device.')
         $toolTip.SetToolTip($btnAssign, 'Register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
         $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
-        if (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when none is selected.') }
+        if ($hasDirectTenantCatalog -and -not $directTenantReady) {
+            $toolTip.SetToolTip($btnSignIn, 'Select a target tenant first. Sign-in will be scoped to that tenant.')
+            $toolTip.SetToolTip($btnAssign, 'Select a target tenant first. Direct mode applies New or no-op only in that selected tenant.')
+        }
+        elseif (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when no catalog is configured.') }
         elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
 
         if ($cloudAlreadyPresent) {
@@ -1163,7 +1176,7 @@ function Show-WindowsDeviceLink {
         if (-not $backendMode) {
             $script:WdlGuiSessionAuthenticated = $true
             $ui.Authentication.Text = "$Method - Signed in"
-            $btnSignIn.Text = 'Sign in again'
+            $btnSignIn.Text = 'Switch account'
         }
 
         $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
@@ -1230,6 +1243,7 @@ function Show-WindowsDeviceLink {
         if ($script:WdlGuiBusy) { return }
         $targetId = Get-SelectedTenantId
         if ($backendMode -and [string]::IsNullOrWhiteSpace($targetId)) { Show-GuiError 'Select a target tenant first.'; return }
+        if ($hasDirectTenantCatalog -and [string]::IsNullOrWhiteSpace($targetId)) { Show-GuiError 'Select a target tenant first. Direct-mode sign-in and registration will use that tenant.'; return }
         $targetLabel = if ($targetId) { [string]$tenantSelector.SelectedItem } else { 'Tenant determined by sign-in' }
         $sourceText = if ($script:WdlGuiCloudStatus -and $script:WdlGuiCloudStatus.TenantId) { [string]$script:WdlGuiCloudStatus.TenantId } else { 'determined automatically' }
         $modeText = if ($backendMode) {
@@ -1755,7 +1769,7 @@ function Show-WindowsDeviceLink {
             if (-not $backendMode) {
                 if ($script:WdlGuiSessionAuthenticated) {
                     Clear-GuiSessionAuthentication
-                    Write-GuiConsole -Message 'Target tenant changed; Direct-mode authentication will be renewed for the selected tenant.'
+                    Write-GuiConsole -Message 'Target tenant changed; sign in again to create a Direct-mode session for the selected tenant.'
                 }
                 $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
             }

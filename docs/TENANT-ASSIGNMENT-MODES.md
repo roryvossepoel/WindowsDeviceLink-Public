@@ -8,7 +8,9 @@ routes.
 Direct mode talks to Microsoft Graph from the device. TenantId is optional for
 Interactive and DeviceCode authentication. When omitted, the authenticated sign-in
 context determines the tenant. A JSON catalog is only an address book for selecting one
-explicit tenant.
+explicit tenant. Without a catalog, the GUI shows no tenant selector. With a catalog,
+the operator must select a tenant before authentication or another cloud action; changing
+that selection invalidates the current GUI session.
 
 Direct mode can prove state only inside that one tenant. It supports New or no-op and
 never claims that the device is absent from other tenants.
