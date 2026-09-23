@@ -113,7 +113,7 @@ Get-WindowsDeviceLinkBackendTenant `
 Set-WindowsDeviceLinkTenant `
     -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
     -BackendApiKey $apiKey `
-    -TargetTenantName 'Contoso'
+    -TargetTenantName 'Tenant Alpha'
 ```
 
 `Set-WindowsDeviceLinkTenant` resolves the friendly name against the authenticated

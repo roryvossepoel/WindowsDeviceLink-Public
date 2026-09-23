@@ -90,15 +90,15 @@ the UI and CLI:
 
 ```json
 {
-  "Contoso": "11111111-1111-1111-1111-111111111111",
-  "Fabrikam": "22222222-2222-2222-2222-222222222222"
+  "Tenant Alpha": "11111111-1111-1111-1111-111111111111",
+  "Tenant Beta": "22222222-2222-2222-2222-222222222222"
 }
 ```
 
 ```powershell
 $tenant = Get-WindowsDeviceLinkTenantCatalog `
     -Path 'E:\Config\tenants.json' `
-    -Name 'Contoso'
+    -Name 'Tenant Alpha'
 
 Get-WindowsDeviceLink |
     Register-WindowsDeviceLink `
