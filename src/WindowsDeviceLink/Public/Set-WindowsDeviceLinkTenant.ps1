@@ -44,6 +44,9 @@ function Set-WindowsDeviceLinkTenant {
         [ValidateNotNull()][securestring]$BackendApiKey,
         [Parameter(Mandatory,ParameterSetName='BackendById')][guid]$TargetTenantId,
         [Parameter(Mandatory,ParameterSetName='BackendByName')][ValidateNotNullOrEmpty()][string]$TargetTenantName,
+        [Parameter(ParameterSetName='BackendById')]
+        [Parameter(ParameterSetName='BackendByName')]
+        [switch]$RepairExistingAssociation,
         [ValidateNotNullOrEmpty()][string]$WindowsManagementServicePath,
         [ValidateRange(5,600)][int]$TimeoutSeconds = 120
     )
@@ -154,6 +157,14 @@ function Set-WindowsDeviceLinkTenant {
             -SourceTenantId $sourceId -TargetTenantId $targetId -FirmwareState ([string]$localBefore.FirmwareState)
         $decision = [string]$assignmentDecision.Decision
 
+        if ($decision -eq 'None' -and $RepairExistingAssociation) {
+            if ([string]$localBefore.FirmwareState -ne '2/4' -or -not $source -or
+                [string]$source.associationState -ine 'associated') {
+                throw '[WDL-BACKEND-REPAIR-NOT-APPLICABLE] Same-tenant repair requires local firmware state 2/4 and an associated cloud record in the selected tenant. No state was changed.'
+            }
+            $decision = 'Repair'
+        }
+
         if ($decision -eq 'None') {
             return [pscustomobject]@{
                 PSTypeName='Windows.DeviceLink.TenantAssignmentResult'; Success=$true; Decision='None'; Changed=$false; OperationMode='Backend'
@@ -166,7 +177,9 @@ function Set-WindowsDeviceLinkTenant {
         }
 
         $renewIdentity = [bool]$assignmentDecision.IdentityRenewalRequired
-        $action = if ($decision -eq 'Move') {
+        $action = if ($decision -eq 'Repair') {
+            "Replace the stale cloud association in $targetName ($targetId) with the current local DeviceLink identity"
+        } elseif ($decision -eq 'Move') {
             "Renew the local DeviceLink identity, remove the association from tenant $sourceId, and pre-associate it with $targetName ($targetId)"
         } elseif ($renewIdentity) {
             "Create a fresh local DeviceLink identity and pre-associate it with $targetName ($targetId)"
@@ -176,7 +189,7 @@ function Set-WindowsDeviceLinkTenant {
         if (-not $PSCmdlet.ShouldProcess([string]$currentDeviceLink.SerialNumber,$action)) {
             return [pscustomobject]@{
                 PSTypeName='Windows.DeviceLink.TenantAssignmentResult'; Success=$true; Decision=$decision; Changed=$false; OperationMode='Backend'
-                ReasonCode=if($decision -eq 'Move'){'WDL-BACKEND-MOVE'}else{'WDL-BACKEND-NEW'}; RetrySafe=$true; RecommendedAction='Review WhatIf output and run without -WhatIf to apply.'
+                ReasonCode=if($decision -eq 'Move'){'WDL-BACKEND-MOVE'}elseif($decision -eq 'Repair'){'WDL-BACKEND-REPAIR'}else{'WDL-BACKEND-NEW'}; RetrySafe=$true; RecommendedAction='Review WhatIf output and run without -WhatIf to apply.'
                 SerialNumber=[string]$currentDeviceLink.SerialNumber; SourceTenantId=$sourceId; TargetTenantId=$targetId
                 TargetTenantName=$targetName; PreviousLinkId=[string]$currentDeviceLink.LinkId; NewLinkId=$null
                 AssociationId=$null; AssociationState=$null; Message="Would perform $decision for target tenant '$targetName'."
@@ -202,6 +215,9 @@ function Set-WindowsDeviceLinkTenant {
             }
             if (-not [string]::IsNullOrWhiteSpace($sourceId)) {
                 $reconcileParameters.SourceTenantId = $sourceId
+            }
+            if ($decision -eq 'Repair') {
+                $reconcileParameters.RepairExistingAssociation = $true
             }
             $reconcile = Invoke-WindowsDeviceLinkBackendReconcile @reconcileParameters
         }
@@ -230,12 +246,12 @@ function Set-WindowsDeviceLinkTenant {
 
         [pscustomobject]@{
             PSTypeName='Windows.DeviceLink.TenantAssignmentResult'; Success=$true; Decision=$decision; Changed=$true; OperationMode='Backend'
-            ReasonCode=if($decision -eq 'Move'){'WDL-BACKEND-MOVE'}else{'WDL-BACKEND-NEW'}; RetrySafe=$true; RecommendedAction='None'
+            ReasonCode=if($decision -eq 'Move'){'WDL-BACKEND-MOVE'}elseif($decision -eq 'Repair'){'WDL-BACKEND-REPAIR'}else{'WDL-BACKEND-NEW'}; RetrySafe=$true; RecommendedAction='None'
             SerialNumber=[string]$deviceLinkForTarget.SerialNumber; SourceTenantId=$sourceId; TargetTenantId=$targetId
             TargetTenantName=$targetName; PreviousLinkId=$previousLinkId; NewLinkId=[string]$deviceLinkForTarget.LinkId
             AssociationId=[string]$verifiedMatches[0].associationId; AssociationState=[string]$verifiedMatches[0].associationState
             RequestId=[string]$reconcile.requestId
-            Message="DeviceLink tenant assignment completed and was verified in '$targetName'."
+            Message=if($decision -eq 'Repair'){"DeviceLink association repair completed and was verified in '$targetName'."}else{"DeviceLink tenant assignment completed and was verified in '$targetName'."}
         }
     }
     finally { $plainKey=$null; $credential=$null }
