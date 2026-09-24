@@ -112,6 +112,7 @@ $sourceTenantId = [string]$body.sourceTenantId
 $targetTenantId = ([string]$body.targetTenantId).Trim().ToLowerInvariant()
 $serialNumber = ([string]$body.device.serialNumber).Trim()
 $deviceLink = [string]$body.device.deviceLink
+$repairExistingAssociation = $body.repairExistingAssociation -eq $true
 if ($sourceTenantId) { $sourceTenantId = $sourceTenantId.Trim().ToLowerInvariant() }
 
 $clientId = [Environment]::GetEnvironmentVariable('WINDOWSDEVICELINK_CLIENT_ID')
@@ -182,7 +183,7 @@ elseif ($current.TenantId -eq $targetTenantId) {
         Write-ReconcileError -StatusCode 409 -Error 'SourceStateMismatch' -Message 'The supplied source tenant does not match the freshly detected tenant state.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId
         return
     }
-    $decision = 'Update'
+    $decision = if ($repairExistingAssociation) { 'Repair' } else { 'Update' }
 }
 else {
     if ([string]::IsNullOrWhiteSpace($sourceTenantId)) {
@@ -255,11 +256,12 @@ if ($decision -eq 'New') {
     return
 }
 
-# Move
+# Move or same-tenant repair. Both operations replace one proven association with
+# the supplied DeviceLink identity and verify every boundary without blind retries.
 $sourceLookup = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
 $sourceMatches = @($sourceLookup.Matches)
 if ($sourceMatches.Count -ne 1 -or [string]$sourceMatches[0].id -ne $current.AssociationId) {
-    Write-ReconcileError -StatusCode 409 -Error 'SourceStateChanged' -Message 'The source association changed between decision and mutation. No deletion was performed.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+    Write-ReconcileError -StatusCode 409 -Error 'SourceStateChanged' -Message 'The source association changed between decision and mutation. No deletion was performed.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision
     return
 }
 
@@ -271,7 +273,7 @@ catch {
     # A DELETE transport failure can be ambiguous. Verify state, but never issue a second DELETE automatically.
     $verifySourceAfterError = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
     if (@($verifySourceAfterError.Matches).Count -ne 0) {
-        Write-ReconcileError -StatusCode 502 -Error 'SourceRemovalUncertain' -Message 'Source removal failed or remains uncertain. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move' -Stage 'GraphDeleteSource' -UpstreamError $_
+        Write-ReconcileError -StatusCode 502 -Error 'SourceRemovalUncertain' -Message 'Source removal failed or remains uncertain. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphDeleteSource' -UpstreamError $_
         return
     }
 }
@@ -323,7 +325,7 @@ if ($targetMatches.Count -ne 1) {
 Write-JsonResponse -StatusCode 200 -Body @{
     success = $true
     requestId = $requestId
-    decision = 'Move'
+    decision = $decision
     changed = $true
     sourceTenantId = $sourceTenantId
     targetTenantId = $targetTenantId
