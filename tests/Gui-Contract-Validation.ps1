@@ -109,6 +109,7 @@ foreach ($required in @(
     'Invoke-WindowsDeviceLinkBackendOffboard',
     'Cloud offboarding completed and verified',
     'Full offboarding completed and verified',
+    '$offboardingStatePresent = $cloudPresent -or $localFullyAssociated',
     'Get-WindowsDeviceLinkBackendTenant',
     'Backend mode',
     'Direct mode',
@@ -161,6 +162,16 @@ foreach ($required in @(
 )) {
     if ($source -notmatch [regex]::Escape($required)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI/delegation contract '$required'."
+    }
+}
+
+foreach ($offboardingEnableContract in @(
+    '$btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent',
+    '$btnLocalOffboard.Enabled = $localFullyAssociated',
+    '$btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent'
+)) {
+    if ($source -notmatch [regex]::Escape($offboardingEnableContract)) {
+        throw "FAIL: GUI offboarding availability must be based on known removable state: '$offboardingEnableContract'."
     }
 }
 
