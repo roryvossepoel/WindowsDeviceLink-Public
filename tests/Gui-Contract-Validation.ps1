@@ -93,7 +93,7 @@ foreach ($required in @(
     'Get-WindowsDeviceLinkTenantCatalog',
     'WindowsManagementServicePath',
     'Windows PE',
-    'Full association is not currently supported in Windows PE',
+    'Full registration is not available in Windows PE',
     'Get-WindowsDeviceLinkLocalAssociation',
     'Get-WindowsDeviceLinkStatus',
     'Get-WindowsDeviceLink',
@@ -119,7 +119,9 @@ foreach ($required in @(
     'Recovery and offboarding',
     'Last checked',
     'Target tenant',
-    'Register device',
+    'Pre-register',
+    'Full register',
+    'Cloud + local',
     'Sign in',
     'Switch account',
     '$usesInteractiveUserAuthentication',
@@ -181,11 +183,14 @@ if ($source -notmatch $fullAssociationGuardPattern) {
 }
 
 if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=.*\$canFullAssociation') {
-    throw 'FAIL: Full associate button must use the Windows PE-aware full-association capability.'
+    throw 'FAIL: Full register button must use the Windows PE-aware full-association capability.'
+}
+
+if ($source -notmatch '(?s)if \(\$backendMode\).*Set-WindowsDeviceLinkTenant.*Complete-WindowsDeviceLinkAssociation') {
+    throw 'FAIL: Backend full registration must ensure tenant assignment before completing the local association.'
 }
 
 foreach ($requiredPolish in @(
-    'cloudAlreadyPresent',
     'cloudKnownAbsent',
     'alreadyFullyAssociated',
     "-Caption 'Link ID'",
