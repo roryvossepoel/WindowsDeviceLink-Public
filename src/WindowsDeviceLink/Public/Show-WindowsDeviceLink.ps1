@@ -559,7 +559,7 @@ function Show-WindowsDeviceLink {
     $ui.Manufacturer = New-ValuePair -Parent $deviceCard -Caption 'Manufacturer' -Y 34 -CaptionWidth 90 -ValueWidth 350
     $ui.Model        = New-ValuePair -Parent $deviceCard -Caption 'Model' -Y 56 -CaptionWidth 90 -ValueWidth 350
     $ui.Serial       = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 78 -CaptionWidth 90 -ValueWidth 350
-    $ui.OperatingSystem = New-ValuePair -Parent $deviceCard -Caption 'Operating system' -Y 100 -CaptionWidth 90 -ValueWidth 350
+    $ui.OperatingSystem = New-ValuePair -Parent $deviceCard -Caption 'Operating system' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
     $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 90 -ValueWidth 350
     $ui.Authentication = New-ValuePair -Parent $connectionCard -Caption 'Authentication' -Y 56 -CaptionWidth 90 -ValueWidth 350
@@ -614,15 +614,15 @@ function Show-WindowsDeviceLink {
     $tenantCaption.Text = 'Target tenant'
     $tenantCaption.Font = New-GuiFont -Size 8.5 -Style Regular
     $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
-    $tenantCaption.Location = [System.Drawing.Point]::new(548,20)
+    $tenantCaption.Location = [System.Drawing.Point]::new(500,20)
     $tenantCaption.Size = [System.Drawing.Size]::new(88,18)
     $assignmentRow.Controls.Add($tenantCaption)
 
     $tenantSelector = New-Object System.Windows.Forms.ComboBox
     $tenantSelector.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
     $tenantSelector.Font = New-GuiFont -Size 8.5 -Style Regular
-    $tenantSelector.Location = [System.Drawing.Point]::new(636,17)
-    $tenantSelector.Size = [System.Drawing.Size]::new(238,24)
+    $tenantSelector.Location = [System.Drawing.Point]::new(588,17)
+    $tenantSelector.Size = [System.Drawing.Size]::new(220,24)
     foreach ($choice in $tenantChoices) {
         [void]$tenantSelector.Items.Add($choice)
     }
@@ -640,13 +640,22 @@ function Show-WindowsDeviceLink {
     $assignmentRow.Controls.Add($tenantSelector)
 
     $btnAssign = New-Object System.Windows.Forms.Button
-    $btnAssign.Text = 'Register device'
+    $btnAssign.Text = 'Pre-register'
     $btnAssign.Font = New-GuiFont -Size 8.6 -Style Regular
-    $btnAssign.Size = [System.Drawing.Size]::new(112,28)
-    $btnAssign.Location = [System.Drawing.Point]::new(902,15)
+    $btnAssign.Size = [System.Drawing.Size]::new(94,28)
+    $btnAssign.Location = [System.Drawing.Point]::new(816,15)
     $btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $btnAssign.UseVisualStyleBackColor = $true
     $assignmentRow.Controls.Add($btnAssign)
+
+    $btnFullAssociate = New-Object System.Windows.Forms.Button
+    $btnFullAssociate.Text = 'Full register'
+    $btnFullAssociate.Font = New-GuiFont -Size 8.6 -Style Regular
+    $btnFullAssociate.Size = [System.Drawing.Size]::new(96,28)
+    $btnFullAssociate.Location = [System.Drawing.Point]::new(918,15)
+    $btnFullAssociate.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+    $btnFullAssociate.UseVisualStyleBackColor = $true
+    $assignmentRow.Controls.Add($btnFullAssociate)
 
     $assignmentSeparator = New-Object System.Windows.Forms.Panel
     $assignmentSeparator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
@@ -655,8 +664,7 @@ function Show-WindowsDeviceLink {
     $assignmentRow.Controls.Add($assignmentSeparator)
 
     $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Sign in for cloud actions, refresh state, or export the DeviceLink CSV.' -Y 58 -Buttons @('Sign in','Refresh local','Refresh cloud','Export CSV')
-    $rowOnboard = New-ActionRow -Parent $actionsPanel -Title 'Direct onboarding' -Description 'Create only the pre-association, or perform the full association flow.' -Y 104 -Buttons @('Pre-associate','Full associate')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Recovery and offboarding' -Description 'Reset local state, remove cloud state, or remove both.' -Y 150 -Buttons @('Cloud','Reset local','Full')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Recovery and offboarding' -Description 'Remove the cloud association, reset local state, or remove both.' -Y 104 -Buttons @('Cloud','Local','Cloud + local')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -689,11 +697,9 @@ function Show-WindowsDeviceLink {
     $btnRefresh = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh local'
     $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
     $btnExport = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Export CSV'
-    $btnPreassociate = Get-ActionButtonByText -Row $rowOnboard.Panel -Text 'Pre-associate'
-    $btnFullAssociate = Get-ActionButtonByText -Row $rowOnboard.Panel -Text 'Full associate'
     $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Cloud'
-    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Reset local'
-    $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Full'
+    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Local'
+    $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Cloud + local'
 
     $allActionButtons = @(
         $btnAssign,
@@ -701,20 +707,17 @@ function Show-WindowsDeviceLink {
         $btnRefresh,
         $btnOnline,
         $btnExport,
-        $btnPreassociate,
         $btnFullAssociate,
         $btnCloudOffboard,
         $btnLocalOffboard,
         $btnFullOffboard
     )
 
-    $rowOnboard.Panel.Visible = -not $backendMode
     $btnSignIn.Visible = $usesInteractiveUserAuthentication
     if (-not $usesInteractiveUserAuthentication) {
         $rowTools.Description.Text = 'Refresh local or cloud state, or export the DeviceLink CSV.'
     }
-    $rowOffboard.Panel.Top = if ($backendMode) { 104 } else { 150 }
-    $actionsPanel.Height = if ($backendMode) { 150 } else { 196 }
+    $actionsPanel.Height = 150
 
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
@@ -930,7 +933,6 @@ function Show-WindowsDeviceLink {
             $cloud.AssociationPresent -eq $false -or
             $cloudState -eq 'notassociated'
         )
-        $cloudAlreadyPresent = $cloudState -in @('preassociated','associated')
         $localFullyAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
         $alreadyFullyAssociated = $localFullyAssociated -and $cloudState -eq 'associated'
 
@@ -941,30 +943,27 @@ function Show-WindowsDeviceLink {
         $btnExport.Enabled = $runtimeReady
         $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
         $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister
-        $btnPreassociate.Enabled = -not $backendMode -and $runtimeReady -and $directTenantReady -and -not $cloudAlreadyPresent
-        $btnFullAssociate.Enabled = -not $backendMode -and $canFullAssociation -and $directTenantReady -and -not $alreadyFullyAssociated
+        $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociated
         $btnCloudOffboard.Enabled = -not $backendMode -and $directTenantReady -and -not $cloudKnownAbsent
         $btnLocalOffboard.Enabled = $true
         $btnFullOffboard.Enabled = -not $backendMode -and $runtimeReady -and $directTenantReady
 
-        $toolTip.SetToolTip($btnPreassociate, 'Create the tenant-side Device Association pre-association.')
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
-        $toolTip.SetToolTip($btnFullAssociate, 'Ensure pre-association exists and perform full Device Association on this device.')
-        $toolTip.SetToolTip($btnAssign, 'Register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
+        $toolTip.SetToolTip($btnLocalOffboard, 'Reset only the local DeviceLink firmware state.')
+        $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and reset the local DeviceLink firmware state.')
+        $toolTip.SetToolTip($btnFullAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
+        $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
         $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
         if ($hasDirectTenantCatalog -and -not $directTenantReady) {
             $toolTip.SetToolTip($btnSignIn, 'Select a target tenant first. Sign-in will be scoped to that tenant.')
             $toolTip.SetToolTip($btnAssign, 'Select a target tenant first. Direct mode applies New or no-op only in that selected tenant.')
+            $toolTip.SetToolTip($btnFullAssociate, 'Select a target tenant first, then sign in to perform full registration.')
         }
         elseif (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when no catalog is configured.') }
         elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
 
-        if ($cloudAlreadyPresent) {
-            $toolTip.SetToolTip($btnPreassociate, 'The cloud association already exists; pre-association is not required.')
-        }
-
         if ($alreadyFullyAssociated) {
-            $toolTip.SetToolTip($btnFullAssociate, 'The device is already fully associated.')
+            $toolTip.SetToolTip($btnFullAssociate, 'The device is already fully registered.')
         }
 
         if ($cloudKnownAbsent) {
@@ -974,7 +973,7 @@ function Show-WindowsDeviceLink {
         if ($support -and [string]$support.Environment -eq 'WindowsPE') {
             $toolTip.SetToolTip(
                 $btnFullAssociate,
-                'Full association is not currently supported in Windows PE. Pre-associate the device and let Windows complete Device Association during OOBE.'
+                'Full registration is not available in Windows PE. Pre-register the device now; full registration is completed automatically during Windows OOBE.'
             )
             $onlineToolTip = if ($backendMode) {
                 'Windows PE online operations are performed through the configured Function backend.'
@@ -993,7 +992,7 @@ function Show-WindowsDeviceLink {
                 [string]$support.Reason
             }
 
-            foreach ($button in @($btnAssign,$btnOnline,$btnExport,$btnPreassociate,$btnFullOffboard)) {
+            foreach ($button in @($btnAssign,$btnFullAssociate,$btnOnline,$btnExport,$btnFullOffboard)) {
                 $toolTip.SetToolTip($button,$runtimeReason)
             }
         }
@@ -1435,126 +1434,74 @@ function Show-WindowsDeviceLink {
         }
     }
 
-    function Invoke-GuiPreassociate {
-        if ($script:WdlGuiBusy) { return }
-
-        if (-not (Confirm-GuiAction -Title 'Create pre-association' -Message 'Ensure the tenant-side Device Association pre-association exists for this device?')) {
-            return
-        }
-
-        Set-GuiBusy -Busy $true -StatusText 'Creating pre-association...'
-        try {
-            $parameters = Get-GuiAuthParameters
-            $runtimeParameters = Get-GuiRuntimeParameters
-            foreach ($key in $runtimeParameters.Keys) {
-                $parameters[$key] = $runtimeParameters[$key]
-            }
-            $parameters.Confirm = $false
-
-            Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method" -Command
-
-            $resultObjects = @(Invoke-GuiInformationCommand -ScriptBlock {
-                Initialize-WindowsDeviceLink @parameters
-            })
-            $result = $resultObjects | Select-Object -Last 1
-            Write-GuiObject $result
-
-            $script:WdlGuiCloudStatus = $null
-            Refresh-LocalView
-
-            if ($result -and $result.PSObject.Properties.Name -contains 'AfterStatus' -and $result.AfterStatus) {
-                $cloud = $result.AfterStatus
-                $script:WdlGuiCloudStatus = $cloud
-                $ui.CloudState.Text = [string]$cloud.AssociationState
-                $ui.CloudTenant.Text = if ($cloud.TenantId) { Get-TenantDisplayName -TenantId ([string]$cloud.TenantId) } else { 'None' }
-                $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'None' }
-                $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
-                $ui.CloudAccent.BackColor = if ($cloud.AssociationPresent) { $colorSuccess } else { $colorNeutral }
-                $cloudCard.BackColor = if ($cloud.AssociationPresent) { $colorCloudTint } else { $colorConnectionTint }
-            }
-
-            $statusText = 'Pre-association completed'
-            if ($result) {
-                if ($result.PSObject.Properties.Name -contains 'Changed' -and -not [bool]$result.Changed) {
-                    if ($result.PSObject.Properties.Name -contains 'AfterState' -and [string]$result.AfterState -eq 'Preassociated') {
-                        $statusText = 'Already pre-associated - no change made'
-                    }
-                    elseif ($result.PSObject.Properties.Name -contains 'AfterState' -and [string]$result.AfterState -eq 'Associated') {
-                        $statusText = 'Already associated - no change made'
-                    }
-                    elseif ($result.PSObject.Properties.Name -contains 'Message' -and -not [string]::IsNullOrWhiteSpace([string]$result.Message)) {
-                        $statusText = [string]$result.Message
-                    }
-                }
-                elseif ($result.PSObject.Properties.Name -contains 'Changed' -and [bool]$result.Changed) {
-                    $statusText = 'Pre-association created successfully'
-                }
-                elseif ($result.PSObject.Properties.Name -contains 'Message' -and -not [string]::IsNullOrWhiteSpace([string]$result.Message)) {
-                    $statusText = [string]$result.Message
-                }
-            }
-
-            Set-GuiStatus $statusText
-            Write-GuiConsole -Message $statusText
-        }
-        catch {
-            Set-GuiStatus 'Pre-association failed'
-            Show-GuiError $_.Exception.Message
-        }
-        finally {
-            Set-GuiBusy -Busy $false
-        }
-    }
-
     function Invoke-GuiFullAssociate {
         if ($script:WdlGuiBusy) { return }
 
         if ($isWinPE) {
-            Show-GuiError 'Full DeviceLink association is not supported in Windows PE. Use Pre-associate in WinPE and let full Windows/OOBE complete Device Association.'
+            Show-GuiError 'Full registration is not available in Windows PE. Pre-register the device now; full registration is completed automatically during Windows OOBE.'
             return
         }
 
-        if (-not (Confirm-GuiAction -Title 'Full association' -Message 'Ensure pre-association exists and complete Device Association on this device?')) {
+        $targetId = Get-SelectedTenantId
+        if (($backendMode -or $hasDirectTenantCatalog) -and [string]::IsNullOrWhiteSpace($targetId)) {
+            Show-GuiError 'Select a target tenant first.'
             return
         }
 
-        Set-GuiBusy -Busy $true -StatusText 'Completing onboarding...'
+        Set-GuiBusy -Busy $true -StatusText 'Performing full registration...'
         try {
-            $parameters = Get-GuiAuthParameters
-            $runtimeParameters = Get-GuiRuntimeParameters
-            foreach ($key in $runtimeParameters.Keys) {
-                $parameters[$key] = $runtimeParameters[$key]
+            if ($backendMode) {
+                $assignmentParameters = Get-GuiBackendParameters
+                $assignmentParameters.TargetTenantId = [guid]$targetId
+                $assignmentParameters.Confirm = $false
+                $runtimeParameters = Get-GuiRuntimeParameters
+                foreach ($key in $runtimeParameters.Keys) { $assignmentParameters[$key] = $runtimeParameters[$key] }
+
+                Write-GuiConsole -Message "Set-WindowsDeviceLinkTenant -BackendUri <configured> -TargetTenantId $targetId" -Command
+                $assignmentResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                    Set-WindowsDeviceLinkTenant @assignmentParameters
+                })
+                $assignment = $assignmentResults | Select-Object -Last 1
+                Write-GuiObject $assignment
+
+                Write-GuiConsole -Message 'Complete-WindowsDeviceLinkAssociation' -Command
+                $completionResults = @(Invoke-GuiInformationCommand -ScriptBlock {
+                    Complete-WindowsDeviceLinkAssociation -Confirm:$false
+                })
+                $result = $completionResults | Select-Object -Last 1
             }
-            $parameters.FullAssociation = $true
-            $parameters.Confirm = $false
+            else {
+                $parameters = Get-GuiAuthParameters
+                $runtimeParameters = Get-GuiRuntimeParameters
+                foreach ($key in $runtimeParameters.Keys) { $parameters[$key] = $runtimeParameters[$key] }
+                $parameters.FullAssociation = $true
+                $parameters.Confirm = $false
 
-            Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method -FullAssociation" -Command
-
-            $resultObjects = New-Object System.Collections.Generic.List[object]
-            & {
-                Initialize-WindowsDeviceLink @parameters
-            } 6>&1 | ForEach-Object {
-                if ($_ -is [System.Management.Automation.InformationRecord]) {
-                    $message = [string]$_.MessageData
-                    if ($message) { Write-GuiConsole -Message $message }
+                Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method -FullAssociation" -Command
+                $resultObjects = New-Object System.Collections.Generic.List[object]
+                & {
+                    Initialize-WindowsDeviceLink @parameters
+                } 6>&1 | ForEach-Object {
+                    if ($_ -is [System.Management.Automation.InformationRecord]) {
+                        $message = [string]$_.MessageData
+                        if ($message) { Write-GuiConsole -Message $message }
+                    }
+                    else { $resultObjects.Add($_) }
+                    [System.Windows.Forms.Application]::DoEvents()
                 }
-                else {
-                    $resultObjects.Add($_)
-                }
-                [System.Windows.Forms.Application]::DoEvents()
+                $result = @($resultObjects.ToArray()) | Select-Object -Last 1
             }
 
-            $result = @($resultObjects.ToArray()) | Select-Object -Last 1
             Write-GuiObject $result
 
             $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
             $verifiedCloud = Refresh-CloudView -WriteCommand
             Write-GuiObject $verifiedCloud
-            Set-GuiStatus 'Full association completed'
+            Set-GuiStatus 'Full registration completed and verified'
         }
         catch {
-            Set-GuiStatus 'Full association failed'
+            Set-GuiStatus 'Full registration failed or requires verification'
             Show-GuiError $_.Exception.Message
         }
         finally { Set-GuiBusy -Busy $false }
@@ -1767,7 +1714,6 @@ function Show-WindowsDeviceLink {
     $btnAssign.Add_Click({ Invoke-GuiTenantAssignment })
     $btnOnline.Add_Click({ Invoke-GuiOnline })
     $btnExport.Add_Click({ Invoke-GuiExport })
-    $btnPreassociate.Add_Click({ Invoke-GuiPreassociate })
     $btnFullAssociate.Add_Click({ Invoke-GuiFullAssociate })
     $btnCloudOffboard.Add_Click({ Invoke-GuiCloudOffboard })
     $btnLocalOffboard.Add_Click({ Invoke-GuiLocalOffboard })
@@ -1867,7 +1813,8 @@ function Show-WindowsDeviceLink {
         $actionsPanel.Width = $fullWidth
 
         $assignmentRow.Width = $fullWidth
-        $btnAssign.Left = $fullWidth - 16 - $btnAssign.Width
+        $btnFullAssociate.Left = $fullWidth - 16 - $btnFullAssociate.Width
+        $btnAssign.Left = $btnFullAssociate.Left - 8 - $btnAssign.Width
         if ($showTenantSelector) {
             $tenantSelector.Left = $btnAssign.Left - 8 - $tenantSelector.Width
             $tenantCaption.Left = $tenantSelector.Left - 88
@@ -1894,7 +1841,7 @@ function Show-WindowsDeviceLink {
         $consoleBox.Height = [Math]::Max(96,$activityHeight - 22)
 
 
-        foreach ($row in @($rowTools,$rowOnboard,$rowOffboard)) {
+        foreach ($row in @($rowTools,$rowOffboard)) {
             $row.Panel.Width = $fullWidth
 
             $buttons = @($row.Buttons)
