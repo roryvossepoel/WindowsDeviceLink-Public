@@ -558,9 +558,13 @@ function Show-WindowsDeviceLink {
     $ui.TenantScope    = New-ValuePair -Parent $connectionCard -Caption 'Tenant scope' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
     $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
+    $ui.LocalState.Text = 'Not checked'
     $ui.Firmware   = New-ValuePair -Parent $associationCard -Caption 'Firmware' -Y 56 -CaptionWidth 105 -ValueWidth 335
+    $ui.Firmware.Text = 'Not checked'
     $ui.LinkId     = New-ValuePair -Parent $associationCard -Caption 'Link ID' -Y 78 -CaptionWidth 105 -ValueWidth 335
+    $ui.LinkId.Text = 'Not checked'
     $ui.LocalCreated = New-ValuePair -Parent $associationCard -Caption 'Created' -Y 100 -CaptionWidth 105 -ValueWidth 335
+    $ui.LocalCreated.Text = 'Not checked'
 
     $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
     $ui.CloudState.Text = 'Not checked'
@@ -582,14 +586,14 @@ function Show-WindowsDeviceLink {
 
     $assignmentRow = New-Object System.Windows.Forms.Panel
     $assignmentRow.Location = [System.Drawing.Point]::new(0,0)
-    $assignmentRow.Size = [System.Drawing.Size]::new(1030,58)
+    $assignmentRow.Size = [System.Drawing.Size]::new(1030,46)
     $assignmentRow.BackColor = [System.Drawing.Color]::White
     $actionsPanel.Controls.Add($assignmentRow)
 
     $assignmentTitle = New-Object System.Windows.Forms.Label
     $assignmentTitle.Text = 'Tenant assignment'
     $assignmentTitle.Font = New-GuiFont -Size 8.5 -Style Bold
-    $assignmentTitle.Location = [System.Drawing.Point]::new(14,7)
+    $assignmentTitle.Location = [System.Drawing.Point]::new(14,5)
     $assignmentTitle.AutoSize = $true
     $assignmentRow.Controls.Add($assignmentTitle)
 
@@ -597,7 +601,7 @@ function Show-WindowsDeviceLink {
     $assignmentDescription.Text = 'Select the destination and choose pre-registration or full registration.'
     $assignmentDescription.Font = New-GuiFont -Size 8.2 -Style Regular
     $assignmentDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
-    $assignmentDescription.Location = [System.Drawing.Point]::new(14,27)
+    $assignmentDescription.Location = [System.Drawing.Point]::new(14,23)
     $assignmentDescription.AutoSize = $true
     $assignmentRow.Controls.Add($assignmentDescription)
 
@@ -605,15 +609,16 @@ function Show-WindowsDeviceLink {
     $tenantCaption.Text = 'Target tenant'
     $tenantCaption.Font = New-GuiFont -Size 8.5 -Style Regular
     $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
-    $tenantCaption.Location = [System.Drawing.Point]::new(500,20)
+    $tenantCaption.Location = [System.Drawing.Point]::new(500,14)
     $tenantCaption.Size = [System.Drawing.Size]::new(88,18)
     $assignmentRow.Controls.Add($tenantCaption)
 
     $tenantSelector = New-Object System.Windows.Forms.ComboBox
     $tenantSelector.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
     $tenantSelector.Font = New-GuiFont -Size 8.5 -Style Regular
-    $tenantSelector.Location = [System.Drawing.Point]::new(588,17)
-    $tenantSelector.Size = [System.Drawing.Size]::new(220,24)
+    $tenantSelector.Location = [System.Drawing.Point]::new(588,9)
+    $tenantSelector.ItemHeight = 22
+    $tenantSelector.Size = [System.Drawing.Size]::new(220,28)
     foreach ($choice in $tenantChoices) {
         [void]$tenantSelector.Items.Add($choice)
     }
@@ -634,7 +639,7 @@ function Show-WindowsDeviceLink {
     $btnAssign.Text = 'Pre-register'
     $btnAssign.Font = New-GuiFont -Size 8.6 -Style Regular
     $btnAssign.Size = [System.Drawing.Size]::new(94,28)
-    $btnAssign.Location = [System.Drawing.Point]::new(816,15)
+    $btnAssign.Location = [System.Drawing.Point]::new(816,9)
     $btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $btnAssign.UseVisualStyleBackColor = $true
     $assignmentRow.Controls.Add($btnAssign)
@@ -643,19 +648,19 @@ function Show-WindowsDeviceLink {
     $btnFullAssociate.Text = 'Full register'
     $btnFullAssociate.Font = New-GuiFont -Size 8.6 -Style Regular
     $btnFullAssociate.Size = [System.Drawing.Size]::new(96,28)
-    $btnFullAssociate.Location = [System.Drawing.Point]::new(918,15)
+    $btnFullAssociate.Location = [System.Drawing.Point]::new(918,9)
     $btnFullAssociate.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $btnFullAssociate.UseVisualStyleBackColor = $true
     $assignmentRow.Controls.Add($btnFullAssociate)
 
     $assignmentSeparator = New-Object System.Windows.Forms.Panel
     $assignmentSeparator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
-    $assignmentSeparator.Location = [System.Drawing.Point]::new(14,57)
+    $assignmentSeparator.Location = [System.Drawing.Point]::new(14,45)
     $assignmentSeparator.Size = [System.Drawing.Size]::new(1002,1)
     $assignmentRow.Controls.Add($assignmentSeparator)
 
-    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Sign in for cloud actions, refresh state, or export the DeviceLink CSV.' -Y 58 -Buttons @('Sign in','Refresh local','Refresh cloud','Export CSV')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or remove both.' -Y 104 -Buttons @('Remove cloud','Reset local','Remove both')
+    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Sign in for cloud actions, refresh state, or export the DeviceLink CSV.' -Y 46 -Buttons @('Sign in','Refresh cloud','Refresh local','Export CSV')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or remove both.' -Y 92 -Buttons @('Remove cloud','Reset local','Remove both')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -708,7 +713,7 @@ function Show-WindowsDeviceLink {
     if (-not $usesInteractiveUserAuthentication) {
         $rowTools.Description.Text = 'Refresh local or cloud state, or export the DeviceLink CSV.'
     }
-    $actionsPanel.Height = 150
+    $actionsPanel.Height = 138
 
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
@@ -1033,6 +1038,12 @@ function Show-WindowsDeviceLink {
     function Refresh-LocalView {
         Set-GuiStatus 'Refreshing local state...'
         Write-GuiConsole -Message 'Refresh local state' -Command
+
+        $ui.LocalState.Text = 'Checking...'
+        $ui.Firmware.Text = 'Checking...'
+        $ui.LinkId.Text = 'Checking...'
+        $ui.LocalCreated.Text = 'Checking...'
+        [System.Windows.Forms.Application]::DoEvents()
 
         $bios = Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop
         $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
