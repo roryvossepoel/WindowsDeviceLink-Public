@@ -932,6 +932,7 @@ function Show-WindowsDeviceLink {
         )
         $cloudPresent = $cloud -and $cloud.AssociationPresent -eq $true
         $localFullyAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
+        $offboardingStatePresent = $cloudPresent -or $localFullyAssociated
         $selectedTenantId = Get-SelectedTenantId
         $selectedMatchesCloud = $cloudPresent -and -not [string]::IsNullOrWhiteSpace($selectedTenantId) -and
             [string]$cloud.TenantId -ieq $selectedTenantId
@@ -946,13 +947,13 @@ function Show-WindowsDeviceLink {
         $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
         $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister -and -not $alreadyRegisteredInTarget
         $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociatedInTarget
-        $btnCloudOffboard.Enabled = $runtimeReady -and -not $cloudKnownAbsent -and ($backendMode -or $directTenantReady)
-        $btnLocalOffboard.Enabled = -not $backendMode -or $cloudKnownAbsent
-        $btnFullOffboard.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
+        $btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent -and ($backendMode -or $directTenantReady)
+        $btnLocalOffboard.Enabled = $localFullyAssociated -and (-not $backendMode -or $cloudKnownAbsent)
+        $btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent -and ($backendMode -or $directTenantReady)
 
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
         $toolTip.SetToolTip($btnLocalOffboard, $(if ($backendMode -and -not $cloudKnownAbsent) { 'Backend mode blocks standalone local removal while a cloud association exists. Use registration or move workflows to keep both states consistent.' } else { 'Remove only the local DeviceLink firmware state.' }))
-        $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and reset the local DeviceLink firmware state.')
+        $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and local DeviceLink firmware state.')
         $toolTip.SetToolTip($btnFullAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
         $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
@@ -1625,7 +1626,6 @@ function Show-WindowsDeviceLink {
             $result = Reset-WindowsDeviceLinkFirmwareState -Confirm:$false
             Write-GuiObject $result
 
-            $script:WdlGuiCloudStatus = $null
             Refresh-LocalView
             Set-GuiStatus 'Local offboarding completed'
         }
