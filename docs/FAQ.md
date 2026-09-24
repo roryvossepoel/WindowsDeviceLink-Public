@@ -33,8 +33,8 @@ Provide friendly tenant choices directly:
 
 ```powershell
 Show-WindowsDeviceLink -Tenants @{
-    'Management' = '11111111-1111-1111-1111-111111111111'
-    'Customer A' = '22222222-2222-2222-2222-222222222222'
+    'Tenant Alpha' = '11111111-1111-1111-1111-111111111111'
+    'Tenant Beta' = '22222222-2222-2222-2222-222222222222'
 }
 ```
 
@@ -56,8 +56,8 @@ The JSON format is intentionally simple:
 
 ```json
 {
-  "Management": "11111111-1111-1111-1111-111111111111",
-  "Customer A": "22222222-2222-2222-2222-222222222222"
+  "Tenant Alpha": "11111111-1111-1111-1111-111111111111",
+  "Tenant Beta": "22222222-2222-2222-2222-222222222222"
 }
 ```
 
@@ -69,7 +69,7 @@ scripts with:
 ```powershell
 $tenant = Get-WindowsDeviceLinkTenantCatalog `
     -Path 'E:\Config\tenants.json' `
-    -Name 'Customer A'
+    -Name 'Tenant Beta'
 ```
 
 Then pass `$tenant.TenantId` to the desired direct Graph command. This does not provide

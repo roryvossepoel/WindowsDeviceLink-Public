@@ -110,7 +110,7 @@ Example with one match:
   "matches": [
     {
       "tenantId": "22222222-2222-2222-2222-222222222222",
-      "tenantName": "Customer A",
+      "tenantName": "Tenant Beta",
       "associationId": "00000000-0000-0000-0000-000000000000",
       "associationState": "preassociated",
       "serialNumber": "ABC123",
@@ -169,8 +169,8 @@ Example:
 
 ```json
 {
-  "11111111-1111-1111-1111-111111111111": "Management",
-  "22222222-2222-2222-2222-222222222222": "Customer A"
+  "11111111-1111-1111-1111-111111111111": "Tenant Alpha",
+  "22222222-2222-2222-2222-222222222222": "Tenant Beta"
 }
 ```
 

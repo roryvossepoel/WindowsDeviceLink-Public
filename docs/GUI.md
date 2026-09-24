@@ -39,9 +39,31 @@ Backend mode and Direct-mode Graph authentication are deliberately separate. Do 
 `-BackendUri`/`-BackendApiKey` with `-Method`, `-Tenants`, `-TenantsUri`, or
 `-TenantsPath`.
 
+In Direct mode, use either one explicit `-TenantId` or one of the tenant-catalog
+parameters. Combining an explicit tenant with a catalog is rejected because it would
+make the effective target ambiguous.
+
 On full Windows, `Interactive` authentication is used by default unless `-Method` is specified.
 
 On Windows PE, `DeviceCode` is used by default because interactive browser authentication is not available there.
+
+Direct mode opens without authenticating and initially loads only local device and
+firmware state. Choose **Sign in**, **Refresh cloud**, or **Register device** when a
+cloud action is needed. After successful authentication, the GUI reuses that session
+for subsequent cloud actions. DeviceCode tokens are retained only in memory, renewed
+when required, cleared when the selected tenant changes, and discarded when the GUI
+closes. Backend mode continues to load cloud state automatically because it does not
+require an interactive Graph sign-in on the device.
+
+After a successful Direct-mode sign-in, **Sign in** changes to **Switch account**.
+Single-tenant Direct mode deliberately has no tenant selector: the authenticated tenant
+is authoritative unless `-TenantId` fixed it explicitly. When a local tenant catalog is
+configured, selecting a target tenant is mandatory before sign-in or any cloud action;
+authentication is then scoped to that selected tenant.
+
+**Sign in** is shown only for delegated `Interactive` and `DeviceCode` methods. App-only
+methods do not represent a user as signed in: their credential is used non-interactively
+when **Refresh cloud**, **Register device**, or another cloud action runs.
 
 ## Authentication
 
@@ -81,7 +103,9 @@ Show-WindowsDeviceLink `
     -ClientSecret $secret
 ```
 
-The GUI does not introduce a separate authentication implementation. Online actions delegate to the existing WindowsDeviceLink cmdlets using the selected authentication parameters.
+The GUI uses the existing WindowsDeviceLink authentication helpers and public cmdlets.
+It adds only session-scoped orchestration so an operator does not need to repeat the
+same DeviceCode sign-in for every action.
 
 ## Tenant selection
 
@@ -110,21 +134,22 @@ Use `-TenantId` when the GUI should use one explicit tenant:
 Show-WindowsDeviceLink -TenantId '<tenant-id>'
 ```
 
-The selector displays **Explicit tenant parameter**.
-
-When no explicit tenant is supplied, the selector displays **Tenant determined by sign-in**.
-The authenticated Microsoft Entra context is then authoritative.
+No selector is shown for this single-target route. When no explicit tenant or tenant
+catalog is supplied, no selector is shown either and the authenticated Microsoft Entra
+context is authoritative.
 
 ### Friendly tenant list
 
 This mode does not require a Function App. The list only supplies display names and
 tenant IDs; authentication and Graph actions still use the selected direct method.
+The operator must select one tenant before signing in. Changing the selection clears
+the current GUI authentication session and requires a new sign-in for the new tenant.
 
 ```powershell
 Show-WindowsDeviceLink -Tenants @{
-    'Management' = '11111111-1111-1111-1111-111111111111'
-    'Customer A' = '22222222-2222-2222-2222-222222222222'
-    'Customer B' = '33333333-3333-3333-3333-333333333333'
+    'Tenant Alpha' = '11111111-1111-1111-1111-111111111111'
+    'Tenant Beta' = '22222222-2222-2222-2222-222222222222'
+    'Tenant Gamma' = '33333333-3333-3333-3333-333333333333'
 }
 ```
 
@@ -146,9 +171,9 @@ Both JSON options use the same simple schema:
 
 ```json
 {
-  "Management": "11111111-1111-1111-1111-111111111111",
-  "Customer A": "22222222-2222-2222-2222-222222222222",
-  "Customer B": "33333333-3333-3333-3333-333333333333"
+  "Tenant Alpha": "11111111-1111-1111-1111-111111111111",
+  "Tenant Beta": "22222222-2222-2222-2222-222222222222",
+  "Tenant Gamma": "33333333-3333-3333-3333-333333333333"
 }
 ```
 
@@ -219,6 +244,8 @@ The DLL must come from an administrator-controlled compatible Windows source. Se
 ## Actions
 
 - **Register** — apply New/no-op in Direct mode, or New/no-op/Move for an explicitly selected Backend-mode target.
+- **Sign in** — authenticate for the current Direct-mode UI session and immediately load the cloud association.
+- **Switch account** — discard the current Direct-mode GUI session and authenticate again; with a tenant catalog, the new session is created for the selected tenant.
 - **Refresh local** — refresh local DeviceLink identity and firmware information.
 - **Refresh cloud** — refresh tenant-side Device Association state using the selected tenant context.
 - **Export CSV** — export the Microsoft-generated DeviceLink CSV.
@@ -239,7 +266,7 @@ the target tenant selector and the primary **Register device** action. In Backen
 Register performs the complete
 lookup, decision, identity renewal, registration, and verification workflow itself.
 **Refresh cloud** remains available for an explicit diagnostic refresh. Direct-only
-onboarding actions are hidden while Backend mode is active.
+sign-in and onboarding actions are hidden while Backend mode is active.
 
 ## Activity log
 

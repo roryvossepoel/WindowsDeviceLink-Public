@@ -40,6 +40,14 @@ WindowsDeviceLink has two explicit execution routes:
 - **Backend mode** uses the optional Function App for complete multitenant lookup and
   guarded New, no-op, or Move orchestration.
 
+Direct mode includes account-based, fixed-tenant, delegated-catalog, and
+application-catalog configurations. These configurations do not all have the same
+automation characteristics: delegated authentication requires a user, while app-only
+and Backend CLI workflows can run unattended. See the
+[tenant assignment mode decision guide](docs/TENANT-ASSIGNMENT-MODES.md) before choosing
+an authentication and deployment model. Backend is recommended for structural
+multitenant use.
+
 The GUI uses one operator view: Device, Connection, Local association, and Cloud
 association are shown together. Select a target tenant and choose **Register device**. In Backend mode
 that one action performs the complete lookup, decision, identity renewal, registration,
