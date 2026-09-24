@@ -661,7 +661,7 @@ function Show-WindowsDeviceLink {
 
     $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status' -Description 'Sign in for cloud actions, or refresh local or cloud state.' -Y 46 -Buttons @('Sign in','Refresh cloud','Refresh local')
     $rowExport = New-ActionRow -Parent $actionsPanel -Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 92 -Buttons @('Export CSV')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, local state, or both.' -Y 138 -Buttons @('Remove cloud','Remove local','Remove both')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or both.' -Y 138 -Buttons @('Remove cloud','Reset local','Remove both')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -695,7 +695,7 @@ function Show-WindowsDeviceLink {
     $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
     $btnExport = Get-ActionButtonByText -Row $rowExport.Panel -Text 'Export CSV'
     $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove cloud'
-    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove local'
+    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Reset local'
     $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove both'
 
     $allActionButtons = @(
@@ -931,6 +931,7 @@ function Show-WindowsDeviceLink {
             $cloudState -eq 'notassociated'
         )
         $cloudPresent = $cloud -and $cloud.AssociationPresent -eq $true
+        $localStatePresent = $local -and ([string]$local.FirmwareState -in @('2/4','4/4'))
         $localFullyAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
         $offboardingStatePresent = $cloudPresent -or $localFullyAssociated
         $selectedTenantId = Get-SelectedTenantId
@@ -948,11 +949,20 @@ function Show-WindowsDeviceLink {
         $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister -and -not $alreadyRegisteredInTarget
         $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociatedInTarget
         $btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent -and ($backendMode -or $directTenantReady)
-        $btnLocalOffboard.Enabled = $localFullyAssociated -and (-not $backendMode -or $cloudKnownAbsent)
+        $btnLocalOffboard.Enabled = $runtimeReady -and $localStatePresent -and $cloudKnownAbsent
         $btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent -and ($backendMode -or $directTenantReady)
 
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
-        $toolTip.SetToolTip($btnLocalOffboard, $(if ($backendMode -and -not $cloudKnownAbsent) { 'Backend mode blocks standalone local removal while a cloud association exists. Use registration or move workflows to keep both states consistent.' } else { 'Remove only the local DeviceLink firmware state.' }))
+        $localResetToolTip = if (-not $cloud) {
+            'Check cloud state before resetting the local DeviceLink firmware state.'
+        }
+        elseif (-not $cloudKnownAbsent) {
+            'Local reset is blocked while a cloud association exists. Use registration, move, or Remove both to keep both states consistent.'
+        }
+        else {
+            'Reset the local DeviceLink firmware state. Windows may create a new base identity automatically.'
+        }
+        $toolTip.SetToolTip($btnLocalOffboard, $localResetToolTip)
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and local DeviceLink firmware state.')
         $toolTip.SetToolTip($btnFullAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
@@ -1616,7 +1626,7 @@ function Show-WindowsDeviceLink {
     function Invoke-GuiLocalOffboard {
         if ($script:WdlGuiBusy) { return }
 
-        if (-not (Confirm-GuiAction -Title 'Local offboarding' -Message 'Remove all known local DeviceLink UEFI variables? The tenant-side Device Association record will remain unchanged.')) {
+        if (-not (Confirm-GuiAction -Title 'Reset local state' -Message 'Reset all known local DeviceLink UEFI variables? Windows may create a new base identity automatically. The tenant-side Device Association record will remain unchanged.')) {
             return
         }
 
