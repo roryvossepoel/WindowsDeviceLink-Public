@@ -45,6 +45,22 @@ foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$tenantCatal
     Assert-True ($errors.Count -eq 0) ("PowerShell parse errors in '$scriptPath': " + (($errors | ForEach-Object Message) -join '; '))
 }
 
+# A clean ZIP deployment keeps reusable helpers under function-app/shared; it
+# does not place copies beside each function's run.ps1.
+foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$tenantCatalogRunPath)) {
+    $functionSource = Get-Content -LiteralPath $scriptPath -Raw
+    Assert-True (
+        $functionSource.Contains("Join-Path `$PSScriptRoot '..\shared\BackendAuth.ps1'")
+    ) "$(Split-Path (Split-Path $scriptPath -Parent) -Leaf) must load BackendAuth.ps1 from function-app/shared."
+}
+
+foreach ($scriptPath in @($runPath,$reconcileRunPath)) {
+    $functionSource = Get-Content -LiteralPath $scriptPath -Raw
+    Assert-True (
+        $functionSource.Contains("Join-Path `$PSScriptRoot '..\shared\AssociationOperations.ps1'")
+    ) "$(Split-Path (Split-Path $scriptPath -Parent) -Leaf) must load AssociationOperations.ps1 from function-app/shared."
+}
+
 $functionJson = Get-Content -LiteralPath $functionJsonPath -Raw | ConvertFrom-Json
 $trigger = @($functionJson.bindings | Where-Object type -eq 'httpTrigger')
 Assert-True ($trigger.Count -eq 1) 'Preassociate Function must expose exactly one HTTP trigger.'
