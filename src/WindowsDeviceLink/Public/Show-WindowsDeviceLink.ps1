@@ -936,11 +936,11 @@ function Show-WindowsDeviceLink {
         $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister
         $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociated
         $btnCloudOffboard.Enabled = -not $backendMode -and $directTenantReady -and -not $cloudKnownAbsent
-        $btnLocalOffboard.Enabled = $true
+        $btnLocalOffboard.Enabled = -not $backendMode -or $cloudKnownAbsent
         $btnFullOffboard.Enabled = -not $backendMode -and $runtimeReady -and $directTenantReady
 
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
-        $toolTip.SetToolTip($btnLocalOffboard, 'Reset only the local DeviceLink firmware state.')
+        $toolTip.SetToolTip($btnLocalOffboard, $(if ($backendMode -and -not $cloudKnownAbsent) { 'Backend mode blocks a standalone local reset while a cloud association exists. Use registration or move workflows to keep both states consistent.' } else { 'Reset only the local DeviceLink firmware state.' }))
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and reset the local DeviceLink firmware state.')
         $toolTip.SetToolTip($btnFullAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
@@ -1453,6 +1453,14 @@ function Show-WindowsDeviceLink {
                 $assignmentParameters.Confirm = $false
                 $runtimeParameters = Get-GuiRuntimeParameters
                 foreach ($key in $runtimeParameters.Keys) { $assignmentParameters[$key] = $runtimeParameters[$key] }
+
+                $cloudState = if ($script:WdlGuiCloudStatus) { ([string]$script:WdlGuiCloudStatus.AssociationState).Trim().ToLowerInvariant() } else { '' }
+                $cloudTenantId = if ($script:WdlGuiCloudStatus) { [string]$script:WdlGuiCloudStatus.TenantId } else { '' }
+                if ($script:WdlGuiLocalAssociation -and [string]$script:WdlGuiLocalAssociation.FirmwareState -eq '2/4' -and
+                    $cloudState -eq 'associated' -and $cloudTenantId -ieq $targetId) {
+                    $assignmentParameters.RepairExistingAssociation = $true
+                    Write-GuiConsole -Message 'Same-tenant repair required: replacing the stale cloud association with the current local identity.'
+                }
 
                 Write-GuiConsole -Message "Set-WindowsDeviceLinkTenant -BackendUri <configured> -TargetTenantId $targetId" -Command
                 $assignmentResults = @(Invoke-GuiInformationCommand -ScriptBlock {
