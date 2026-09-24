@@ -148,10 +148,8 @@ foreach ($required in @(
     '$activityCard.Height = $activityHeight',
     '$btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard',
     'New-GuiFont',
-    '$colorDeviceTint',
-    '$colorCloudTint',
-    '$colorConnectionAccent',
-    '$colorLocalAccent',
+    '$colorCardTint',
+    '$colorCardAccent',
     "'Tahoma'",
     "'Assets\WindowsDeviceLink.ico'"
 )) {
