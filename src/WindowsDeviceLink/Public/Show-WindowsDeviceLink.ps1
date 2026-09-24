@@ -177,17 +177,8 @@ function Show-WindowsDeviceLink {
     $toolTip.ReshowDelay = 200
     $toolTip.ShowAlways = $true
 
-    $colorPrimary = [System.Drawing.Color]::FromArgb(29,52,78)
-    $colorAccent = [System.Drawing.Color]::FromArgb(202,153,55)
-    $colorSuccess = [System.Drawing.Color]::FromArgb(51,153,78)
-    $colorNeutral = [System.Drawing.Color]::FromArgb(166,166,166)
-    $colorConnectionAccent = [System.Drawing.Color]::FromArgb(92,105,139)
-    $colorLocalAccent = [System.Drawing.Color]::FromArgb(63,127,142)
-    $colorDeviceTint = [System.Drawing.Color]::FromArgb(246,249,252)
-    $colorConnectionTint = [System.Drawing.Color]::FromArgb(247,247,252)
-    $colorLocalTint = [System.Drawing.Color]::FromArgb(244,249,250)
-    $colorCloudTint = [System.Drawing.Color]::FromArgb(245,250,246)
-    $colorWarningTint = [System.Drawing.Color]::FromArgb(253,250,243)
+    $colorCardAccent = [System.Drawing.Color]::FromArgb(86,94,102)
+    $colorCardTint = [System.Drawing.Color]::FromArgb(248,249,250)
 
     function New-GuiFont {
         param(
@@ -527,31 +518,31 @@ function Show-WindowsDeviceLink {
     $connectionCard = New-Card -Title 'Connection' -X 536 -Y 12 -Width 508 -Height 126
     $associationCard = New-Card -Title 'Local association' -X 14 -Y 150 -Width 508 -Height 126
     $cloudCard = New-Card -Title 'Cloud association' -X 536 -Y 150 -Width 508 -Height 126
-    $deviceCard.BackColor = $colorDeviceTint
-    $connectionCard.BackColor = $colorConnectionTint
-    $associationCard.BackColor = $colorLocalTint
-    $cloudCard.BackColor = $colorConnectionTint
+    $deviceCard.BackColor = $colorCardTint
+    $connectionCard.BackColor = $colorCardTint
+    $associationCard.BackColor = $colorCardTint
+    $cloudCard.BackColor = $colorCardTint
 
     $deviceAccent = New-Object System.Windows.Forms.Panel
-    $deviceAccent.BackColor = $colorPrimary
+    $deviceAccent.BackColor = $colorCardAccent
     $deviceAccent.Location = [System.Drawing.Point]::new(0,0)
     $deviceAccent.Size = [System.Drawing.Size]::new(4,126)
     $deviceCard.Controls.Add($deviceAccent)
 
     $connectionAccent = New-Object System.Windows.Forms.Panel
-    $connectionAccent.BackColor = $colorConnectionAccent
+    $connectionAccent.BackColor = $colorCardAccent
     $connectionAccent.Location = [System.Drawing.Point]::new(0,0)
     $connectionAccent.Size = [System.Drawing.Size]::new(4,126)
     $connectionCard.Controls.Add($connectionAccent)
 
     $localAccent = New-Object System.Windows.Forms.Panel
-    $localAccent.BackColor = $colorLocalAccent
+    $localAccent.BackColor = $colorCardAccent
     $localAccent.Location = [System.Drawing.Point]::new(0,0)
     $localAccent.Size = [System.Drawing.Size]::new(4,126)
     $associationCard.Controls.Add($localAccent)
 
     $ui.CloudAccent = New-Object System.Windows.Forms.Panel
-    $ui.CloudAccent.BackColor = $colorNeutral
+    $ui.CloudAccent.BackColor = $colorCardAccent
     $ui.CloudAccent.Location = [System.Drawing.Point]::new(0,0)
     $ui.CloudAccent.Size = [System.Drawing.Size]::new(4,126)
     $cloudCard.Controls.Add($ui.CloudAccent)
@@ -561,23 +552,23 @@ function Show-WindowsDeviceLink {
     $ui.Serial       = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 78 -CaptionWidth 105 -ValueWidth 335
     $ui.OperatingSystem = New-ValuePair -Parent $deviceCard -Caption 'Operating system' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
-    $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 90 -ValueWidth 350
-    $ui.Authentication = New-ValuePair -Parent $connectionCard -Caption 'Authentication' -Y 56 -CaptionWidth 90 -ValueWidth 350
-    $ui.Endpoint       = New-ValuePair -Parent $connectionCard -Caption 'Endpoint' -Y 78 -CaptionWidth 90 -ValueWidth 350
-    $ui.TenantScope    = New-ValuePair -Parent $connectionCard -Caption 'Tenant scope' -Y 100 -CaptionWidth 90 -ValueWidth 350
+    $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 105 -ValueWidth 335
+    $ui.Authentication = New-ValuePair -Parent $connectionCard -Caption 'Authentication' -Y 56 -CaptionWidth 105 -ValueWidth 335
+    $ui.Endpoint       = New-ValuePair -Parent $connectionCard -Caption 'Endpoint' -Y 78 -CaptionWidth 105 -ValueWidth 335
+    $ui.TenantScope    = New-ValuePair -Parent $connectionCard -Caption 'Tenant scope' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
-    $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'State' -Y 34 -CaptionWidth 72 -ValueWidth 215
-    $ui.Firmware   = New-ValuePair -Parent $associationCard -Caption 'Firmware' -Y 56 -CaptionWidth 72 -ValueWidth 215
-    $ui.LinkId     = New-ValuePair -Parent $associationCard -Caption 'Link ID' -Y 78 -CaptionWidth 72 -ValueWidth 215
-    $ui.LocalCreated = New-ValuePair -Parent $associationCard -Caption 'Created' -Y 100 -CaptionWidth 72 -ValueWidth 215
+    $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
+    $ui.Firmware   = New-ValuePair -Parent $associationCard -Caption 'Firmware' -Y 56 -CaptionWidth 105 -ValueWidth 335
+    $ui.LinkId     = New-ValuePair -Parent $associationCard -Caption 'Link ID' -Y 78 -CaptionWidth 105 -ValueWidth 335
+    $ui.LocalCreated = New-ValuePair -Parent $associationCard -Caption 'Created' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
-    $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
     $ui.CloudState.Text = 'Not checked'
-    $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant' -Y 56 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant' -Y 56 -CaptionWidth 105 -ValueWidth 335
     $ui.CloudTenant.Text = 'Not checked yet'
-    $ui.CloudId = New-ValuePair -Parent $cloudCard -Caption 'Association ID' -Y 78 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudId = New-ValuePair -Parent $cloudCard -Caption 'Association ID' -Y 78 -CaptionWidth 105 -ValueWidth 335
     $ui.CloudId.Text = 'Not checked yet'
-    $ui.CloudChecked = New-ValuePair -Parent $cloudCard -Caption 'Last checked' -Y 100 -CaptionWidth 88 -ValueWidth 205
+    $ui.CloudChecked = New-ValuePair -Parent $cloudCard -Caption 'Last checked' -Y 100 -CaptionWidth 105 -ValueWidth 335
     $ui.CloudChecked.Text = 'Not yet'
 
     $actionsTitle = New-Object System.Windows.Forms.Label
@@ -1193,8 +1184,8 @@ function Show-WindowsDeviceLink {
         $cloudAssociationId = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { $null }
         $ui.CloudId.Text = if ($cloudAssociationId) { $cloudAssociationId } else { 'None' }
         $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
-        $ui.CloudAccent.BackColor = if ($cloud.AssociationPresent) { $colorSuccess } else { $colorNeutral }
-        $cloudCard.BackColor = if ($cloud.AssociationPresent) { $colorCloudTint } else { $colorConnectionTint }
+        $ui.CloudAccent.BackColor = $colorCardAccent
+        $cloudCard.BackColor = $colorCardTint
 
         $cloudTenantIdText = if ($cloud.TenantId) { [string]$cloud.TenantId } else { 'Unavailable' }
         $toolTip.SetToolTip($ui.CloudTenant,$cloudTenantIdText)
@@ -1286,8 +1277,8 @@ function Show-WindowsDeviceLink {
                 $ui.CloudTenant.Text = if ($cloud.TenantId) { Get-TenantDisplayName -TenantId ([string]$cloud.TenantId) } else { 'None' }
                 $ui.CloudId.Text = if ($cloud.AssociationId) { [string]$cloud.AssociationId } else { 'None' }
                 $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
-                $ui.CloudAccent.BackColor = if ($cloud.AssociationPresent) { $colorSuccess } else { $colorNeutral }
-                $cloudCard.BackColor = if ($cloud.AssociationPresent) { $colorCloudTint } else { $colorConnectionTint }
+                $ui.CloudAccent.BackColor = $colorCardAccent
+                $cloudCard.BackColor = $colorCardTint
             }
             Write-GuiObject $cloud
             Set-GuiStatus ([string]$result.Message)
@@ -1531,8 +1522,8 @@ function Show-WindowsDeviceLink {
             $ui.CloudTenant.Text = 'Not checked yet'
             $ui.CloudId.Text = 'Not checked yet'
             $ui.CloudChecked.Text = 'Not yet'
-            $ui.CloudAccent.BackColor = $colorNeutral
-            $cloudCard.BackColor = $colorConnectionTint
+            $ui.CloudAccent.BackColor = $colorCardAccent
+            $cloudCard.BackColor = $colorCardTint
 
             Refresh-LocalView
             Set-GuiStatus 'Cloud offboarding completed'
@@ -1547,8 +1538,8 @@ function Show-WindowsDeviceLink {
                 $ui.CloudTenant.Text = 'None'
                 $ui.CloudId.Text = 'None'
                 $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
-                $ui.CloudAccent.BackColor = $colorNeutral
-                $cloudCard.BackColor = $colorConnectionTint
+                $ui.CloudAccent.BackColor = $colorCardAccent
+                $cloudCard.BackColor = $colorCardTint
                 Refresh-LocalView
                 Set-GuiStatus $noChangeMessage
                 [void][System.Windows.Forms.MessageBox]::Show(
@@ -1693,8 +1684,8 @@ function Show-WindowsDeviceLink {
             $ui.CloudTenant.Text = 'Not checked yet'
             $ui.CloudId.Text = 'Not checked yet'
             $ui.CloudChecked.Text = 'Not yet'
-            $ui.CloudAccent.BackColor = $colorNeutral
-            $cloudCard.BackColor = $colorConnectionTint
+            $ui.CloudAccent.BackColor = $colorCardAccent
+            $cloudCard.BackColor = $colorCardTint
 
             Refresh-LocalView
             Set-GuiStatus 'Full offboarding completed'
@@ -1769,8 +1760,8 @@ function Show-WindowsDeviceLink {
                     $ui.CloudTenant.Text = 'Unavailable'
                     $ui.CloudId.Text = 'Unavailable'
                     $ui.CloudChecked.Text = (Get-Date).ToString('HH:mm:ss')
-                    $ui.CloudAccent.BackColor = $colorAccent
-                    $cloudCard.BackColor = $colorWarningTint
+                    $ui.CloudAccent.BackColor = $colorCardAccent
+                    $cloudCard.BackColor = $colorCardTint
                     Write-GuiConsole -Message ("Automatic cloud check failed: " + $_.Exception.Message) -ErrorMessage
                     Set-GuiStatus 'Local state loaded; cloud check unavailable'
                 }
