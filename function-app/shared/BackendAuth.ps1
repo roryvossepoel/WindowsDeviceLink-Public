@@ -6,7 +6,7 @@ function Get-WindowsDeviceLinkBackendMetadata {
     [ordered]@{
         apiVersion = '1.0'
         minimumModuleVersion = '0.10.0'
-        capabilities = @('TenantCatalog','MultitenantLookup','Reconcile')
+        capabilities = @('TenantCatalog','MultitenantLookup','Reconcile','Offboarding')
     }
 }
 

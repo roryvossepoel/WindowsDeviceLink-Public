@@ -2,11 +2,11 @@
 
 This folder contains the WindowsDeviceLink PowerShell Azure Function backend. It is the project's only server-side backend.
 
-The Function provides pre-association, fast multitenant lookup and safe New / Update / Move reconciliation. Windows/WinPE clients do not need Microsoft Graph credentials.
+The Function provides pre-association, fast multitenant lookup, safe New / Update / Move / Repair reconciliation, and verified cloud offboarding. Windows/WinPE clients do not need Microsoft Graph credentials.
 
 The authenticated tenant-catalog response is also the compatibility handshake. Backend
 API version `1.0` requires WindowsDeviceLink `0.10.0` or newer and advertises
-`TenantCatalog`, `MultitenantLookup`, and `Reconcile` capabilities. Clients fail closed
+`TenantCatalog`, `MultitenantLookup`, `Reconcile`, and `Offboarding` capabilities. Clients fail closed
 when the version or required capabilities do not match.
 
 ## Endpoint
@@ -18,6 +18,7 @@ POST /api/devicelink/preassociate
 GET  /api/devicelink/lookup?serialNumber=<serial>
 GET  /api/devicelink/tenants
 POST /api/devicelink/reconcile
+POST /api/devicelink/offboard
 ```
 
 The module sends:
@@ -116,8 +117,18 @@ found in target        -> Update
 found in another tenant + matching sourceTenantId -> Move
 ```
 
-A Move uses internal DELETE/POST operations, but **no standalone delete endpoint is exposed**.
+A Move uses internal DELETE/POST operations. Cloud offboarding is exposed separately as
+an authenticated, schema-versioned POST workflow; raw Graph DELETE semantics are never
+exposed to the client.
 
 The endpoint fails closed when the source is ambiguous, a configured tenant cannot be searched, or the supplied source does not match current state.
 
 See [../docs/RECONCILE-SCHEMA-v1.md](../docs/RECONCILE-SCHEMA-v1.md).
+
+## Verified cloud offboarding
+
+`POST /api/devicelink/offboard` performs a fresh lookup across every allowed tenant,
+requires an unambiguous association, optionally verifies the caller's expected source
+tenant, deletes exactly one proven association, and verifies that it is absent. A
+transport-ambiguous DELETE is never retried blindly. Repeating the workflow after the
+association is absent returns a successful no-change result.

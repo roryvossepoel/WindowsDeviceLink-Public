@@ -143,7 +143,7 @@ function Invoke-LookupTest {
 
 function Invoke-WorkflowTest {
     param(
-        [ValidateSet('Register','Reconcile')][string]$FunctionName,
+        [ValidateSet('Register','Reconcile','Offboard')][string]$FunctionName,
         [string]$Scenario,
         [bool]$SourcePresent = $false,
         [string]$SourceTenantId,
@@ -160,12 +160,18 @@ function Invoke-WorkflowTest {
     $global:wdlBackendTest_sourceTenant = $SourceTenantId
     $global:wdlBackendTest_targetTenant = $TargetTenantId
     $requestId = [guid]::NewGuid().ToString()
+    $requestType = switch ($FunctionName) {
+        'Register' { 'DeviceLinkPreassociation' }
+        'Reconcile' { 'DeviceLinkReconcile' }
+        'Offboard' { 'DeviceLinkOffboard' }
+    }
     $body = @{
         schemaVersion = 1
-        requestType = if ($FunctionName -eq 'Register') { 'DeviceLinkPreassociation' } else { 'DeviceLinkReconcile' }
+        requestType = $requestType
         requestId = $requestId
         tenantId = $TargetTenantId
         targetTenantId = $TargetTenantId
+        serialNumber = $global:wdlBackendTest_serial
         device = @{ serialNumber = $global:wdlBackendTest_serial; deviceLink = 'synthetic-device-link' }
     }
     if ($SourceTenantId) { $body.sourceTenantId = $SourceTenantId }
@@ -239,7 +245,7 @@ try {
     $tenantBody = $global:wdlBackendTest_response.Body | ConvertFrom-Json
     Assert-True ($global:wdlBackendTest_response.StatusCode -eq 200 -and $tenantBody.success -eq $true -and $tenantBody.tenantCount -eq 2) 'Tenant catalog did not return both allowed tenants.'
     Assert-True ($tenantBody.apiVersion -eq '1.0' -and $tenantBody.minimumModuleVersion -eq '0.10.0') 'Tenant catalog did not return the expected compatibility contract.'
-    Assert-True (@($tenantBody.capabilities).Count -ge 3 -and 'Reconcile' -in @($tenantBody.capabilities)) 'Tenant catalog did not advertise required capabilities.'
+    Assert-True (@($tenantBody.capabilities).Count -ge 4 -and 'Reconcile' -in @($tenantBody.capabilities) -and 'Offboarding' -in @($tenantBody.capabilities)) 'Tenant catalog did not advertise required capabilities.'
     Assert-True (@($tenantBody.tenants | Where-Object name -eq 'Tenant A').Count -eq 1) 'Tenant catalog lost its friendly-name mapping.'
     Assert-True (-not (($tenantLogs | Out-String) + $global:wdlBackendTest_response.Body).Contains('synthetic-api-key')) 'Tenant catalog leaked the API key.'
     $global:wdlBackendTest_response = $null
@@ -333,6 +339,14 @@ try {
     $result = Invoke-WorkflowTest Reconcile 'operation-delete403' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
     Assert-True ($result.StatusCode -eq 502 -and $result.Body.stage -eq 'GraphDeleteSource' -and $result.Body.upstreamStatusCode -eq 403 -and $result.DeleteCount -eq 1 -and $result.ImportCount -eq 0) 'Failed source deletion must block import and preserve its diagnostic.'
     Write-Host 'PASS: source DELETE failure blocks import'
+
+    $result = Invoke-WorkflowTest Offboard 'operation-success' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
+    Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'Remove' -and $result.Body.changed -and $result.DeleteCount -eq 1 -and $result.ImportCount -eq 0) 'Backend offboarding must delete and verify exactly one association.'
+    $result = Invoke-WorkflowTest Offboard 'operation-success'
+    Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'None' -and -not $result.Body.changed -and $result.DeleteCount -eq 0) 'Backend offboarding must be idempotent when no cloud association exists.'
+    $result = Invoke-WorkflowTest Offboard 'operation-delete403' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
+    Assert-True ($result.StatusCode -eq 502 -and $result.Body.error -eq 'RemovalUncertain' -and $result.DeleteCount -eq 1) 'Backend offboarding must not retry an unsuccessful DELETE.'
+    Write-Host 'PASS: backend offboarding removal, idempotency and DELETE guard'
 
     foreach ($present in @($false,$true)) {
         $source = if ($present) { $global:wdlBackendTest_tenantA } else { $null }

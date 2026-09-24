@@ -17,7 +17,7 @@ function Invoke-WindowsDeviceLinkBackendTenantCatalog {
         if ([string]$response.apiVersion -ne '1.0') {
             throw "The Function backend API version '$($response.apiVersion)' is not supported; version 1.0 is required."
         }
-        $requiredCapabilities = @('TenantCatalog','MultitenantLookup','Reconcile')
+        $requiredCapabilities = @('TenantCatalog','MultitenantLookup','Reconcile','Offboarding')
         $capabilities = @($response.capabilities)
         $missingCapabilities = @($requiredCapabilities | Where-Object { $_ -notin $capabilities })
         if ($missingCapabilities.Count -gt 0) {

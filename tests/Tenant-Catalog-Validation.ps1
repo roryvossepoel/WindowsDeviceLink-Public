@@ -42,7 +42,7 @@ Write-Host 'PASS: backend-independent tenant catalog supports hashtable, local J
 
 $backendResponse = [pscustomobject]@{
     success=$true; apiVersion='1.0'; minimumModuleVersion='0.10.0'
-    capabilities=@('TenantCatalog','MultitenantLookup','Reconcile'); tenantCount=2
+    capabilities=@('TenantCatalog','MultitenantLookup','Reconcile','Offboarding'); tenantCount=2
     tenants=@(
         [pscustomobject]@{name='Tenant A';tenantId=$tenantA},
         [pscustomobject]@{name='Tenant B';tenantId=$tenantB}
@@ -65,7 +65,7 @@ try {
 Assert-True $blocked 'A backend missing Reconcile capability must fail closed.'
 
 $blocked=$false
-$backendResponse.capabilities=@('TenantCatalog','MultitenantLookup','Reconcile')
+$backendResponse.capabilities=@('TenantCatalog','MultitenantLookup','Reconcile','Offboarding')
 $backendResponse.apiVersion='2.0'
 try {
     $null = & (Get-Module WindowsDeviceLink) {

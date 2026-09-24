@@ -929,8 +929,13 @@ function Show-WindowsDeviceLink {
             $cloud.AssociationPresent -eq $false -or
             $cloudState -eq 'notassociated'
         )
+        $cloudPresent = $cloud -and $cloud.AssociationPresent -eq $true
         $localFullyAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
-        $alreadyFullyAssociated = $localFullyAssociated -and $cloudState -eq 'associated'
+        $selectedTenantId = Get-SelectedTenantId
+        $selectedMatchesCloud = $cloudPresent -and -not [string]::IsNullOrWhiteSpace($selectedTenantId) -and
+            [string]$cloud.TenantId -ieq $selectedTenantId
+        $alreadyRegisteredInTarget = $selectedMatchesCloud -and $cloudState -in @('associated','preassociated')
+        $alreadyFullyAssociatedInTarget = $localFullyAssociated -and $selectedMatchesCloud -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
         $directTenantReady = -not $hasDirectTenantCatalog -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
@@ -938,11 +943,11 @@ function Show-WindowsDeviceLink {
         $btnOnline.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
         $btnExport.Enabled = $runtimeReady
         $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
-        $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister
-        $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociated
-        $btnCloudOffboard.Enabled = -not $backendMode -and $directTenantReady -and -not $cloudKnownAbsent
+        $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister -and -not $alreadyRegisteredInTarget
+        $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociatedInTarget
+        $btnCloudOffboard.Enabled = $runtimeReady -and -not $cloudKnownAbsent -and ($backendMode -or $directTenantReady)
         $btnLocalOffboard.Enabled = -not $backendMode -or $cloudKnownAbsent
-        $btnFullOffboard.Enabled = -not $backendMode -and $runtimeReady -and $directTenantReady
+        $btnFullOffboard.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
 
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
         $toolTip.SetToolTip($btnLocalOffboard, $(if ($backendMode -and -not $cloudKnownAbsent) { 'Backend mode blocks a standalone local reset while a cloud association exists. Use registration or move workflows to keep both states consistent.' } else { 'Reset only the local DeviceLink firmware state.' }))
@@ -958,8 +963,11 @@ function Show-WindowsDeviceLink {
         elseif (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when no catalog is configured.') }
         elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
 
-        if ($alreadyFullyAssociated) {
+        if ($alreadyFullyAssociatedInTarget) {
             $toolTip.SetToolTip($btnFullAssociate, 'The device is already fully registered.')
+        }
+        if ($alreadyRegisteredInTarget) {
+            $toolTip.SetToolTip($btnAssign, 'The device is already registered in the selected tenant. Select another tenant to move it.')
         }
 
         if ($cloudKnownAbsent) {
@@ -1532,6 +1540,26 @@ function Show-WindowsDeviceLink {
 
         Set-GuiBusy -Busy $true -StatusText 'Removing cloud association...'
         try {
+            if ($backendMode) {
+                $serialNumber = ([string](Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop).SerialNumber).Trim()
+                $sourceTenantId = if ($script:WdlGuiCloudStatus) { [string]$script:WdlGuiCloudStatus.TenantId } else { $null }
+                $credential = New-Object System.Management.Automation.PSCredential('api-key',$BackendApiKey)
+                $plainKey = $null
+                try {
+                    $plainKey = $credential.GetNetworkCredential().Password
+                    Write-GuiConsole -Message 'Invoke backend cloud offboarding' -Command
+                    $result = Invoke-WindowsDeviceLinkBackendOffboard -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $serialNumber -SourceTenantId $sourceTenantId
+                }
+                finally { $plainKey=$null; $credential=$null }
+
+                Write-GuiObject $result
+                Refresh-LocalView
+                $verifiedCloud = Refresh-CloudView -WriteCommand
+                Write-GuiObject $verifiedCloud
+                Set-GuiStatus 'Cloud offboarding completed and verified'
+                return
+            }
+
             $parameters = Get-GuiAuthParameters
             $parameters.Confirm = $false
 
@@ -1629,6 +1657,31 @@ function Show-WindowsDeviceLink {
         Set-GuiBusy -Busy $true -StatusText 'Performing full offboarding...'
         $effectiveAccessToken = $null
         try {
+            if ($backendMode) {
+                $serialNumber = ([string](Get-CimInstance -ClassName Win32_BIOS -ErrorAction Stop).SerialNumber).Trim()
+                $sourceTenantId = if ($script:WdlGuiCloudStatus) { [string]$script:WdlGuiCloudStatus.TenantId } else { $null }
+                $credential = New-Object System.Management.Automation.PSCredential('api-key',$BackendApiKey)
+                $plainKey = $null
+                try {
+                    $plainKey = $credential.GetNetworkCredential().Password
+                    Write-GuiConsole -Message 'Invoke backend cloud offboarding' -Command
+                    $removed = Invoke-WindowsDeviceLinkBackendOffboard -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $serialNumber -SourceTenantId $sourceTenantId
+                }
+                finally { $plainKey=$null; $credential=$null }
+                Write-GuiObject $removed
+
+                Write-GuiConsole -Message 'Reset-WindowsDeviceLinkFirmwareState' -Command
+                $reset = Reset-WindowsDeviceLinkFirmwareState -Confirm:$false
+                Write-GuiObject $reset
+
+                $script:WdlGuiCloudStatus = $null
+                Refresh-LocalView
+                $verifiedCloud = Refresh-CloudView -WriteCommand
+                Write-GuiObject $verifiedCloud
+                Set-GuiStatus 'Full offboarding completed and verified'
+                return
+            }
+
             $auth = Get-GuiAuthParameters
             $effectiveAuth = @{}
             foreach ($key in $auth.Keys) { $effectiveAuth[$key] = $auth[$key] }
