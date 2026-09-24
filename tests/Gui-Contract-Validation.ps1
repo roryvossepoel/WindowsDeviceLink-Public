@@ -177,6 +177,18 @@ if ($source -match [regex]::Escape('Show-WindowsDeviceLink is not supported in W
     throw 'FAIL: Show-WindowsDeviceLink must not hard-block Windows PE.'
 }
 
+foreach ($inconsistentCloudPlaceholder in @('Not checked yet','Not yet')) {
+    if ($source -match [regex]::Escape($inconsistentCloudPlaceholder)) {
+        throw "FAIL: Cloud association placeholders must consistently use 'Not checked', not '$inconsistentCloudPlaceholder'."
+    }
+}
+
+foreach ($cloudField in @('CloudState','CloudTenant','CloudId','CloudChecked')) {
+    if ($source -notmatch [regex]::Escape("`$ui.$cloudField.Text = 'Checking...'")) {
+        throw "FAIL: Cloud association field '$cloudField' must show the shared 'Checking...' state during lookup."
+    }
+}
+
 $fullAssociationGuardPattern = '(?s)\$canFullAssociation\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
 if ($source -notmatch $fullAssociationGuardPattern) {
     throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
