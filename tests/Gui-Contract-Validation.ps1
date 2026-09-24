@@ -120,14 +120,15 @@ foreach ($required in @(
     "-Caption 'Operating system'",
     "-Caption 'Tenant scope'",
     'Tenant assignment',
-    'Status and export',
+    'Status',
+    'Export',
     'Offboarding',
     'Last checked',
     'Target tenant',
     'Pre-register',
     'Full register',
     'Remove cloud',
-    'Reset local',
+    'Remove local',
     'Remove both',
     'Sign in',
     'Switch account',
@@ -203,15 +204,19 @@ foreach ($localField in @('LocalState','Firmware','LinkId','LocalCreated')) {
     }
 }
 
-if ($source -notmatch [regex]::Escape("-Buttons @('Sign in','Refresh cloud','Refresh local','Export CSV')")) {
+if ($source -notmatch [regex]::Escape("-Buttons @('Sign in','Refresh cloud','Refresh local')")) {
     throw 'FAIL: Status actions must present cloud before local, matching the Offboarding action order.'
+}
+
+if ($source -notmatch [regex]::Escape("-Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 92 -Buttons @('Export CSV')")) {
+    throw 'FAIL: CSV export must use its own compact action row with the manual Intune import explanation.'
 }
 
 foreach ($layoutContract in @(
     '$assignmentRow.Size = [System.Drawing.Size]::new(1030,46)',
     '$tenantSelector.ItemHeight = 22',
     '$tenantSelector.Size = [System.Drawing.Size]::new(220,28)',
-    '$actionsPanel.Height = 138'
+    '$actionsPanel.Height = 184'
 )) {
     if ($source -notmatch [regex]::Escape($layoutContract)) {
         throw "FAIL: Unified action-row layout contract is missing '$layoutContract'."
