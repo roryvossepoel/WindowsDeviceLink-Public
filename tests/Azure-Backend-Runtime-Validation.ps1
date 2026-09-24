@@ -66,7 +66,7 @@ function Invoke-RestMethod {
     if ($global:wdlBackendTest_scenario.StartsWith('operation-')) {
         $scenario = $global:wdlBackendTest_scenario
         if ($Method -eq 'DELETE') {
-            Assert-True ($tenant -eq $global:wdlBackendTest_tenantA -and $Uri.EndsWith("/association-$tenant")) 'Delete must target the exact source record.'
+            Assert-True ($tenant -eq $global:wdlBackendTest_sourceTenant -and $Uri.EndsWith("/association-$tenant")) 'Delete must target the exact source record.'
             if ($scenario -eq 'operation-delete403') {
                 Throw-UpstreamTestError 403 '{"error":{"code":"Authorization_RequestDenied","message":"DO-NOT-EXPOSE-UPSTREAM-BODY"}}'
             }
@@ -75,7 +75,7 @@ function Invoke-RestMethod {
         }
         if ($Method -eq 'POST') {
             Assert-True ($Uri.EndsWith('/importTenantAssociatedDevice')) 'Unexpected mutation endpoint.'
-            Assert-True ($tenant -eq $global:wdlBackendTest_tenantB) 'Import must target tenant B.'
+            Assert-True ($tenant -eq $global:wdlBackendTest_targetTenant) 'Import must target the selected tenant.'
             Assert-True (($Body | ConvertFrom-Json).deviceLink -eq 'synthetic-device-link') 'Import lost the DeviceLink payload.'
             $global:wdlBackendTest_postAttempted = $true
             if ($scenario -match '^operation-import(403|409|429)$') {
@@ -147,7 +147,8 @@ function Invoke-WorkflowTest {
         [string]$Scenario,
         [bool]$SourcePresent = $false,
         [string]$SourceTenantId,
-        [string]$TargetTenantId = $global:wdlBackendTest_tenantB
+        [string]$TargetTenantId = $global:wdlBackendTest_tenantB,
+        [switch]$RepairExistingAssociation
     )
     $global:wdlBackendTest_scenario = $Scenario
     $global:wdlBackendTest_httpCalls.Clear()
@@ -156,6 +157,8 @@ function Invoke-WorkflowTest {
     $global:wdlBackendTest_graphState = @{}
     $global:wdlBackendTest_graphState[$global:wdlBackendTest_tenantA] = $SourcePresent
     $global:wdlBackendTest_graphState[$global:wdlBackendTest_tenantB] = $false
+    $global:wdlBackendTest_sourceTenant = $SourceTenantId
+    $global:wdlBackendTest_targetTenant = $TargetTenantId
     $requestId = [guid]::NewGuid().ToString()
     $body = @{
         schemaVersion = 1
@@ -166,6 +169,7 @@ function Invoke-WorkflowTest {
         device = @{ serialNumber = $global:wdlBackendTest_serial; deviceLink = 'synthetic-device-link' }
     }
     if ($SourceTenantId) { $body.sourceTenantId = $SourceTenantId }
+    if ($RepairExistingAssociation) { $body.repairExistingAssociation = $true }
     $request = [pscustomobject]@{
         Headers = @{ 'X-WindowsDeviceLink-Key' = 'synthetic-api-key'; 'X-WindowsDeviceLink-Schema' = '1'; 'X-WindowsDeviceLink-RequestId' = $requestId }
         Body = $body
@@ -320,6 +324,8 @@ try {
 
     $result = Invoke-WorkflowTest Reconcile 'operation-success' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
     Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'Move' -and $result.DeleteCount -eq 1 -and $result.ImportCount -eq 1) 'Successful Move regressed.'
+    $result = Invoke-WorkflowTest Reconcile 'operation-success' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA -TargetTenantId $global:wdlBackendTest_tenantA -RepairExistingAssociation
+    Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'Repair' -and $result.DeleteCount -eq 1 -and $result.ImportCount -eq 1) 'Successful same-tenant Repair regressed.'
     $result = Invoke-WorkflowTest Reconcile 'operation-committed500' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
     Assert-True ($result.StatusCode -eq 200 -and $result.Body.success -and $result.ImportCount -eq 1) 'A committed target must be verified without a repeated POST.'
     Write-Host 'PASS: successful Move and ambiguous POST with verified commit'
