@@ -129,7 +129,7 @@ foreach ($required in @(
     'Pre-register',
     'Full register',
     'Remove cloud',
-    'Remove local',
+    'Reset local',
     'Remove both',
     'Sign in',
     'Switch account',
@@ -167,7 +167,7 @@ foreach ($required in @(
 
 foreach ($offboardingEnableContract in @(
     '$btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent',
-    '$btnLocalOffboard.Enabled = $localFullyAssociated',
+    '$btnLocalOffboard.Enabled = $runtimeReady -and $localStatePresent -and $cloudKnownAbsent',
     '$btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent'
 )) {
     if ($source -notmatch [regex]::Escape($offboardingEnableContract)) {
