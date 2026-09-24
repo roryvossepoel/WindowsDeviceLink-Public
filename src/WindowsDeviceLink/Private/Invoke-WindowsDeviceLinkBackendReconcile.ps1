@@ -6,6 +6,7 @@ function Invoke-WindowsDeviceLinkBackendReconcile {
         [Parameter(Mandatory)][PSTypeName('Windows.DeviceLink.Information')][psobject]$InputObject,
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$TargetTenantId,
         [AllowNull()][AllowEmptyString()][string]$SourceTenantId,
+        [switch]$RepairExistingAssociation,
         [scriptblock]$RequestScript
     )
 
@@ -23,6 +24,7 @@ function Invoke-WindowsDeviceLinkBackendReconcile {
         requestId = $requestId
         sourceTenantId = if ($SourceTenantId) { $SourceTenantId } else { $null }
         targetTenantId = $TargetTenantId
+        repairExistingAssociation = [bool]$RepairExistingAssociation
         device = [ordered]@{ serialNumber=[string]$InputObject.SerialNumber; deviceLink=[string]$InputObject.DeviceLink }
     }
     $body = $payload | ConvertTo-Json -Depth 5 -Compress
