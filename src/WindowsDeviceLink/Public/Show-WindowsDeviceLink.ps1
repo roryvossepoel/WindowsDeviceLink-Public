@@ -565,11 +565,11 @@ function Show-WindowsDeviceLink {
     $ui.CloudState  = New-ValuePair -Parent $cloudCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
     $ui.CloudState.Text = 'Not checked'
     $ui.CloudTenant = New-ValuePair -Parent $cloudCard -Caption 'Tenant' -Y 56 -CaptionWidth 105 -ValueWidth 335
-    $ui.CloudTenant.Text = 'Not checked yet'
+    $ui.CloudTenant.Text = 'Not checked'
     $ui.CloudId = New-ValuePair -Parent $cloudCard -Caption 'Association ID' -Y 78 -CaptionWidth 105 -ValueWidth 335
-    $ui.CloudId.Text = 'Not checked yet'
+    $ui.CloudId.Text = 'Not checked'
     $ui.CloudChecked = New-ValuePair -Parent $cloudCard -Caption 'Last checked' -Y 100 -CaptionWidth 105 -ValueWidth 335
-    $ui.CloudChecked.Text = 'Not yet'
+    $ui.CloudChecked.Text = 'Not checked'
 
     $actionsTitle = New-Object System.Windows.Forms.Label
     $actionsTitle.Text = 'Actions'
@@ -1149,6 +1149,12 @@ function Show-WindowsDeviceLink {
             [switch]$WriteCommand
         )
 
+        $ui.CloudState.Text = 'Checking...'
+        $ui.CloudTenant.Text = 'Checking...'
+        $ui.CloudId.Text = 'Checking...'
+        $ui.CloudChecked.Text = 'Checking...'
+        [System.Windows.Forms.Application]::DoEvents()
+
         if ($backendMode) {
             $credential = New-Object System.Management.Automation.PSCredential('api-key',$BackendApiKey)
             $plainKey = $null
@@ -1519,9 +1525,9 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = 'Not checked yet'
-            $ui.CloudId.Text = 'Not checked yet'
-            $ui.CloudChecked.Text = 'Not yet'
+            $ui.CloudTenant.Text = 'Not checked'
+            $ui.CloudId.Text = 'Not checked'
+            $ui.CloudChecked.Text = 'Not checked'
             $ui.CloudAccent.BackColor = $colorCardAccent
             $cloudCard.BackColor = $colorCardTint
 
@@ -1681,9 +1687,9 @@ function Show-WindowsDeviceLink {
 
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
-            $ui.CloudTenant.Text = 'Not checked yet'
-            $ui.CloudId.Text = 'Not checked yet'
-            $ui.CloudChecked.Text = 'Not yet'
+            $ui.CloudTenant.Text = 'Not checked'
+            $ui.CloudId.Text = 'Not checked'
+            $ui.CloudChecked.Text = 'Not checked'
             $ui.CloudAccent.BackColor = $colorCardAccent
             $cloudCard.BackColor = $colorCardTint
 
