@@ -191,6 +191,30 @@ foreach ($cloudField in @('CloudState','CloudTenant','CloudId','CloudChecked')) 
     }
 }
 
+foreach ($localField in @('LocalState','Firmware','LinkId','LocalCreated')) {
+    if ($source -notmatch [regex]::Escape("`$ui.$localField.Text = 'Not checked'")) {
+        throw "FAIL: Local association field '$localField' must use the shared initial 'Not checked' state."
+    }
+    if ($source -notmatch [regex]::Escape("`$ui.$localField.Text = 'Checking...'")) {
+        throw "FAIL: Local association field '$localField' must show the shared 'Checking...' state during refresh."
+    }
+}
+
+if ($source -notmatch [regex]::Escape("-Buttons @('Sign in','Refresh cloud','Refresh local','Export CSV')")) {
+    throw 'FAIL: Status actions must present cloud before local, matching the Offboarding action order.'
+}
+
+foreach ($layoutContract in @(
+    '$assignmentRow.Size = [System.Drawing.Size]::new(1030,46)',
+    '$tenantSelector.ItemHeight = 22',
+    '$tenantSelector.Size = [System.Drawing.Size]::new(220,28)',
+    '$actionsPanel.Height = 138'
+)) {
+    if ($source -notmatch [regex]::Escape($layoutContract)) {
+        throw "FAIL: Unified action-row layout contract is missing '$layoutContract'."
+    }
+}
+
 $fullAssociationGuardPattern = '(?s)\$canFullAssociation\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
 if ($source -notmatch $fullAssociationGuardPattern) {
     throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
