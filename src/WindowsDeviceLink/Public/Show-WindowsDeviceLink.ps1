@@ -659,8 +659,9 @@ function Show-WindowsDeviceLink {
     $assignmentSeparator.Size = [System.Drawing.Size]::new(1002,1)
     $assignmentRow.Controls.Add($assignmentSeparator)
 
-    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Sign in for cloud actions, refresh state, or export the DeviceLink CSV.' -Y 46 -Buttons @('Sign in','Refresh cloud','Refresh local','Export CSV')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or remove both.' -Y 92 -Buttons @('Remove cloud','Reset local','Remove both')
+    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status' -Description 'Sign in for cloud actions, or refresh local or cloud state.' -Y 46 -Buttons @('Sign in','Refresh cloud','Refresh local')
+    $rowExport = New-ActionRow -Parent $actionsPanel -Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 92 -Buttons @('Export CSV')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, local state, or both.' -Y 138 -Buttons @('Remove cloud','Remove local','Remove both')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -692,9 +693,9 @@ function Show-WindowsDeviceLink {
     $btnSignIn = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Sign in'
     $btnRefresh = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh local'
     $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
-    $btnExport = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Export CSV'
+    $btnExport = Get-ActionButtonByText -Row $rowExport.Panel -Text 'Export CSV'
     $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove cloud'
-    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Reset local'
+    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove local'
     $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove both'
 
     $allActionButtons = @(
@@ -711,14 +712,14 @@ function Show-WindowsDeviceLink {
 
     $btnSignIn.Visible = $usesInteractiveUserAuthentication
     if (-not $usesInteractiveUserAuthentication) {
-        $rowTools.Description.Text = 'Refresh local or cloud state, or export the DeviceLink CSV.'
+        $rowTools.Description.Text = 'Refresh local or cloud state.'
     }
-    $actionsPanel.Height = 138
+    $actionsPanel.Height = 184
 
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
     $activityTitle.Font = New-GuiFont -Size 11 -Style Bold
-    $activityTitle.Location = [System.Drawing.Point]::new(16,518)
+    $activityTitle.Location = [System.Drawing.Point]::new(16,564)
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
 
@@ -729,7 +730,7 @@ function Show-WindowsDeviceLink {
     $btnClearActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $content.Controls.Add($btnClearActivity)
 
-    $activityCard = New-Card -Title '' -X 14 -Y 544 -Width 1030 -Height 118
+    $activityCard = New-Card -Title '' -X 14 -Y 590 -Width 1030 -Height 118
 
     $consoleBox = New-Object System.Windows.Forms.TextBox
     $consoleBox.Location = [System.Drawing.Point]::new(12,10)
@@ -950,7 +951,7 @@ function Show-WindowsDeviceLink {
         $btnFullOffboard.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
 
         $toolTip.SetToolTip($btnCloudOffboard, 'Remove only the tenant-side Device Association record.')
-        $toolTip.SetToolTip($btnLocalOffboard, $(if ($backendMode -and -not $cloudKnownAbsent) { 'Backend mode blocks a standalone local reset while a cloud association exists. Use registration or move workflows to keep both states consistent.' } else { 'Reset only the local DeviceLink firmware state.' }))
+        $toolTip.SetToolTip($btnLocalOffboard, $(if ($backendMode -and -not $cloudKnownAbsent) { 'Backend mode blocks standalone local removal while a cloud association exists. Use registration or move workflows to keep both states consistent.' } else { 'Remove only the local DeviceLink firmware state.' }))
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and reset the local DeviceLink firmware state.')
         $toolTip.SetToolTip($btnFullAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
@@ -1614,7 +1615,7 @@ function Show-WindowsDeviceLink {
     function Invoke-GuiLocalOffboard {
         if ($script:WdlGuiBusy) { return }
 
-        if (-not (Confirm-GuiAction -Title 'Local offboarding' -Message 'Reset all known local DeviceLink UEFI variables? The tenant-side Device Association record will remain unchanged.')) {
+        if (-not (Confirm-GuiAction -Title 'Local offboarding' -Message 'Remove all known local DeviceLink UEFI variables? The tenant-side Device Association record will remain unchanged.')) {
             return
         }
 
@@ -1910,7 +1911,7 @@ function Show-WindowsDeviceLink {
         $consoleBox.Height = [Math]::Max(96,$activityHeight - 22)
 
 
-        foreach ($row in @($rowTools,$rowOffboard)) {
+        foreach ($row in @($rowTools,$rowExport,$rowOffboard)) {
             $row.Panel.Width = $fullWidth
 
             $buttons = @($row.Buttons)
