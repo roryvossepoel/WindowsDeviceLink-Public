@@ -556,9 +556,9 @@ function Show-WindowsDeviceLink {
     $ui.CloudAccent.Size = [System.Drawing.Size]::new(4,126)
     $cloudCard.Controls.Add($ui.CloudAccent)
 
-    $ui.Manufacturer = New-ValuePair -Parent $deviceCard -Caption 'Manufacturer' -Y 34 -CaptionWidth 90 -ValueWidth 350
-    $ui.Model        = New-ValuePair -Parent $deviceCard -Caption 'Model' -Y 56 -CaptionWidth 90 -ValueWidth 350
-    $ui.Serial       = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 78 -CaptionWidth 90 -ValueWidth 350
+    $ui.Manufacturer = New-ValuePair -Parent $deviceCard -Caption 'Manufacturer' -Y 34 -CaptionWidth 105 -ValueWidth 335
+    $ui.Model        = New-ValuePair -Parent $deviceCard -Caption 'Model' -Y 56 -CaptionWidth 105 -ValueWidth 335
+    $ui.Serial       = New-ValuePair -Parent $deviceCard -Caption 'Serial number' -Y 78 -CaptionWidth 105 -ValueWidth 335
     $ui.OperatingSystem = New-ValuePair -Parent $deviceCard -Caption 'Operating system' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
     $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 90 -ValueWidth 350
@@ -603,7 +603,7 @@ function Show-WindowsDeviceLink {
     $assignmentRow.Controls.Add($assignmentTitle)
 
     $assignmentDescription = New-Object System.Windows.Forms.Label
-    $assignmentDescription.Text = 'Select the destination. Register checks, renews, assigns, and verifies automatically.'
+    $assignmentDescription.Text = 'Select the destination and choose pre-registration or full registration.'
     $assignmentDescription.Font = New-GuiFont -Size 8.2 -Style Regular
     $assignmentDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
     $assignmentDescription.Location = [System.Drawing.Point]::new(14,27)
@@ -631,10 +631,10 @@ function Show-WindowsDeviceLink {
     $tenantSelector.Visible = $showTenantSelector
     if (-not $showTenantSelector) {
         $assignmentDescription.Text = if ($outerBoundParameters.ContainsKey('TenantId')) {
-            'The destination tenant is fixed by the supplied tenant ID. Register checks, renews, assigns, and verifies.'
+            'The destination tenant is fixed by the supplied tenant ID. Choose pre-registration or full registration.'
         }
         else {
-            'The destination tenant is determined by sign-in. Register checks, renews, assigns, and verifies.'
+            'The destination tenant is determined by sign-in. Choose pre-registration or full registration.'
         }
     }
     $assignmentRow.Controls.Add($tenantSelector)
@@ -664,7 +664,7 @@ function Show-WindowsDeviceLink {
     $assignmentRow.Controls.Add($assignmentSeparator)
 
     $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status and export' -Description 'Sign in for cloud actions, refresh state, or export the DeviceLink CSV.' -Y 58 -Buttons @('Sign in','Refresh local','Refresh cloud','Export CSV')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Recovery and offboarding' -Description 'Remove the cloud association, reset local state, or remove both.' -Y 104 -Buttons @('Cloud','Local','Cloud + local')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or remove both.' -Y 104 -Buttons @('Remove cloud','Reset local','Remove both')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -697,9 +697,9 @@ function Show-WindowsDeviceLink {
     $btnRefresh = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh local'
     $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
     $btnExport = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Export CSV'
-    $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Cloud'
-    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Local'
-    $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Cloud + local'
+    $btnCloudOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove cloud'
+    $btnLocalOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Reset local'
+    $btnFullOffboard = Get-ActionButtonByText -Row $rowOffboard.Panel -Text 'Remove both'
 
     $allActionButtons = @(
         $btnAssign,
@@ -758,7 +758,7 @@ function Show-WindowsDeviceLink {
     $statusProgress = New-Object System.Windows.Forms.ToolStripProgressBar
     $statusProgress.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
     $statusProgress.MarqueeAnimationSpeed = 30
-    $statusProgress.Size = [System.Drawing.Size]::new(140,16)
+    $statusProgress.Size = [System.Drawing.Size]::new(220,16)
     $statusProgress.Visible = $false
 
     [void]$statusStrip.Items.Add($statusLabel)
