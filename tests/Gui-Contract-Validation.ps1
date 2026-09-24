@@ -104,6 +104,8 @@ foreach ($required in @(
     'Full DeviceLink offboarding',
     'No cloud association was found. Nothing was removed.',
     'Set-WindowsDeviceLinkTenant',
+    'RepairExistingAssociation',
+    'Same-tenant repair required',
     'Get-WindowsDeviceLinkBackendTenant',
     'Backend mode',
     'Direct mode',
