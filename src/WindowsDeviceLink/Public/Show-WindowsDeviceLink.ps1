@@ -124,6 +124,7 @@ function Show-WindowsDeviceLink {
     if ($isWinPE -and $Method -eq 'Interactive') {
         throw 'Interactive authentication is not available in Windows PE. Use -Method DeviceCode or a supported app-only authentication method.'
     }
+    $usesInteractiveUserAuthentication = -not $backendMode -and $Method -in @('Interactive','DeviceCode')
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
@@ -329,6 +330,7 @@ function Show-WindowsDeviceLink {
         [pscustomobject]@{
             Panel = $row
             Buttons = $buttonList.ToArray()
+            Description = $descriptionLabel
         }
     }
 
@@ -492,7 +494,7 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiSessionExpiresUtc = $null
         $script:WdlGuiSessionAuthenticated = $false
         if ($ui -and $ui.Authentication -and -not $backendMode) {
-            $ui.Authentication.Text = "$Method - Signed out"
+            $ui.Authentication.Text = if ($usesInteractiveUserAuthentication) { "$Method - Signed out" } else { "$Method - Non-interactive" }
         }
         if ($btnSignIn) { $btnSignIn.Text = 'Sign in' }
     }
@@ -707,7 +709,10 @@ function Show-WindowsDeviceLink {
     )
 
     $rowOnboard.Panel.Visible = -not $backendMode
-    $btnSignIn.Visible = -not $backendMode
+    $btnSignIn.Visible = $usesInteractiveUserAuthentication
+    if (-not $usesInteractiveUserAuthentication) {
+        $rowTools.Description.Text = 'Refresh local or cloud state, or export the DeviceLink CSV.'
+    }
     $rowOffboard.Panel.Top = if ($backendMode) { 104 } else { 150 }
     $actionsPanel.Height = if ($backendMode) { 150 } else { 196 }
 
@@ -931,7 +936,7 @@ function Show-WindowsDeviceLink {
 
         $btnRefresh.Enabled = $true
         $directTenantReady = -not $hasDirectTenantCatalog -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
-        $btnSignIn.Enabled = -not $backendMode -and $directTenantReady
+        $btnSignIn.Enabled = $usesInteractiveUserAuthentication -and $directTenantReady
         $btnOnline.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
         $btnExport.Enabled = $runtimeReady
         $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
@@ -1097,8 +1102,13 @@ function Show-WindowsDeviceLink {
         }
         else {
             $ui.ConnectionMode.Text = 'Direct'
-            $sessionState = if ($script:WdlGuiSessionAuthenticated) { 'Signed in' } else { 'Signed out' }
-            $ui.Authentication.Text = "$Method - $sessionState"
+            if ($usesInteractiveUserAuthentication) {
+                $sessionState = if ($script:WdlGuiSessionAuthenticated) { 'Signed in' } else { 'Signed out' }
+                $ui.Authentication.Text = "$Method - $sessionState"
+            }
+            else {
+                $ui.Authentication.Text = "$Method - Non-interactive"
+            }
             $ui.Endpoint.Text = 'Microsoft Graph'
             $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
         }
@@ -1173,7 +1183,7 @@ function Show-WindowsDeviceLink {
         }
         $script:WdlGuiCloudStatus = $cloud
 
-        if (-not $backendMode) {
+        if ($usesInteractiveUserAuthentication) {
             $script:WdlGuiSessionAuthenticated = $true
             $ui.Authentication.Text = "$Method - Signed in"
             $btnSignIn.Text = 'Switch account'

@@ -61,6 +61,10 @@ is authoritative unless `-TenantId` fixed it explicitly. When a local tenant cat
 configured, selecting a target tenant is mandatory before sign-in or any cloud action;
 authentication is then scoped to that selected tenant.
 
+**Sign in** is shown only for delegated `Interactive` and `DeviceCode` methods. App-only
+methods do not represent a user as signed in: their credential is used non-interactively
+when **Refresh cloud**, **Register device**, or another cloud action runs.
+
 ## Authentication
 
 Select an authentication method with `-Method`.
@@ -143,9 +147,9 @@ the current GUI authentication session and requires a new sign-in for the new te
 
 ```powershell
 Show-WindowsDeviceLink -Tenants @{
-    'Management' = '11111111-1111-1111-1111-111111111111'
-    'Customer A' = '22222222-2222-2222-2222-222222222222'
-    'Customer B' = '33333333-3333-3333-3333-333333333333'
+    'Tenant Alpha' = '11111111-1111-1111-1111-111111111111'
+    'Tenant Beta' = '22222222-2222-2222-2222-222222222222'
+    'Tenant Gamma' = '33333333-3333-3333-3333-333333333333'
 }
 ```
 
@@ -167,9 +171,9 @@ Both JSON options use the same simple schema:
 
 ```json
 {
-  "Management": "11111111-1111-1111-1111-111111111111",
-  "Customer A": "22222222-2222-2222-2222-222222222222",
-  "Customer B": "33333333-3333-3333-3333-333333333333"
+  "Tenant Alpha": "11111111-1111-1111-1111-111111111111",
+  "Tenant Beta": "22222222-2222-2222-2222-222222222222",
+  "Tenant Gamma": "33333333-3333-3333-3333-333333333333"
 }
 ```
 

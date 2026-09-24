@@ -122,6 +122,8 @@ foreach ($required in @(
     'Register device',
     'Sign in',
     'Switch account',
+    '$usesInteractiveUserAuthentication',
+    'Non-interactive',
     'Invoke-GuiSignIn',
     'Signed out',
     'Signed in; cloud association loaded',
