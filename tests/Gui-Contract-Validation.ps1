@@ -159,6 +159,7 @@ foreach ($required in @(
     '$targetTenantRow.Controls.Add($btnSignIn)',
     '$interactiveTenantReady',
     '-not ($usesInteractiveUserAuthentication -and $script:WdlGuiSessionAuthenticated)',
+    '$targetTenantValue.Left = if ($usesInteractiveUserAuthentication)',
     '$activityCard.Height = $activityHeight',
     '$btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard',
     'New-GuiFont',

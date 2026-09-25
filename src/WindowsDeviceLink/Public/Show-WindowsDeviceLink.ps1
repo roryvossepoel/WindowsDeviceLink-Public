@@ -2070,7 +2070,7 @@ function Show-WindowsDeviceLink {
         $targetTenantRow.Width = $fullWidth
         $btnSignIn.Left = $fullWidth - 16 - $btnSignIn.Width
         if ($showTenantSelector) {
-            $tenantSelector.Left = if ($btnSignIn.Visible) {
+            $tenantSelector.Left = if ($usesInteractiveUserAuthentication) {
                 $btnSignIn.Left - 8 - $tenantSelector.Width
             }
             else {
@@ -2078,7 +2078,7 @@ function Show-WindowsDeviceLink {
             }
         }
         else {
-            $targetTenantValue.Left = if ($btnSignIn.Visible) {
+            $targetTenantValue.Left = if ($usesInteractiveUserAuthentication) {
                 $btnSignIn.Left - 8 - $targetTenantValue.Width
             }
             else {
