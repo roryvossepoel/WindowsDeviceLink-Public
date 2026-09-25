@@ -86,7 +86,7 @@ Show-WindowsDeviceLink `
 
 On Windows 11, `Interactive` is the default GUI authentication method. In Windows PE, the GUI defaults to `DeviceCode` because interactive browser authentication is unavailable.
 
-Windows PE supports local inspection, online lookup, CSV export, pre-association and offboarding actions when their prerequisites are available. **Full associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-associate the device and let Windows complete Device Association during OOBE.
+Windows PE supports local inspection, online lookup, CSV export, pre-registration and offboarding actions when their prerequisites are available. **Full register** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-register the device and let Windows complete Device Association during OOBE.
 
 For the complete GUI parameter reference, tenant JSON examples and Windows 11 / Windows PE comparison, see [GUI.md](GUI.md).
 
@@ -480,8 +480,8 @@ The timings below are **planning estimates from live WindowsDeviceLink validatio
 | Local firmware reset | usually under 1 second for the reset itself; roughly 4-17 seconds including GUI refresh/verification | UEFI variable reset is fast; verification and identity rematerialization take longer |
 | Pre-association | roughly 40-65 seconds end-to-end in the validated full-Windows runs | Authentication, Graph lookup, registration and post-registration verification |
 | Full association from an existing pre-association | roughly 70-100 seconds for the guarded native completion itself; about 1.5-2.5 minutes for the complete GUI/initializer action | Preflight, discovery, Windows attestation/configuration, JWT verification and final cloud verification |
-| Cloud-only removal | Graph deletion itself is typically a few seconds; allow roughly 10-30 seconds for lookup/authentication plus GUI verification | Authentication and locating/verifying the association usually take longer than the DELETE |
-| Full offboarding | commonly tens of seconds once authenticated | Cloud verification/removal happens first, followed by the fast local reset and refresh |
+| Remove cloud | Graph deletion itself is typically a few seconds; allow roughly 10-30 seconds for lookup/authentication plus GUI verification | Authentication and locating/verifying the association usually take longer than the DELETE |
+| Remove both | commonly tens of seconds once authenticated | Cloud verification/removal happens first, followed by the fast local reset and refresh |
 
 Two measured full-association runs reported internal completion totals of **70.2 seconds** and **100 seconds**. Native `ConfigureDeviceLinkAsync` accounted for about **35.8-39.5 seconds** of those runs; the remaining time was preflight, discovery and verification.
 

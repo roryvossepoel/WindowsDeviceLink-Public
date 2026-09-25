@@ -94,7 +94,9 @@ foreach ($required in @(
     'WindowsManagementServicePath',
     'Windows PE',
     'Full registration is not available in Windows PE',
+    'btnFullAssociateHost',
     'Get-WindowsDeviceLinkLocalAssociation',
+    'Get-GuiOperationParameters',
     'Get-WindowsDeviceLinkStatus',
     'Get-WindowsDeviceLink',
     'Initialize-WindowsDeviceLink',
@@ -163,6 +165,21 @@ foreach ($required in @(
     if ($source -notmatch [regex]::Escape($required)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI/delegation contract '$required'."
     }
+}
+
+$runtimeHelperPattern = '(?s)function\s+Get-GuiRuntimeParameters\s*\{(?<Body>.*?)\n\s*\}'
+$runtimeHelperMatch = [regex]::Match($source,$runtimeHelperPattern)
+if (-not $runtimeHelperMatch.Success) {
+    throw 'FAIL: GUI runtime-parameter helper was not found.'
+}
+if ($runtimeHelperMatch.Groups['Body'].Value -match 'TimeoutSeconds') {
+    throw 'FAIL: Runtime-only parameters must not pass -TimeoutSeconds to Test-WindowsDeviceLinkSupport.'
+}
+
+$operationHelperPattern = '(?s)function\s+Get-GuiOperationParameters\s*\{(?<Body>.*?)\n\s*\}'
+$operationHelperMatch = [regex]::Match($source,$operationHelperPattern)
+if (-not $operationHelperMatch.Success -or $operationHelperMatch.Groups['Body'].Value -notmatch 'TimeoutSeconds') {
+    throw 'FAIL: Operation parameters must include the caller-selected timeout.'
 }
 
 foreach ($offboardingEnableContract in @(

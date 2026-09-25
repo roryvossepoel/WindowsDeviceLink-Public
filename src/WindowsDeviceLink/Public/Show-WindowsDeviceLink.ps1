@@ -95,6 +95,9 @@ function Show-WindowsDeviceLink {
 
         ,[ValidateSet('Simple','Advanced')]
         [string]$ViewMode = 'Simple'
+
+        ,[ValidateRange(5,600)]
+        [int]$TimeoutSeconds = 120
     )
 
     $outerBoundParameters = @{}
@@ -492,7 +495,7 @@ function Show-WindowsDeviceLink {
 
     function Get-GuiBackendParameters {
         if (-not $backendMode) { throw 'This action requires -BackendUri and -BackendApiKey.' }
-        @{ BackendUri=$BackendUri; BackendApiKey=$BackendApiKey }
+        @{ BackendUri=$BackendUri; BackendApiKey=$BackendApiKey; TimeoutSeconds=$TimeoutSeconds }
     }
 
 
@@ -501,6 +504,12 @@ function Show-WindowsDeviceLink {
         if ($outerBoundParameters.ContainsKey('WindowsManagementServicePath')) {
             $parameters.WindowsManagementServicePath = $WindowsManagementServicePath
         }
+        $parameters
+    }
+
+    function Get-GuiOperationParameters {
+        $parameters = Get-GuiRuntimeParameters
+        $parameters.TimeoutSeconds = $TimeoutSeconds
         $parameters
     }
 
@@ -644,14 +653,23 @@ function Show-WindowsDeviceLink {
     $btnAssign.UseVisualStyleBackColor = $true
     $assignmentRow.Controls.Add($btnAssign)
 
+    # Host the full-registration button in an enabled panel. WinForms does not
+    # display ToolTips for disabled controls, while the host can still receive
+    # hover messages when Full register is capability-disabled in Windows PE.
+    $btnFullAssociateHost = New-Object System.Windows.Forms.Panel
+    $btnFullAssociateHost.Size = [System.Drawing.Size]::new(96,28)
+    $btnFullAssociateHost.Location = [System.Drawing.Point]::new(918,9)
+    $btnFullAssociateHost.BackColor = [System.Drawing.Color]::Transparent
+    $assignmentRow.Controls.Add($btnFullAssociateHost)
+
     $btnFullAssociate = New-Object System.Windows.Forms.Button
     $btnFullAssociate.Text = 'Full register'
     $btnFullAssociate.Font = New-GuiFont -Size 8.6 -Style Regular
     $btnFullAssociate.Size = [System.Drawing.Size]::new(96,28)
-    $btnFullAssociate.Location = [System.Drawing.Point]::new(918,9)
+    $btnFullAssociate.Location = [System.Drawing.Point]::new(0,0)
     $btnFullAssociate.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $btnFullAssociate.UseVisualStyleBackColor = $true
-    $assignmentRow.Controls.Add($btnFullAssociate)
+    $btnFullAssociateHost.Controls.Add($btnFullAssociate)
 
     $assignmentSeparator = New-Object System.Windows.Forms.Panel
     $assignmentSeparator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
@@ -987,10 +1005,9 @@ function Show-WindowsDeviceLink {
         }
 
         if ($support -and [string]$support.Environment -eq 'WindowsPE') {
-            $toolTip.SetToolTip(
-                $btnFullAssociate,
-                'Full registration is not available in Windows PE. Pre-register the device now; full registration is completed automatically during Windows OOBE.'
-            )
+            $winPeFullRegistrationToolTip = 'Full registration is not available in Windows PE. Pre-register the device now; full registration is completed automatically during Windows OOBE.'
+            $toolTip.SetToolTip($btnFullAssociate,$winPeFullRegistrationToolTip)
+            $toolTip.SetToolTip($btnFullAssociateHost,$winPeFullRegistrationToolTip)
             $onlineToolTip = if ($backendMode) {
                 'Windows PE online operations are performed through the configured Function backend.'
             }
@@ -1192,7 +1209,7 @@ function Show-WindowsDeviceLink {
             try {
                 $plainKey = $credential.GetNetworkCredential().Password
                 $parameters = @{ BackendUri=$BackendUri; BackendApiKey=$plainKey }
-                $runtimeParameters = Get-GuiRuntimeParameters
+                $runtimeParameters = Get-GuiOperationParameters
                 foreach ($key in $runtimeParameters.Keys) { $parameters[$key]=$runtimeParameters[$key] }
                 if ($WriteCommand) { Write-GuiConsole -Message 'Get-WindowsDeviceLinkStatus through Backend mode' -Command }
                 $cloud = Get-WindowsDeviceLinkBackendStatus @parameters
@@ -1201,7 +1218,7 @@ function Show-WindowsDeviceLink {
         }
         else {
             $parameters = Get-GuiAuthParameters
-            $runtimeParameters = Get-GuiRuntimeParameters
+            $runtimeParameters = Get-GuiOperationParameters
             foreach ($key in $runtimeParameters.Keys) { $parameters[$key]=$runtimeParameters[$key] }
             $parameters.Online = $true
             if ($WriteCommand) { Write-GuiConsole -Message "Get-WindowsDeviceLinkStatus -Online -Method $Method" -Command }
@@ -1296,7 +1313,7 @@ function Show-WindowsDeviceLink {
             $parameters = if ($backendMode) { Get-GuiBackendParameters } else { Get-GuiAuthParameters }
             if ($backendMode) { $parameters.TargetTenantId = [guid]$targetId }
             $parameters.Confirm = $false
-            $runtimeParameters = Get-GuiRuntimeParameters
+            $runtimeParameters = Get-GuiOperationParameters
             foreach ($key in $runtimeParameters.Keys) { $parameters[$key]=$runtimeParameters[$key] }
             $commandText = if ($backendMode) { "Set-WindowsDeviceLinkTenant -BackendUri <configured> -TargetTenantId $targetId" } elseif ($targetId) { "Set-WindowsDeviceLinkTenant -Method $Method -TenantId $targetId" } else { "Set-WindowsDeviceLinkTenant -Method $Method" }
             Write-GuiConsole -Message $commandText -Command
@@ -1441,7 +1458,7 @@ function Show-WindowsDeviceLink {
             Set-GuiStatus 'Exporting DeviceLink CSV...'
             Write-GuiConsole -Message "Get-WindowsDeviceLink -OutputDirectory '$selectedPath'" -Command
 
-            $deviceLinkParameters = Get-GuiRuntimeParameters
+            $deviceLinkParameters = Get-GuiOperationParameters
             $deviceLinkParameters.OutputDirectory = $selectedPath
             $file = Get-WindowsDeviceLink @deviceLinkParameters
             Write-GuiObject $file
@@ -1482,7 +1499,7 @@ function Show-WindowsDeviceLink {
                 $assignmentParameters = Get-GuiBackendParameters
                 $assignmentParameters.TargetTenantId = [guid]$targetId
                 $assignmentParameters.Confirm = $false
-                $runtimeParameters = Get-GuiRuntimeParameters
+                $runtimeParameters = Get-GuiOperationParameters
                 foreach ($key in $runtimeParameters.Keys) { $assignmentParameters[$key] = $runtimeParameters[$key] }
 
                 $cloudState = if ($script:WdlGuiCloudStatus) { ([string]$script:WdlGuiCloudStatus.AssociationState).Trim().ToLowerInvariant() } else { '' }
@@ -1508,7 +1525,7 @@ function Show-WindowsDeviceLink {
             }
             else {
                 $parameters = Get-GuiAuthParameters
-                $runtimeParameters = Get-GuiRuntimeParameters
+                $runtimeParameters = Get-GuiOperationParameters
                 foreach ($key in $runtimeParameters.Keys) { $parameters[$key] = $runtimeParameters[$key] }
                 $parameters.FullAssociation = $true
                 $parameters.Confirm = $false
@@ -1560,7 +1577,7 @@ function Show-WindowsDeviceLink {
                 try {
                     $plainKey = $credential.GetNetworkCredential().Password
                     Write-GuiConsole -Message 'Invoke backend cloud offboarding' -Command
-                    $result = Invoke-WindowsDeviceLinkBackendOffboard -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $serialNumber -SourceTenantId $sourceTenantId
+                    $result = Invoke-WindowsDeviceLinkBackendOffboard -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $serialNumber -SourceTenantId $sourceTenantId -TimeoutSeconds $TimeoutSeconds
                 }
                 finally { $plainKey=$null; $credential=$null }
 
@@ -1676,7 +1693,7 @@ function Show-WindowsDeviceLink {
                 try {
                     $plainKey = $credential.GetNetworkCredential().Password
                     Write-GuiConsole -Message 'Invoke backend cloud offboarding' -Command
-                    $removed = Invoke-WindowsDeviceLinkBackendOffboard -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $serialNumber -SourceTenantId $sourceTenantId
+                    $removed = Invoke-WindowsDeviceLinkBackendOffboard -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $serialNumber -SourceTenantId $sourceTenantId -TimeoutSeconds $TimeoutSeconds
                 }
                 finally { $plainKey=$null; $credential=$null }
                 Write-GuiObject $removed
@@ -1730,7 +1747,7 @@ function Show-WindowsDeviceLink {
 
             $statusParameters = @{}
             foreach ($key in $effectiveAuth.Keys) { $statusParameters[$key] = $effectiveAuth[$key] }
-            $runtimeParameters = Get-GuiRuntimeParameters
+            $runtimeParameters = Get-GuiOperationParameters
             foreach ($key in $runtimeParameters.Keys) {
                 $statusParameters[$key] = $runtimeParameters[$key]
             }
@@ -1893,8 +1910,8 @@ function Show-WindowsDeviceLink {
         $actionsPanel.Width = $fullWidth
 
         $assignmentRow.Width = $fullWidth
-        $btnFullAssociate.Left = $fullWidth - 16 - $btnFullAssociate.Width
-        $btnAssign.Left = $btnFullAssociate.Left - 8 - $btnAssign.Width
+        $btnFullAssociateHost.Left = $fullWidth - 16 - $btnFullAssociateHost.Width
+        $btnAssign.Left = $btnFullAssociateHost.Left - 8 - $btnAssign.Width
         if ($showTenantSelector) {
             $tenantSelector.Left = $btnAssign.Left - 8 - $tenantSelector.Width
             $tenantCaption.Left = $tenantSelector.Left - 88
