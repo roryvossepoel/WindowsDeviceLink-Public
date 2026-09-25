@@ -1,6 +1,6 @@
 # WindowsDeviceLink validation matrix
 
-Last updated: 2026-09-23
+Last updated: 2026-09-25
 
 The primary Windows Autopilot Device Preparation Device Association workflow has been validated on physical AMD64 hardware across Windows 11 and AMD64 Windows PE.
 
@@ -155,7 +155,9 @@ Validated authentication methods continue to cover DeviceCode, Interactive, Clie
 
 ## Operator GUI validation
 
-`Show-WindowsDeviceLink` has been exercised on physical AMD64 Windows 11 hardware. Windows PE GUI support is implemented and requires dedicated live validation on the existing AMD64 WinPE test environment before RC1.
+`Show-WindowsDeviceLink` has been exercised on physical AMD64 Windows 11 and AMD64
+Windows PE hardware. Backend mode was validated through a real Function deployment
+with an authenticated multitenant catalog.
 
 Validated GUI behavior includes:
 
@@ -179,23 +181,25 @@ Validated GUI behavior includes:
 
 The hardware-independent `Gui-Contract-Validation.ps1` suite validates export, authentication defaults, tenant-selector contract, WinPE guardrails and delegation to existing public cmdlets.
 
-### Windows PE GUI validation matrix
+### Windows PE GUI validation
 
-Before RC1, validate on physical AMD64 Windows PE:
+Validated on physical AMD64 Windows PE:
 
 - GUI startup with WinForms available;
-- automatic runtime discovery where configured;
-- explicit `-WindowsManagementServicePath`;
-- default `Interactive` authentication;
-- explicit `DeviceCode` authentication;
-- local refresh;
-- online Device Association lookup;
+- explicit administrator-supplied `Windows.Management.Service.dll` activation;
+- local refresh and backend Device Association lookup;
 - DeviceLink CSV export;
-- pre-association;
-- `Full associate` visible but disabled;
+- backend pre-registration and verified tenant reassignment;
+- **Full register** visible but disabled because device-side completion belongs to
+  full Windows/OOBE;
 - cloud-only offboarding;
 - local firmware reset;
-- fail-closed full offboarding.
+- combined cloud and local offboarding;
+- automatic action-state refresh after each operation.
+
+The default Direct-mode authentication in Windows PE is `DeviceCode`, not
+`Interactive`. Broader Direct-mode GUI authentication testing is tracked separately
+from the focused `0.10.0-preview1` release gate.
 
 The GUI must remain usable when the DeviceLink runtime is unavailable: runtime-dependent actions are disabled and the blocking reason is surfaced through Activity/tooltips rather than terminating the dashboard.
 

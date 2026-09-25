@@ -1,8 +1,10 @@
-# WinPE runtime requirement
+# WinPE Bring Your Own DLL (BYO-DLL)
 
 WindowsDeviceLink supports Windows PE, but the PowerShell Gallery package intentionally does **not** include `Windows.Management.Service.dll`.
 
 `Windows.Management.Service.dll` is a Microsoft Windows binary. Redistribution rights for this specific file have not been confirmed, so WindowsDeviceLink does not redistribute it in public packages.
+
+WindowsDeviceLink calls this WinPE compatibility path **Bring Your Own DLL (BYO-DLL)**. The abbreviation avoids confusion with *Bring Your Own Device*. BYO-DLL is not required on full Windows 11 because Windows provides and registers the runtime. The same compatible Microsoft binary can be activated directly in WinPE. Microsoft has not documented whether or when WinPE will provide native DeviceLink runtime support.
 
 ## Windows 11
 

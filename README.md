@@ -49,7 +49,7 @@ an authentication and deployment model. Backend is recommended for structural
 multitenant use.
 
 The GUI uses one operator view: Device, Connection, Local association, and Cloud
-association are shown together. Select a target tenant and choose **Register device**. In Backend mode
+association are shown together. Select a target tenant and choose **Pre-register** or, on supported full Windows, **Full register**. In Backend mode
 that one action performs the complete lookup, decision, identity renewal, registration,
 and verification workflow. Diagnostic, export, recovery, and offboarding actions remain
 available below the primary assignment action.
@@ -206,7 +206,7 @@ Install-Module WindowsDeviceLink `
     -Force
 ```
 
-WinPE additionally requires a compatible administrator-supplied `Windows.Management.Service.dll`. WindowsDeviceLink intentionally does not redistribute this Microsoft binary.
+WinPE additionally uses the project's **Bring Your Own DLL (BYO-DLL)** compatibility path: the administrator supplies a compatible `Windows.Management.Service.dll`. WindowsDeviceLink intentionally does not download or redistribute this Microsoft binary. Full Windows 11 already contains and registers the runtime, so BYO-DLL is not needed there.
 
 See [INSTALLATION.md](docs/INSTALLATION.md) for the complete setup and troubleshooting path.
 
@@ -217,7 +217,7 @@ See [INSTALLATION.md](docs/INSTALLATION.md) for the complete setup and troublesh
 - UEFI firmware.
 - 64-bit Windows PowerShell 5.1.
 - Windows 11 or compatible AMD64 Windows PE.
-- WinPE: compatible administrator-supplied `Windows.Management.Service.dll`.
+- WinPE: compatible administrator-supplied `Windows.Management.Service.dll` through the **Bring Your Own DLL (BYO-DLL)** compatibility path.
 - Direct Graph Device Association operations: Microsoft Graph permission `DeviceManagementServiceConfig.ReadWrite.All`.
 - Firmware read/reset and explicit device-side completion: elevated PowerShell with the required firmware/runtime access.
 
@@ -261,8 +261,6 @@ Get-WindowsDeviceLink |
 ```powershell
 Show-WindowsDeviceLink
 ```
-
-![WindowsDeviceLink operator GUI](docs/images/windowsdevicelink-gui.svg)
 
 The GUI is available on Windows 11 and compatible Windows PE environments. Windows 11 defaults to `Interactive` authentication; Windows PE defaults to `DeviceCode`. Full association is available on supported full Windows only.
 
@@ -318,6 +316,7 @@ Windows PE is primarily a **preparation** environment:
 ```text
 Windows PE
     |
+    | Bring Your Own DLL (BYO-DLL)
     | administrator-supplied Windows.Management.Service.dll
     v
 Generate/read DeviceLink identity
@@ -336,6 +335,8 @@ Windows completes Device Association
 ```
 
 With an administrator-supplied compatible runtime, identity generation/readout and tenant-side lifecycle operations are validated in AMD64 WinPE.
+
+**BYO-DLL is a compatibility solution, not a bundled runtime.** Windows 11 provides and registers `Windows.Management.Service.dll`; the validated stock AMD64 WinPE image does not. The same compatible Microsoft binary can be activated directly in WinPE. Microsoft has not documented whether or when WinPE will provide native DeviceLink runtime support, so WindowsDeviceLink makes no assumption about the future lifetime of BYO-DLL.
 
 Native DeviceLink discovery/completion in WinPE remains experimental. Current research reaches `RequestDiscoveryUrlAsync` and fails with HRESULT `0x81036C00`. Full Windows remains the validated environment for explicit native completion.
 

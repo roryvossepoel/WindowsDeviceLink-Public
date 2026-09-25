@@ -15,6 +15,7 @@ In a normal imaging scenario, Windows PE only needs to perform steps 1 and 2. Wi
 ```text
 Windows PE
     |
+    |  Bring Your Own DLL (BYO-DLL)
     |  administrator-supplied Windows.Management.Service.dll
     v
 Generate/read DeviceLink identity
@@ -39,11 +40,18 @@ Microsoft documents that a pre-associated device automatically completes Device 
 
 For this reason, native association completion inside Windows PE is **not required for the normal preinstallation workflow**.
 
-## Why Windows PE needs an administrator-supplied runtime
+## Bring Your Own DLL (BYO-DLL)
 
 Windows PE does not ship `Windows.Management.Service.dll` in the validated stock AMD64 image.
 
-WindowsDeviceLink does not redistribute this Microsoft binary.
+WindowsDeviceLink calls the compatibility path for this limitation **Bring Your Own DLL (BYO-DLL)**. The module and PowerShell Gallery package do not include, download or redistribute this Microsoft binary. `BYO-DLL` is used instead of `BYOD` to avoid confusion with the established *Bring Your Own Device* term.
+
+BYO-DLL applies only when the target environment doesn't already provide a usable registered DeviceLink runtime:
+
+- **Full Windows 11:** no BYO-DLL action is needed. Windows provides and registers the runtime.
+- **Validated stock AMD64 WinPE:** the administrator supplies a compatible Microsoft-provided DLL.
+
+The same compatible Microsoft binary used by Windows 11 can be activated directly in WinPE. Microsoft has not documented whether or when WinPE will include and register the DeviceLink runtime natively. WindowsDeviceLink therefore describes BYO-DLL as the current compatibility route without claiming that it is temporary or permanent. If native WinPE support appears later, the runtime-selection behavior can be reassessed.
 
 Administrators may supply a compatible Microsoft-provided copy explicitly:
 
@@ -55,6 +63,21 @@ Get-WindowsDeviceLink `
 The runtime can also be placed in the module `Runtime` directory when appropriate for a controlled deployment image.
 
 The administrator remains responsible for obtaining and using the Microsoft binary in accordance with Microsoft's licensing terms.
+
+## Windows 11 OOBE version requirement
+
+Use current Windows 11 installation media and service it with current cumulative updates before first boot. Microsoft explicitly recommends verifying that installation media contains the minimum required updates for Windows Autopilot device preparation.
+
+The end-to-end WindowsDeviceLink validation on physical hardware produced these results:
+
+| Windows 11 25H2 build | Observed Device Association OOBE behavior |
+|---|---|
+| `26200.9168` | Device Association wasn't picked up; generic OOBE was shown and the tenant record remained pre-associated. |
+| `26200.9457` after `KB5129195` | OOBE automatically completed Device Association, local firmware changed from `2/4` to `4/4`, the tenant record changed to associated, and the assigned Device Preparation policy was used. |
+
+These are project validation results, not a claim that `KB5129195` itself is the permanent minimum. For deployment media, use the latest supported cumulative update rather than pinning an imaging workflow to this single KB.
+
+Microsoft requirements: <https://learn.microsoft.com/autopilot/device-preparation/requirements>
 
 ## What has been validated in AMD64 Windows PE
 
@@ -141,7 +164,7 @@ Local firmware:       2/4
 Tenant association:   preassociated
 ```
 
-At this point the intended Windows PE task is complete. Install Windows 11 and allow OOBE to continue the Device Association lifecycle.
+At this point the intended Windows PE task is complete. Install a sufficiently current Windows 11 image and allow OOBE to continue the Device Association lifecycle.
 
 ## Cleaning up from Windows PE
 
