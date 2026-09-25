@@ -488,7 +488,11 @@ function Show-WindowsDeviceLink {
     }
 
     function Clear-GuiSessionAuthentication {
-        $disconnectGraphSession = $Method -eq 'Interactive' -and $script:WdlGuiSessionAuthenticated
+        param([switch]$ForceGraphDisconnect)
+
+        $disconnectGraphSession = $Method -eq 'Interactive' -and (
+            $script:WdlGuiSessionAuthenticated -or $ForceGraphDisconnect
+        )
         if ($disconnectGraphSession -and (Get-Command Disconnect-MgGraph -ErrorAction SilentlyContinue)) {
             try { Disconnect-MgGraph -ErrorAction Stop | Out-Null } catch {}
         }
@@ -1520,7 +1524,12 @@ function Show-WindowsDeviceLink {
             return
         }
 
-        Clear-GuiSessionAuthentication
+        if ($Method -eq 'Interactive') {
+            Clear-GuiSessionAuthentication -ForceGraphDisconnect
+        }
+        else {
+            Clear-GuiSessionAuthentication
+        }
         Set-GuiBusy -Busy $true -StatusText 'Signing in...'
         Set-GuiSigningInState
         Write-GuiConsole -Message "Waiting for $Method authentication..."
@@ -1539,7 +1548,7 @@ function Show-WindowsDeviceLink {
             }
         }
         catch {
-            Clear-GuiSessionAuthentication
+            Clear-GuiSessionAuthentication -ForceGraphDisconnect
             $script:WdlGuiCloudStatus = $null
             $ui.CloudState.Text = 'Not checked'
             $ui.CloudTenant.Text = 'Not checked'

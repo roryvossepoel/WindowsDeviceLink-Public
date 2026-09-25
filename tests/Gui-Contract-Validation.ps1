@@ -157,6 +157,8 @@ foreach ($required in @(
     'WdlGuiSessionAccountName',
     'WdlGuiSessionExpiresUtc',
     'Clear-GuiSessionAuthentication',
+    'Clear-GuiSessionAuthentication -ForceGraphDisconnect',
+    '[switch]$ForceGraphDisconnect',
     "Method = 'AccessToken'",
     'Authenticating once for this Direct-mode UI session.',
     'the in-memory token will be reused for cloud actions.',
