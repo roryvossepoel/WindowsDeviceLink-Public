@@ -491,7 +491,7 @@ function Show-WindowsDeviceLink {
         if ($ui -and $ui.Authentication -and -not $backendMode) {
             $ui.Authentication.Text = if ($usesInteractiveUserAuthentication) { "$Method - Signed out" } else { "$Method - Non-interactive" }
         }
-        if ($btnSignIn) { $btnSignIn.Text = 'Sign in to tenant' }
+        if ($btnSignIn) { $btnSignIn.Text = 'Sign in' }
         Update-GuiTargetTenantDisplay
     }
 
@@ -653,9 +653,9 @@ function Show-WindowsDeviceLink {
     $targetTenantRow.Controls.Add($targetTenantValue)
 
     $btnSignIn = New-Object System.Windows.Forms.Button
-    $btnSignIn.Text = 'Sign in to tenant'
+    $btnSignIn.Text = 'Sign in'
     $btnSignIn.Font = New-GuiFont -Size 8.6 -Style Regular
-    $btnSignIn.Size = [System.Drawing.Size]::new(126,28)
+    $btnSignIn.Size = [System.Drawing.Size]::new(118,28)
     $btnSignIn.Location = [System.Drawing.Point]::new(888,9)
     $btnSignIn.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
     $btnSignIn.UseVisualStyleBackColor = $true

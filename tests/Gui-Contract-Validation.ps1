@@ -134,7 +134,7 @@ foreach ($required in @(
     'Reset local',
     'Remove both',
     'Sign in',
-    'Sign in to tenant',
+    'Sign in',
     'Change account',
     '$usesInteractiveUserAuthentication',
     'Non-interactive',
@@ -245,6 +245,7 @@ if ($source -notmatch [regex]::Escape("-Title 'Export' -Description 'Export Devi
 
 foreach ($layoutContract in @(
     '$targetTenantRow.Size = [System.Drawing.Size]::new(1030,46)',
+    '$btnSignIn.Size = [System.Drawing.Size]::new(118,28)',
     '$assignmentRow.Size = [System.Drawing.Size]::new(1030,46)',
     '$tenantSelector.ItemHeight = 22',
     '$tenantSelector.Size = [System.Drawing.Size]::new(220,28)',
