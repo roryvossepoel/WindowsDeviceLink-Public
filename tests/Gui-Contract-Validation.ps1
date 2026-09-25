@@ -93,17 +93,25 @@ foreach ($required in @(
     'Get-WindowsDeviceLinkTenantCatalog',
     'WindowsManagementServicePath',
     'Windows PE',
-    'Full association is not currently supported in Windows PE',
+    'Association is not available in Windows PE',
+    'btnAssociateHost',
     'Get-WindowsDeviceLinkLocalAssociation',
+    'Get-GuiOperationParameters',
     'Get-WindowsDeviceLinkStatus',
     'Get-WindowsDeviceLink',
     'Initialize-WindowsDeviceLink',
     'Remove-WindowsDeviceLinkAssociation',
     'Reset-WindowsDeviceLinkFirmwareState',
-    'FullAssociation',
+    'Associate',
     'Full DeviceLink offboarding',
     'No cloud association was found. Nothing was removed.',
     'Set-WindowsDeviceLinkTenant',
+    'RepairExistingAssociation',
+    'Same-tenant repair required',
+    'Invoke-WindowsDeviceLinkBackendOffboard',
+    'Cloud offboarding completed and verified',
+    'Full offboarding completed and verified',
+    '$offboardingStatePresent = $cloudPresent -or $localAssociated',
     'Get-WindowsDeviceLinkBackendTenant',
     'Backend mode',
     'Direct mode',
@@ -114,12 +122,17 @@ foreach ($required in @(
     "-Caption 'Manufacturer'",
     "-Caption 'Operating system'",
     "-Caption 'Tenant scope'",
-    'Tenant assignment',
-    'Status and export',
-    'Recovery and offboarding',
+    'Device association',
+    'Status',
+    'Export',
+    'Offboarding',
     'Last checked',
     'Target tenant',
-    'Register device',
+    'Pre-associate',
+    'Associate',
+    'Remove cloud',
+    'Reset local',
+    'Remove both',
     'Sign in',
     'Switch account',
     '$usesInteractiveUserAuthentication',
@@ -144,15 +157,38 @@ foreach ($required in @(
     '$activityCard.Height = $activityHeight',
     '$btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard',
     'New-GuiFont',
-    '$colorDeviceTint',
-    '$colorCloudTint',
-    '$colorConnectionAccent',
-    '$colorLocalAccent',
+    '$colorCardTint',
+    '$colorCardAccent',
     "'Tahoma'",
     "'Assets\WindowsDeviceLink.ico'"
 )) {
     if ($source -notmatch [regex]::Escape($required)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI/delegation contract '$required'."
+    }
+}
+
+$runtimeHelperPattern = '(?s)function\s+Get-GuiRuntimeParameters\s*\{(?<Body>.*?)\n\s*\}'
+$runtimeHelperMatch = [regex]::Match($source,$runtimeHelperPattern)
+if (-not $runtimeHelperMatch.Success) {
+    throw 'FAIL: GUI runtime-parameter helper was not found.'
+}
+if ($runtimeHelperMatch.Groups['Body'].Value -match 'TimeoutSeconds') {
+    throw 'FAIL: Runtime-only parameters must not pass -TimeoutSeconds to Test-WindowsDeviceLinkSupport.'
+}
+
+$operationHelperPattern = '(?s)function\s+Get-GuiOperationParameters\s*\{(?<Body>.*?)\n\s*\}'
+$operationHelperMatch = [regex]::Match($source,$operationHelperPattern)
+if (-not $operationHelperMatch.Success -or $operationHelperMatch.Groups['Body'].Value -notmatch 'TimeoutSeconds') {
+    throw 'FAIL: Operation parameters must include the caller-selected timeout.'
+}
+
+foreach ($offboardingEnableContract in @(
+    '$btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent',
+    '$btnLocalOffboard.Enabled = $runtimeReady -and $localStatePresent -and $cloudKnownAbsent',
+    '$btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent'
+)) {
+    if ($source -notmatch [regex]::Escape($offboardingEnableContract)) {
+        throw "FAIL: GUI offboarding availability must be based on known removable state: '$offboardingEnableContract'."
     }
 }
 
@@ -175,25 +211,68 @@ if ($source -match [regex]::Escape('Show-WindowsDeviceLink is not supported in W
     throw 'FAIL: Show-WindowsDeviceLink must not hard-block Windows PE.'
 }
 
-$fullAssociationGuardPattern = '(?s)\$canFullAssociation\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
-if ($source -notmatch $fullAssociationGuardPattern) {
-    throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
+foreach ($inconsistentCloudPlaceholder in @('Not checked yet','Not yet')) {
+    if ($source -match [regex]::Escape($inconsistentCloudPlaceholder)) {
+        throw "FAIL: Cloud association placeholders must consistently use 'Not checked', not '$inconsistentCloudPlaceholder'."
+    }
 }
 
-if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=.*\$canFullAssociation') {
-    throw 'FAIL: Full associate button must use the Windows PE-aware full-association capability.'
+foreach ($cloudField in @('CloudState','CloudTenant','CloudId','CloudChecked')) {
+    if ($source -notmatch [regex]::Escape("`$ui.$cloudField.Text = 'Checking...'")) {
+        throw "FAIL: Cloud association field '$cloudField' must show the shared 'Checking...' state during lookup."
+    }
+}
+
+foreach ($localField in @('LocalState','Firmware','LinkId','LocalCreated')) {
+    if ($source -notmatch [regex]::Escape("`$ui.$localField.Text = 'Not checked'")) {
+        throw "FAIL: Local association field '$localField' must use the shared initial 'Not checked' state."
+    }
+    if ($source -notmatch [regex]::Escape("`$ui.$localField.Text = 'Checking...'")) {
+        throw "FAIL: Local association field '$localField' must show the shared 'Checking...' state during refresh."
+    }
+}
+
+if ($source -notmatch [regex]::Escape("-Buttons @('Sign in','Refresh cloud','Refresh local')")) {
+    throw 'FAIL: Status actions must present cloud before local, matching the Offboarding action order.'
+}
+
+if ($source -notmatch [regex]::Escape("-Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 92 -Buttons @('Export CSV')")) {
+    throw 'FAIL: CSV export must use its own compact action row with the manual Intune import explanation.'
+}
+
+foreach ($layoutContract in @(
+    '$assignmentRow.Size = [System.Drawing.Size]::new(1030,46)',
+    '$tenantSelector.ItemHeight = 22',
+    '$tenantSelector.Size = [System.Drawing.Size]::new(220,28)',
+    '$actionsPanel.Height = 184'
+)) {
+    if ($source -notmatch [regex]::Escape($layoutContract)) {
+        throw "FAIL: Unified action-row layout contract is missing '$layoutContract'."
+    }
+}
+
+$associationGuardPattern = '(?s)\$canAssociate\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
+if ($source -notmatch $associationGuardPattern) {
+    throw 'FAIL: Association must remain capability-disabled in Windows PE.'
+}
+
+if ($source -notmatch '(?s)\$btnAssociate\.Enabled\s*=.*\$canAssociate') {
+    throw 'FAIL: Associate button must use the Windows PE-aware association capability.'
+}
+
+if ($source -notmatch '(?s)if \(\$backendMode\).*Set-WindowsDeviceLinkTenant.*Complete-WindowsDeviceLinkAssociation') {
+    throw 'FAIL: Backend association must ensure tenant assignment before completing the local association.'
 }
 
 foreach ($requiredPolish in @(
-    'cloudAlreadyPresent',
     'cloudKnownAbsent',
-    'alreadyFullyAssociated',
+    'alreadyAssociated',
     "-Caption 'Link ID'",
     "-Caption 'Created'",
     "'RegistrationResult'",
     "'BeforeStatus'",
     "'AfterStatus'",
-    "'FullAssociationDetails'"
+    "'AssociationDetails'"
 )) {
     if ($source -notmatch [regex]::Escape($requiredPolish)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI polish contract '$requiredPolish'."

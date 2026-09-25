@@ -19,7 +19,7 @@ The GUI provides:
 - optional tenant-side cloud state;
 - tenant selection by friendly name when `-Tenants` is supplied;
 - CSV export;
-- pre-association and full association;
+- pre-association and association;
 - cloud-only, local-only and full DeviceLink offboarding;
 - live activity output.
 
@@ -86,7 +86,7 @@ Show-WindowsDeviceLink `
 
 On Windows 11, `Interactive` is the default GUI authentication method. In Windows PE, the GUI defaults to `DeviceCode` because interactive browser authentication is unavailable.
 
-Windows PE supports local inspection, online lookup, CSV export, pre-association and offboarding actions when their prerequisites are available. **Full associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-associate the device and let Windows complete Device Association during OOBE.
+Windows PE supports local inspection, online lookup, CSV export, pre-association and offboarding actions when their prerequisites are available. **Associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-associate the device and let Windows complete Device Association during OOBE.
 
 For the complete GUI parameter reference, tenant JSON examples and Windows 11 / Windows PE comparison, see [GUI.md](GUI.md).
 
@@ -215,7 +215,7 @@ Preassociated + firmware 2/4
 
 The cmdlet does not retry, reset firmware, delete cloud state, or reboot automatically.
 
-## I want to go from a clean local identity to fully associated in one command
+## I want to go from a clean local identity to associated in one command
 
 Use:
 
@@ -223,7 +223,7 @@ Use:
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -FullAssociation |
+    -Associate |
     Format-List *
 ```
 
@@ -235,9 +235,9 @@ LocalOnly -> Register -> Preassociated -> Complete -> Associated
 
 If the device is already associated, the command is idempotent and does not run configure again.
 
-## I only want a preassociation, not full completion
+## I only want a preassociation, not association completion
 
-Use the initializer **without** `-FullAssociation`:
+Use the initializer **without** `-Associate`:
 
 ```powershell
 Initialize-WindowsDeviceLink `
@@ -344,7 +344,7 @@ Recommended controlled sequence:
 5. Reboot
 6. Verify Windows generated a new local identity (normally 2/4)
 7. Register / initialize again
-8. Perform full association if required
+8. Perform association if required
 ```
 
 Example:
@@ -368,7 +368,7 @@ Get-WindowsDeviceLinkStatus
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -FullAssociation
+    -Associate
 ```
 
 Do not combine destructive cleanup steps blindly. Verify the state between operations, especially on production devices.
@@ -479,17 +479,17 @@ The timings below are **planning estimates from live WindowsDeviceLink validatio
 | Local inspection / refresh | roughly 4-15 seconds | Runtime activation, firmware reads and local correlation |
 | Local firmware reset | usually under 1 second for the reset itself; roughly 4-17 seconds including GUI refresh/verification | UEFI variable reset is fast; verification and identity rematerialization take longer |
 | Pre-association | roughly 40-65 seconds end-to-end in the validated full-Windows runs | Authentication, Graph lookup, registration and post-registration verification |
-| Full association from an existing pre-association | roughly 70-100 seconds for the guarded native completion itself; about 1.5-2.5 minutes for the complete GUI/initializer action | Preflight, discovery, Windows attestation/configuration, JWT verification and final cloud verification |
-| Cloud-only removal | Graph deletion itself is typically a few seconds; allow roughly 10-30 seconds for lookup/authentication plus GUI verification | Authentication and locating/verifying the association usually take longer than the DELETE |
-| Full offboarding | commonly tens of seconds once authenticated | Cloud verification/removal happens first, followed by the fast local reset and refresh |
+| Association from an existing pre-association | roughly 70-100 seconds for the guarded native completion itself; about 1.5-2.5 minutes for the complete GUI/initializer action | Preflight, discovery, Windows attestation/configuration, JWT verification and final cloud verification |
+| Remove cloud | Graph deletion itself is typically a few seconds; allow roughly 10-30 seconds for lookup/authentication plus GUI verification | Authentication and locating/verifying the association usually take longer than the DELETE |
+| Remove both | commonly tens of seconds once authenticated | Cloud verification/removal happens first, followed by the fast local reset and refresh |
 
-Two measured full-association runs reported internal completion totals of **70.2 seconds** and **100 seconds**. Native `ConfigureDeviceLinkAsync` accounted for about **35.8-39.5 seconds** of those runs; the remaining time was preflight, discovery and verification.
+Two measured association runs reported internal completion totals of **70.2 seconds** and **100 seconds**. Native `ConfigureDeviceLinkAsync` accounted for about **35.8-39.5 seconds** of those runs; the remaining time was preflight, discovery and verification.
 
 Two measured pre-association GUI runs completed in about **43 seconds** and **64 seconds** from action start through verified state.
 
 Treat these as operator expectations rather than timeout values. In particular, interactive or device-code sign-in can add arbitrary user time, and Windows/Microsoft service processing can occasionally take longer.
 
-## Why does full association sometimes appear to take a while?
+## Why does association sometimes appear to take a while?
 
 The native Windows Device Association operation can take tens of seconds or longer while Windows performs discovery, attestation, retrieval, and configuration.
 
@@ -563,7 +563,7 @@ Complete-WindowsDeviceLinkAssociation -WhatIf
 Initialize-WindowsDeviceLink `
     -Method DeviceCode `
     -TenantId '<tenant-id>' `
-    -FullAssociation `
+    -Associate `
     -WhatIf
 ```
 
@@ -609,8 +609,8 @@ See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md) and [INSTALLATION.md](INSTALLATION.md
 | Read local identity | `Get-WindowsDeviceLink` | Read / Windows may materialize base identity | No change | No change |
 | Inspect firmware | `Get-WindowsDeviceLinkFirmwareState` | Read only | No change | No change |
 | Create preassociation | `Register-WindowsDeviceLink` | No destructive change | Creates / preassociates | No change |
-| Full association | `Complete-WindowsDeviceLinkAssociation` | `2/4 -> 4/4` on success | Becomes associated | No change |
-| Full association via initializer | `Initialize-WindowsDeviceLink -FullAssociation` | May complete to `4/4` | May create + associate | No change |
+| Association | `Complete-WindowsDeviceLinkAssociation` | `2/4 -> 4/4` on success | Becomes associated | No change |
+| Association via initializer | `Initialize-WindowsDeviceLink -Associate` | May complete to `4/4` | May create + associate | No change |
 | Remove Device Association | `Remove-WindowsDeviceLinkAssociation` | No change | Deletes record | No change |
 | Reset local DeviceLink | `Reset-WindowsDeviceLinkFirmwareState` | Removes known DeviceLink variables | No change | No change |
 | Remove classic Autopilot registration | Not provided by this module | No change | No change | Use supported Autopilot administration tooling |

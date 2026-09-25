@@ -115,8 +115,8 @@ jobs:
           if (-not $initializer.Parameters.ContainsKey('WhatIf')) {
               throw 'Initialize-WindowsDeviceLink must support ShouldProcess / -WhatIf.'
           }
-          if (-not $initializer.Parameters.ContainsKey('FullAssociation')) {
-              throw 'Initialize-WindowsDeviceLink must expose explicit -FullAssociation opt-in.'
+          if (-not $initializer.Parameters.ContainsKey('Associate')) {
+              throw 'Initialize-WindowsDeviceLink must expose explicit -Associate opt-in.'
           }
 
           $completion = Get-Command Complete-WindowsDeviceLinkAssociation -Module WindowsDeviceLink -ErrorAction Stop

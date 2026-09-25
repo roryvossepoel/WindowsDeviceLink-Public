@@ -5,7 +5,7 @@ param($Request, $TriggerMetadata)
 
 $ErrorActionPreference = 'Stop'
 
-. (Join-Path $PSScriptRoot 'BackendAuth.ps1')
+. (Join-Path $PSScriptRoot '..\shared\BackendAuth.ps1')
 
 function Write-JsonResponse {
     param(

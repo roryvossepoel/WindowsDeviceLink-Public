@@ -42,6 +42,8 @@ function Get-WindowsDeviceLinkLocalAssociation {
     $firmware = @(Get-WindowsDeviceLinkFirmwareState)
     $presentCount = @($firmware | Where-Object Present).Count
     $firmwareState = ('{0}/4' -f $presentCount)
+    $creationVariable = @($firmware | Where-Object Name -eq 'DeviceLinkCreationTimeUtc') | Select-Object -First 1
+    $firmwareCreationTimeUtc = if ($creationVariable -and $creationVariable.Present) { $creationVariable.ParsedUtc } else { $null }
 
     $localState = switch ($presentCount) {
         0 { 'NoFirmwareState' }
@@ -71,6 +73,7 @@ function Get-WindowsDeviceLinkLocalAssociation {
             PSTypeName                = 'Windows.DeviceLink.LocalAssociation'
             LocalAssociationState     = $localState
             FirmwareState             = $firmwareState
+            FirmwareCreationTimeUtc   = $firmwareCreationTimeUtc
             LinkId                    = $null
             TenantId                  = $null
             DiscoveryUrl              = $null
@@ -139,6 +142,7 @@ function Get-WindowsDeviceLinkLocalAssociation {
             PSTypeName                = 'Windows.DeviceLink.LocalAssociation'
             LocalAssociationState     = $localState
             FirmwareState             = $firmwareState
+            FirmwareCreationTimeUtc   = $firmwareCreationTimeUtc
             LinkId                    = $linkId
             TenantId                  = $correlation.TenantId
             DiscoveryUrl              = $discoveryUrl

@@ -35,10 +35,10 @@ workflow is unattended.
 | Fixed-tenant Direct with delegated auth | Tenant is hidden and enforced; operator still signs in | Target is deterministic, but user authentication remains interactive |
 | Delegated catalog Direct | Operator selects a tenant, then signs in against it | A script can resolve the catalog entry, but delegated authentication still requires a user or existing SSO context |
 | Fixed or catalog Direct with app-only auth | No **Sign in** button; cloud actions obtain authentication non-interactively | Can be unattended when the credential and target tenant are supplied securely |
-| Backend | Operator selects the Function-provided target and chooses **Register device** | Can be unattended by calling `Set-WindowsDeviceLinkTenant` with an explicit target |
+| Backend | Operator selects the Function-provided target and chooses **Pre-associate** or **Associate** | Can be unattended by calling `Set-WindowsDeviceLinkTenant` with an explicit target |
 
 The GUI remains an operator interface: even with non-interactive authentication, tenant
-selection and **Register device** are intentional operator actions. For zero-touch
+selection and registration are intentional operator actions. For zero-touch
 execution, use the CLI and pass or resolve the target tenant in the script.
 
 Examples of CLI-oriented choices:
@@ -137,7 +137,7 @@ WinPE media or powerful multitenant permissions, use Backend mode instead.
 
 In the GUI, app-only methods do not show **Sign in** because there is no user session to
 establish. Selecting a catalog tenant scopes subsequent **Refresh cloud** or
-**Register device** actions; token acquisition happens as part of that action.
+**Pre-associate** or **Associate** actions; token acquisition happens as part of that action.
 
 ## Backend mode — recommended for multitenant
 

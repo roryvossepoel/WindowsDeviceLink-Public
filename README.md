@@ -18,7 +18,7 @@ WindowsDeviceLink can:
 - send pre-association requests to the optional Azure Function backend.
 
 > [!IMPORTANT]
-> WindowsDeviceLink is preview / proof-of-concept software. The WinPE implementation and native DeviceLink full association use undocumented Windows Runtime interfaces, and Device Association cloud operations use Microsoft Graph beta endpoints. These can change without notice.
+> WindowsDeviceLink is preview / proof-of-concept software. The WinPE implementation and native DeviceLink association use undocumented Windows Runtime interfaces, and Device Association cloud operations use Microsoft Graph beta endpoints. These can change without notice.
 
 ## Start here
 
@@ -49,8 +49,8 @@ an authentication and deployment model. Backend is recommended for structural
 multitenant use.
 
 The GUI uses one operator view: Device, Connection, Local association, and Cloud
-association are shown together. Select a target tenant and choose **Register device**. In Backend mode
-that one action performs the complete lookup, decision, identity renewal, registration,
+association are shown together. Select a target tenant and choose **Pre-associate** or, on supported full Windows, **Associate**. In Backend mode
+that one action performs the complete lookup, decision, identity renewal, pre-association,
 and verification workflow. Diagnostic, export, recovery, and offboarding actions remain
 available below the primary assignment action.
 
@@ -161,8 +161,8 @@ flowchart LR
     C["Associated<br/>Tenant affinity stored in UEFI"]
     D["Offboarded<br/>Association removed"]
 
-    A -->|"Register"| B
-    B -->|"Full association"| C
+    A -->|"Pre-associate"| B
+    B -->|"Association"| C
     B -->|"Remove cloud record"| D
     C -->|"Offboard"| D
 ```
@@ -206,7 +206,7 @@ Install-Module WindowsDeviceLink `
     -Force
 ```
 
-WinPE additionally requires a compatible administrator-supplied `Windows.Management.Service.dll`. WindowsDeviceLink intentionally does not redistribute this Microsoft binary.
+WinPE additionally uses the project's **Bring Your Own DLL (BYO-DLL)** compatibility path: the administrator supplies a compatible `Windows.Management.Service.dll`. WindowsDeviceLink intentionally does not download or redistribute this Microsoft binary. Full Windows 11 already contains and registers the runtime, so BYO-DLL is not needed there.
 
 See [INSTALLATION.md](docs/INSTALLATION.md) for the complete setup and troubleshooting path.
 
@@ -217,7 +217,7 @@ See [INSTALLATION.md](docs/INSTALLATION.md) for the complete setup and troublesh
 - UEFI firmware.
 - 64-bit Windows PowerShell 5.1.
 - Windows 11 or compatible AMD64 Windows PE.
-- WinPE: compatible administrator-supplied `Windows.Management.Service.dll`.
+- WinPE: compatible administrator-supplied `Windows.Management.Service.dll` through the **Bring Your Own DLL (BYO-DLL)** compatibility path.
 - Direct Graph Device Association operations: Microsoft Graph permission `DeviceManagementServiceConfig.ReadWrite.All`.
 - Firmware read/reset and explicit device-side completion: elevated PowerShell with the required firmware/runtime access.
 
@@ -262,9 +262,7 @@ Get-WindowsDeviceLink |
 Show-WindowsDeviceLink
 ```
 
-![WindowsDeviceLink operator GUI](docs/images/windowsdevicelink-gui.svg)
-
-The GUI is available on Windows 11 and compatible Windows PE environments. Windows 11 defaults to `Interactive` authentication; Windows PE defaults to `DeviceCode`. Full association is available on supported full Windows only.
+The GUI is available on Windows 11 and compatible Windows PE environments. Windows 11 defaults to `Interactive` authentication; Windows PE defaults to `DeviceCode`. Association is available on supported full Windows only.
 
 See the [operator GUI guide](docs/GUI.md) for authentication parameters, tenant selectors/JSON, Windows 11 vs Windows PE behavior, and `Windows.Management.Service.dll` usage.
 
@@ -300,13 +298,13 @@ Pre-association plus explicit device-side completion:
 ```powershell
 Initialize-WindowsDeviceLink `
     -Method Interactive `
-    -FullAssociation
+    -Associate
 ```
 
 Expected lifecycle:
 
 ```text
-LocalOnly -> Register -> Preassociated -> Complete -> Associated
+LocalOnly -> Pre-associate -> Preassociated -> Complete -> Associated
 ```
 
 For removal, firmware reset, tenant moves, discovery troubleshooting and detailed state transitions, use the [FAQ](docs/FAQ.md) and dedicated documentation instead of treating the README as the operational manual.
@@ -318,6 +316,7 @@ Windows PE is primarily a **preparation** environment:
 ```text
 Windows PE
     |
+    | Bring Your Own DLL (BYO-DLL)
     | administrator-supplied Windows.Management.Service.dll
     v
 Generate/read DeviceLink identity
@@ -336,6 +335,8 @@ Windows completes Device Association
 ```
 
 With an administrator-supplied compatible runtime, identity generation/readout and tenant-side lifecycle operations are validated in AMD64 WinPE.
+
+**BYO-DLL is a compatibility solution, not a bundled runtime.** Windows 11 provides and registers `Windows.Management.Service.dll`; the validated stock AMD64 WinPE image does not. The same compatible Microsoft binary can be activated directly in WinPE. Microsoft has not documented whether or when WinPE will provide native DeviceLink runtime support, so WindowsDeviceLink makes no assumption about the future lifetime of BYO-DLL.
 
 Native DeviceLink discovery/completion in WinPE remains experimental. Current research reaches `RequestDiscoveryUrlAsync` and fails with HRESULT `0x81036C00`. Full Windows remains the validated environment for explicit native completion.
 
@@ -394,14 +395,14 @@ See:
 | `Get-WindowsDeviceLinkLocalAssociation` | Correlate the current local DeviceLink identity with registry and Association JWT tenant hints without cloud access. |
 | `Get-WindowsDeviceLinkRepairPlan` | Return a non-destructive repair recommendation for observed lifecycle state. |
 | `Get-WindowsDeviceLinkStatus` | Combine runtime, local identity, firmware and optional tenant-side association diagnostics. |
-| `Initialize-WindowsDeviceLink` | Safely initialize pre-association and optionally full association with explicit `-FullAssociation`. |
+| `Initialize-WindowsDeviceLink` | Safely initialize pre-association and optionally complete association with explicit `-Associate`. |
 | `Get-WindowsDeviceLinkBackendTenant` | Read the authenticated Function backend tenant catalog. |
 | `Get-WindowsDeviceLinkTenantCatalog` | Read and resolve a local, HTTPS, or in-memory tenant-name catalog without a Function App. |
 | `Set-WindowsDeviceLinkTenant` | Apply New/no-op in Direct mode, or New/no-op/verified Move in Backend mode. |
 | `Register-WindowsDeviceLink` | Explicitly create a tenant-side pre-association directly or through a webhook. |
 | `Remove-WindowsDeviceLinkAssociation` | Remove a tenant-side Device Association record. |
 | `Reset-WindowsDeviceLinkFirmwareState` | Reset and immediately verify local DeviceLink UEFI identity state. |
-| `Show-WindowsDeviceLink` | Open the Windows 11 / Windows PE operator GUI for status, tenant selection, onboarding, offboarding, CSV export and activity output. Full native association remains disabled in Windows PE. |
+| `Show-WindowsDeviceLink` | Open the Windows 11 / Windows PE operator GUI for status, tenant selection, onboarding, offboarding, CSV export and activity output. Native association remains disabled in Windows PE. |
 | `Test-WindowsDeviceLinkAssociationJwt` | Validate local association JWT structure/time/identity correlation without exposing the raw JWT. |
 | `Test-WindowsDeviceLinkDiscovery` | Perform read-only native DeviceLink association discovery. |
 | `Test-WindowsDeviceLinkHealth` | Non-destructively classify status into machine-readable lifecycle/health states. |

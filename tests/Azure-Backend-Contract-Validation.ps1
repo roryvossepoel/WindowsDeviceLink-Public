@@ -21,8 +21,11 @@ $reconcileRunPath = Join-Path $functionRoot 'Reconcile-WindowsDeviceLink\run.ps1
 $reconcileFunctionJsonPath = Join-Path $functionRoot 'Reconcile-WindowsDeviceLink\function.json'
 $tenantCatalogRunPath = Join-Path $functionRoot 'Get-WindowsDeviceLinkTenants\run.ps1'
 $tenantCatalogFunctionJsonPath = Join-Path $functionRoot 'Get-WindowsDeviceLinkTenants\function.json'
+$offboardRunPath = Join-Path $functionRoot 'Offboard-WindowsDeviceLink\run.ps1'
+$offboardFunctionJsonPath = Join-Path $functionRoot 'Offboard-WindowsDeviceLink\function.json'
 $associationOperationsPath = Join-Path $functionRoot 'shared\AssociationOperations.ps1'
 $sharedBackendPath = Join-Path $functionRoot 'shared\BackendAuth.ps1'
+$backendOffboardClientPath = Join-Path $root 'src\WindowsDeviceLink\Private\Invoke-WindowsDeviceLinkBackendOffboard.ps1'
 $hostPath = Join-Path $functionRoot 'host.json'
 $bicepPath = Join-Path $root 'infrastructure\function-app\main.bicep'
 $armPath = Join-Path $root 'infrastructure\function-app\azuredeploy.json'
@@ -32,17 +35,34 @@ foreach ($path in @(
     $lookupRunPath,$lookupFunctionJsonPath,
     $reconcileRunPath,$reconcileFunctionJsonPath,
     $tenantCatalogRunPath,$tenantCatalogFunctionJsonPath,
-    $associationOperationsPath,$sharedBackendPath,
+    $offboardRunPath,$offboardFunctionJsonPath,
+    $associationOperationsPath,$sharedBackendPath,$backendOffboardClientPath,
     $hostPath,$bicepPath,$armPath
 )) {
     Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required Azure Function backend file is missing: $path"
 }
 
-foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$tenantCatalogRunPath,$associationOperationsPath,$sharedBackendPath)) {
+foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$tenantCatalogRunPath,$offboardRunPath,$associationOperationsPath,$sharedBackendPath,$backendOffboardClientPath)) {
     $tokens = $null
     $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile($scriptPath,[ref]$tokens,[ref]$errors)
     Assert-True ($errors.Count -eq 0) ("PowerShell parse errors in '$scriptPath': " + (($errors | ForEach-Object Message) -join '; '))
+}
+
+# A clean ZIP deployment keeps reusable helpers under function-app/shared; it
+# does not place copies beside each function's run.ps1.
+foreach ($scriptPath in @($runPath,$lookupRunPath,$reconcileRunPath,$tenantCatalogRunPath,$offboardRunPath)) {
+    $functionSource = Get-Content -LiteralPath $scriptPath -Raw
+    Assert-True (
+        $functionSource.Contains("Join-Path `$PSScriptRoot '..\shared\BackendAuth.ps1'")
+    ) "$(Split-Path (Split-Path $scriptPath -Parent) -Leaf) must load BackendAuth.ps1 from function-app/shared."
+}
+
+foreach ($scriptPath in @($runPath,$reconcileRunPath,$offboardRunPath)) {
+    $functionSource = Get-Content -LiteralPath $scriptPath -Raw
+    Assert-True (
+        $functionSource.Contains("Join-Path `$PSScriptRoot '..\shared\AssociationOperations.ps1'")
+    ) "$(Split-Path (Split-Path $scriptPath -Parent) -Leaf) must load AssociationOperations.ps1 from function-app/shared."
 }
 
 $functionJson = Get-Content -LiteralPath $functionJsonPath -Raw | ConvertFrom-Json
@@ -69,6 +89,17 @@ $tenantCatalogTrigger = @($tenantCatalogFunctionJson.bindings | Where-Object typ
 Assert-True ($tenantCatalogTrigger.Count -eq 1) 'Tenant catalog Function must expose exactly one HTTP trigger.'
 Assert-True ([string]$tenantCatalogTrigger[0].route -eq 'devicelink/tenants') 'Unexpected tenant catalog Function route.'
 Assert-True ('get' -in @($tenantCatalogTrigger[0].methods)) 'Tenant catalog Function must allow GET.'
+
+$offboardFunctionJson = Get-Content -LiteralPath $offboardFunctionJsonPath -Raw | ConvertFrom-Json
+$offboardTrigger = @($offboardFunctionJson.bindings | Where-Object type -eq 'httpTrigger')
+Assert-True ($offboardTrigger.Count -eq 1) 'Offboarding Function must expose exactly one HTTP trigger.'
+Assert-True ([string]$offboardTrigger[0].route -eq 'devicelink/offboard') 'Unexpected offboarding Function route.'
+Assert-True ('post' -in @($offboardTrigger[0].methods)) 'Offboarding Function must allow POST.'
+Assert-True ('delete' -notin @($offboardTrigger[0].methods)) 'Offboarding Function must not expose unauthenticated HTTP DELETE semantics.'
+$offboardRun = Get-Content -LiteralPath $offboardRunPath -Raw
+foreach ($needle in @('DeviceLinkOffboard','Get-WindowsDeviceLinkAllowedTenants','Get-WindowsDeviceLinkTenantAssociation','Remove-WindowsDeviceLinkBackendAssociation','RemovalVerificationFailed','SourceStateMismatch')) {
+    Assert-True ($offboardRun.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Offboarding Function is missing '$needle'."
+}
 $tenantCatalogRun = Get-Content -LiteralPath $tenantCatalogRunPath -Raw
 foreach ($needle in @('X-WindowsDeviceLink-Key','Get-WindowsDeviceLinkAllowedTenants','Get-WindowsDeviceLinkTenantNames','Get-WindowsDeviceLinkBackendMetadata','apiVersion','minimumModuleVersion','capabilities','tenantCount')) {
     Assert-True ($tenantCatalogRun.IndexOf($needle,[StringComparison]::OrdinalIgnoreCase) -ge 0) "Tenant catalog Function is missing '$needle'."

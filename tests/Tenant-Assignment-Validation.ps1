@@ -20,6 +20,7 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
     $script:AssignmentReconcileCount = 0
     $script:AssignmentSource = $null
     $script:AssignmentTarget = $null
+    $script:AssignmentRepair = $false
     $script:DirectTenant = $null
     $script:DirectMethod = $null
 
@@ -36,7 +37,7 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
     }
 
     function script:Invoke-WindowsDeviceLinkBackendTenantCatalog {
-        param($BackendUri,$BackendApiKey)
+        param($BackendUri,$BackendApiKey,$TimeoutSeconds)
         [pscustomobject]@{ success=$true; tenantCount=2; tenants=@(
             [pscustomobject]@{ name='Tenant A'; tenantId='11111111-1111-1111-1111-111111111111' },
             [pscustomobject]@{ name='Tenant B'; tenantId='22222222-2222-2222-2222-222222222222' }
@@ -52,7 +53,7 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
     }
     function script:Reset-WindowsDeviceLinkFirmwareState { param($Confirm) $script:AssignmentReset=$true; [pscustomobject]@{ Success=$true } }
     function script:Invoke-WindowsDeviceLinkBackendLookup {
-        param($BackendUri,$BackendApiKey,$SerialNumber)
+        param($BackendUri,$BackendApiKey,$SerialNumber,$TimeoutSeconds)
         $rows = @(
             [pscustomobject]@{ tenantId='11111111-1111-1111-1111-111111111111'; success=$true },
             [pscustomobject]@{ tenantId='22222222-2222-2222-2222-222222222222'; success=$true }
@@ -62,8 +63,9 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
             return [pscustomobject]@{ success=$true; searchedTenantCount=2; successfulTenantCount=1; failedTenantCount=1; tenantErrors=@([pscustomobject]@{tenantId=$rows[1].tenantId}); tenants=$rows; matchCount=0; matches=@() }
         }
         $matches = @()
-        if ($script:AssignmentReconciled -or $script:AssignmentScenario -eq 'same') {
-            $matches = @([pscustomobject]@{ tenantId='22222222-2222-2222-2222-222222222222'; associationId='new-association'; associationState='preassociated'; serialNumber='TEST-SERIAL' })
+        if ($script:AssignmentReconciled -or $script:AssignmentScenario -in @('same','repair')) {
+            $state = if ($script:AssignmentScenario -eq 'repair' -and -not $script:AssignmentReconciled) { 'associated' } else { 'preassociated' }
+            $matches = @([pscustomobject]@{ tenantId='22222222-2222-2222-2222-222222222222'; associationId='new-association'; associationState=$state; serialNumber='TEST-SERIAL' })
         }
         elseif ($script:AssignmentScenario -in @('move','move-failure')) {
             $matches = @([pscustomobject]@{ tenantId='11111111-1111-1111-1111-111111111111'; associationId='old-association'; associationState='associated'; serialNumber='TEST-SERIAL' })
@@ -71,10 +73,11 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
         [pscustomobject]@{ success=$true; searchedTenantCount=2; successfulTenantCount=2; failedTenantCount=0; tenantErrors=@(); tenants=$rows; matchCount=$matches.Count; matches=$matches }
     }
     function script:Invoke-WindowsDeviceLinkBackendReconcile {
-        param($BackendUri,$BackendApiKey,$InputObject,$SourceTenantId,$TargetTenantId)
+        param($BackendUri,$BackendApiKey,$InputObject,$SourceTenantId,$TargetTenantId,$RepairExistingAssociation,$TimeoutSeconds)
         $script:AssignmentReconcileCount++
         $script:AssignmentSource=$SourceTenantId
         $script:AssignmentTarget=$TargetTenantId
+        $script:AssignmentRepair=[bool]$RepairExistingAssociation
         if ($script:AssignmentScenario -eq 'move-failure') { throw 'synthetic reconcile failure' }
         $script:AssignmentReconciled=$true
         [pscustomobject]@{ success=$true; requestId='33333333-3333-3333-3333-333333333333'; decision=if($SourceTenantId){'Move'}else{'New'} }
@@ -82,9 +85,9 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
 }
 
 function Reset-Scenario([string]$Name) {
-    & $module { param($n) $script:AssignmentScenario=$n; $script:AssignmentReset=$false; $script:AssignmentReconciled=$false; $script:AssignmentReconcileCount=0; $script:AssignmentSource=$null; $script:AssignmentTarget=$null } $Name
+    & $module { param($n) $script:AssignmentScenario=$n; $script:AssignmentReset=$false; $script:AssignmentReconciled=$false; $script:AssignmentReconcileCount=0; $script:AssignmentSource=$null; $script:AssignmentTarget=$null; $script:AssignmentRepair=$false } $Name
 }
-function Read-State { & $module { [pscustomobject]@{ Reset=$script:AssignmentReset; Reconciled=$script:AssignmentReconciled; Count=$script:AssignmentReconcileCount; Source=$script:AssignmentSource; Target=$script:AssignmentTarget } } }
+function Read-State { & $module { [pscustomobject]@{ Reset=$script:AssignmentReset; Reconciled=$script:AssignmentReconciled; Count=$script:AssignmentReconcileCount; Source=$script:AssignmentSource; Target=$script:AssignmentTarget; Repair=$script:AssignmentRepair } } }
 
 $common = @{ BackendUri='https://example.test/api/devicelink'; BackendApiKey=$secureKey; Confirm=$false }
 
@@ -129,13 +132,20 @@ Reset-Scenario stale-new
 $result = Set-WindowsDeviceLinkTenant @common -TargetTenantId $tenantB
 $state = Read-State
 Assert-True ($result.Decision -eq 'New' -and $state.Reset -and $result.PreviousLinkId -ne $result.NewLinkId -and $state.Count -eq 1) 'New with stale 4/4 local affinity must renew identity before registration.'
-Write-Host 'PASS: New renews stale fully-associated local identity'
+Write-Host 'PASS: New renews stale associated local identity'
 
 Reset-Scenario same
 $result = Set-WindowsDeviceLinkTenant @common -TargetTenantName 'tenant b'
 $state = Read-State
 Assert-True ($result.Decision -eq 'None' -and -not $result.Changed -and -not $state.Reset -and $state.Count -eq 0) 'Same-tenant assignment must be a no-op.'
 Write-Host 'PASS: friendly-name resolution and same-tenant no-op'
+
+Reset-Scenario repair
+$result = Set-WindowsDeviceLinkTenant @common -TargetTenantId $tenantB -RepairExistingAssociation
+$state = Read-State
+Assert-True ($result.Decision -eq 'Repair' -and $result.Changed -and -not $state.Reset -and $state.Count -eq 1 -and $state.Repair) 'Same-tenant repair must reuse the current 2/4 identity and request one explicit backend replacement.'
+Assert-True ($state.Source -eq $tenantB -and $state.Target -eq $tenantB -and $result.ReasonCode -eq 'WDL-BACKEND-REPAIR') 'Same-tenant repair lost its explicit same-tenant source/target boundary.'
+Write-Host 'PASS: same-tenant repair replaces stale cloud state without another local reset'
 
 Reset-Scenario move
 $result = Set-WindowsDeviceLinkTenant @common -TargetTenantId $tenantB

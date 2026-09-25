@@ -43,7 +43,8 @@ Before publishing a new version:
 2. update release-facing documentation where the currently published version is mentioned;
 3. run the Windows 11 smoke tests;
 4. run the AMD64 WinPE smoke tests where applicable;
-5. review `TESTING.md` and record new validated behavior;
+5. review `TESTING.md` and complete the applicable rows in
+   `docs/TEST-MATRIX-0.10.0.md`, including separate operator and automation paths;
 6. scan the public repository for tenant IDs, serial numbers, association IDs, JWT data, secrets, test API keys and other environment-specific identifiers;
 7. confirm `Windows.Management.Service.dll` is not present in the public repository or release package;
 8. build locally with `tools/New-GalleryPackage.ps1` when doing a final manual verification;

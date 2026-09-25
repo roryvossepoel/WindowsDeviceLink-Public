@@ -11,6 +11,7 @@ The Function keeps Microsoft Graph credentials off Windows/WinPE endpoints and p
 - authenticated tenant-catalog discovery;
 - multitenant lookup;
 - New / Update / Move reconciliation;
+- cloud offboarding;
 - authoritative pre/post-state verification.
 
 ## Architecture
@@ -27,6 +28,7 @@ Windows / WinPE
 | /api/devicelink/tenants               |
 | /api/devicelink/lookup                |
 | /api/devicelink/reconcile             |
+| /api/devicelink/offboard              |
 |                                       |
 | validate schema/API key               |
 | enforce tenant allow list             |
@@ -52,9 +54,10 @@ POST /api/devicelink/preassociate
 GET  /api/devicelink/tenants
 GET  /api/devicelink/lookup?serialNumber=<serial>
 POST /api/devicelink/reconcile
+POST /api/devicelink/offboard
 ```
 
-No standalone DELETE endpoint is exposed. Deletion is an internal guarded step of a validated Move.
+No standalone unauthenticated DELETE endpoint is exposed. Deletion is performed through the authenticated, schema-validated offboarding route or as an internal guarded step of a validated Move.
 
 ## Deployment status for 0.10.0-preview1
 
@@ -122,7 +125,7 @@ performs a complete lookup first and chooses New, no-op, or Move. A Move renews 
 local DeviceLink identity before the backend removes the proven source record and
 creates the target record. Mutations are not blindly retried.
 
-The same flow is exposed by the **Register device** action in `Show-WindowsDeviceLink`.
+The same assignment flow is exposed by **Pre-associate** and forms the first phase of **Associate** in `Show-WindowsDeviceLink`.
 
 ### Lower-level initialization
 
@@ -137,14 +140,14 @@ Initialize-WindowsDeviceLink `
     -TargetTenantId '<target-tenant-id>'
 ```
 
-Full association:
+Association:
 
 ```powershell
 Initialize-WindowsDeviceLink `
     -BackendUri 'https://<app>.azurewebsites.net/api/devicelink' `
     -BackendApiKey $env:WINDOWSDEVICELINK_WEBHOOK_API_KEY `
     -TargetTenantId '<target-tenant-id>' `
-    -FullAssociation
+    -Associate
 ```
 
 The backend path performs an authoritative all-tenant lookup first.
@@ -163,7 +166,7 @@ found in another tenant
 
 `Initialize-WindowsDeviceLink` deliberately does **not** perform an implicit Move. A cross-tenant move deletes tenant-side state and therefore remains an explicit operation.
 
-With `-FullAssociation`, once the requested target tenant is verified as pre-associated, WindowsDeviceLink invokes the existing guarded local `Complete-WindowsDeviceLinkAssociation` operation. The Function App is then queried again to verify the final tenant-side state.
+With `-Associate`, once the requested target tenant is verified as pre-associated, WindowsDeviceLink invokes the existing guarded local `Complete-WindowsDeviceLinkAssociation` operation. The Function App is then queried again to verify the final tenant-side state.
 
 `-BackendUri` is the API base URI ending in:
 
@@ -171,7 +174,7 @@ With `-FullAssociation`, once the requested target tenant is verified as pre-ass
 /api/devicelink
 ```
 
-WindowsDeviceLink derives the `tenants`, `lookup`, `preassociate`, and `reconcile`
+WindowsDeviceLink derives the `tenants`, `lookup`, `preassociate`, `reconcile`, and `offboard`
 routes from that base URI.
 
 ## Client pre-association

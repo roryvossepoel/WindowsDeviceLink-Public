@@ -2,10 +2,6 @@
 
 `Show-WindowsDeviceLink` opens a compact operator dashboard for inspecting and managing Windows Autopilot device preparation Device Association.
 
-![WindowsDeviceLink operator GUI](images/windowsdevicelink-gui.svg)
-
-> The image above uses sanitized example data. Device name and serial number are intentionally omitted.
-
 ## Start the GUI
 
 Direct mode is the default. On full Windows the sign-in is Interactive; Windows PE
@@ -32,7 +28,7 @@ Show-WindowsDeviceLink `
 The GUI retrieves the allowed tenant catalog from the Function App and automatically
 checks the current cloud association when it opens. Device, Local association, and
 Cloud association are shown together. Select a target tenant and choose
-**Register device**; the action performs its own fresh cloud check before changing state.
+**Pre-associate** or, on supported full Windows, **Associate**. Each action performs its own fresh cloud check before changing state.
 Diagnostic, export, recovery, and offboarding actions are available in the same view.
 
 Backend mode and Direct-mode Graph authentication are deliberately separate. Do not combine
@@ -47,8 +43,10 @@ On full Windows, `Interactive` authentication is used by default unless `-Method
 
 On Windows PE, `DeviceCode` is used by default because interactive browser authentication is not available there.
 
+Windows PE also requires the **Bring Your Own DLL (BYO-DLL)** compatibility path unless the environment already provides a usable registered DeviceLink runtime. Supply a compatible `Windows.Management.Service.dll` in the module `Runtime` directory or pass `-WindowsManagementServicePath`. The GUI disables **Associate** in WinPE because normal WinPE usage ends at pre-association; Windows 11 OOBE completes the association. See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
+
 Direct mode opens without authenticating and initially loads only local device and
-firmware state. Choose **Sign in**, **Refresh cloud**, or **Register device** when a
+firmware state. Choose **Sign in**, **Refresh cloud**, **Pre-associate**, or **Associate** when a
 cloud action is needed. After successful authentication, the GUI reuses that session
 for subsequent cloud actions. DeviceCode tokens are retained only in memory, renewed
 when required, cleared when the selected tenant changes, and discarded when the GUI
@@ -63,7 +61,7 @@ authentication is then scoped to that selected tenant.
 
 **Sign in** is shown only for delegated `Interactive` and `DeviceCode` methods. App-only
 methods do not represent a user as signed in: their credential is used non-interactively
-when **Refresh cloud**, **Register device**, or another cloud action runs.
+when **Refresh cloud**, **Pre-associate**, **Associate**, or another cloud action runs.
 
 ## Authentication
 
@@ -114,7 +112,7 @@ same DeviceCode sign-in for every action.
 The Function App provides tenant IDs and friendly names. The selected tenant is always
 an explicit target; the backend never selects one on the operator's behalf.
 
-The **Register** action performs one of these guarded outcomes after a complete
+The **Pre-associate** action performs one of these guarded outcomes after a complete
 multitenant lookup:
 
 | Current cloud state | Result |
@@ -213,10 +211,10 @@ required.
 | Tenant-side online lookup | Yes | Yes, when authentication/network prerequisites are available |
 | DeviceLink CSV export | Yes | Yes |
 | Pre-associate | Yes | Yes |
-| Full associate | Yes | No; use pre-association and let full Windows/OOBE complete Device Association |
-| Cloud offboard | Yes | Yes |
-| Local offboard | Yes | Yes |
-| Full offboard | Yes | Yes, when cloud authentication/network prerequisites are available |
+| Associate | Yes | No; use pre-association and let full Windows/OOBE complete Device Association |
+| Remove cloud | Yes | Yes |
+| Reset local | Yes | Yes |
+| Remove both | Yes | Yes, when cloud authentication/network prerequisites are available |
 | Default GUI authentication | `Interactive` | `DeviceCode` |
 | DeviceLink runtime | Registered Windows runtime | Administrator-supplied compatible runtime may be required |
 
@@ -243,17 +241,16 @@ The DLL must come from an administrator-controlled compatible Windows source. Se
 
 ## Actions
 
-- **Register** — apply New/no-op in Direct mode, or New/no-op/Move for an explicitly selected Backend-mode target.
+- **Pre-associate** — ensure the device is pre-associated with the selected target. In Backend mode this can perform a verified New, no-op, Move, or same-tenant Repair as required.
+- **Associate** — first ensure the selected tenant assignment, then explicitly complete and verify the device-side association on supported full Windows. This action is disabled in WinPE.
 - **Sign in** — authenticate for the current Direct-mode UI session and immediately load the cloud association.
 - **Switch account** — discard the current Direct-mode GUI session and authenticate again; with a tenant catalog, the new session is created for the selected tenant.
 - **Refresh local** — refresh local DeviceLink identity and firmware information.
 - **Refresh cloud** — refresh tenant-side Device Association state using the selected tenant context.
 - **Export CSV** — export the Microsoft-generated DeviceLink CSV.
-- **Pre-associate** — create only the tenant-side pre-association.
-- **Full associate** — ensure pre-association exists and perform the full association flow on supported full Windows.
-- **Cloud offboard** — remove only the tenant-side Device Association record.
-- **Local offboard** — reset only local DeviceLink firmware state.
-- **Full offboard** — verify/remove cloud state first, then reset local DeviceLink firmware state.
+- **Remove cloud** — remove only the tenant-side Device Association record.
+- **Reset local** — reset only local DeviceLink firmware state.
+- **Remove both** — verify/remove cloud state first, then reset local DeviceLink firmware state.
 
 State-changing actions delegate to the existing guarded public cmdlets and retain their safety behavior.
 
@@ -262,9 +259,8 @@ association and Cloud association. Device separates manufacturer, model, serial 
 and operating system. Connection explains the active mode, authentication route,
 endpoint, and tenant scope. The Cloud association card keeps the current state, friendly
 tenant name, Association ID, and last-check time together. The Actions section contains
-the target tenant selector and the primary **Register device** action. In Backend mode,
-Register performs the complete
-lookup, decision, identity renewal, registration, and verification workflow itself.
+the target tenant selector and the **Pre-associate** and **Associate** actions. In Backend mode,
+Pre-associate performs the complete lookup, decision, identity renewal, tenant assignment, and verification workflow itself. Associate continues with supported device-side completion.
 **Refresh cloud** remains available for an explicit diagnostic refresh. Direct-only
 sign-in and onboarding actions are hidden while Backend mode is active.
 

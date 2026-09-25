@@ -3,7 +3,7 @@
 This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL. For the intended pre-association -> Windows 11 OOBE lifecycle and the WinPE native-completion boundary, see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 > [!IMPORTANT]
-> WindowsDeviceLink is currently preview software. The published version documented here is `0.5.2-preview1`.
+> WindowsDeviceLink is currently preview software. This guide targets the `0.10.0-preview1` development release line.
 
 ## Quick start - Windows 11
 
@@ -59,7 +59,7 @@ This distinction matters when multiple PowerShellGet versions are present. A Pow
 
 ## Prerelease support
 
-WindowsDeviceLink `0.5.2-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
+WindowsDeviceLink `0.10.0-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
 
 ```powershell
 Install-Module WindowsDeviceLink `
@@ -125,7 +125,7 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-For `0.5.2-preview1`, verify the exported command set directly:
+For `0.10.0-preview1`, verify the exported command set directly:
 
 ```powershell
 Get-Command -Module WindowsDeviceLink |
@@ -133,7 +133,7 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-`0.5.2-preview1` includes the read-only `Test-WindowsDeviceLinkRuntime` diagnostic for validating an administrator-supplied runtime DLL before using DeviceLink identity workflows.
+The current preview includes the read-only `Test-WindowsDeviceLinkRuntime` diagnostic for validating an administrator-supplied runtime DLL before using DeviceLink identity workflows.
 
 Then run:
 
@@ -153,6 +153,7 @@ AMD64 Windows PE
     -> PackageManagement / PowerShellGet
     -> TLS 1.2 and PSGallery connectivity
     -> WindowsDeviceLink from PSGallery
+    -> Bring Your Own DLL (BYO-DLL)
     -> user-supplied Windows.Management.Service.dll
     -> Test-WindowsDeviceLinkSupport
 ```
@@ -183,7 +184,7 @@ The current preview remains unsigned while the project remains unsigned. In the 
 
 This is documented as a WinPE installation limitation/workaround for the unsigned preview, not as a WindowsDeviceLink runtime failure.
 
-### Recommended WinPE installation for 0.5.2-preview1
+### Recommended WinPE installation for 0.10.0-preview1
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -213,15 +214,19 @@ Save-Module WindowsDeviceLink `
     -Force
 ```
 
-Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.5.2`:
+Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.10.0`:
 
 ```powershell
-Import-Module 'X:\Temp\WindowsDeviceLink\0.5.2\WindowsDeviceLink.psd1' -Force
+Import-Module 'X:\Temp\WindowsDeviceLink\0.10.0\WindowsDeviceLink.psd1' -Force
 ```
 
-## Windows.Management.Service.dll in WinPE
+## Bring Your Own DLL (BYO-DLL) in WinPE
 
 The PowerShell Gallery package intentionally does **not** redistribute Microsoft's `Windows.Management.Service.dll`.
+
+WindowsDeviceLink calls this WinPE compatibility path **Bring Your Own DLL (BYO-DLL)**. The abbreviation avoids confusion with the established *Bring Your Own Device* meaning of BYOD. It is needed because the validated stock AMD64 WinPE image doesn't include the DeviceLink runtime DLL. It does not apply to full Windows 11, where Windows already provides and registers the runtime.
+
+The same compatible Microsoft binary used by Windows 11 can be activated directly in WinPE. Microsoft has not documented whether or when WinPE will include and register this runtime natively, so the project doesn't characterize BYO-DLL as temporary or permanent.
 
 A compatible AMD64 copy must be supplied by the user for DeviceLink runtime activation in WinPE. Place it in the installed/saved module's Runtime directory:
 
@@ -232,12 +237,12 @@ A compatible AMD64 copy must be supplied by the user for DeviceLink runtime acti
 For example:
 
 ```text
-X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.5.2\Runtime\Windows.Management.Service.dll
+X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.10.0\Runtime\Windows.Management.Service.dll
 ```
 
 Or pass the DLL explicitly to commands that expose `-WindowsManagementServicePath`.
 
-WindowsDeviceLink does not provide, download, or redistribute this DLL.
+WindowsDeviceLink does not provide, download, or redistribute this DLL. Obtain it only from a properly licensed Microsoft Windows source and keep its architecture/build compatible with the WinPE image.
 
 See [`../src/WindowsDeviceLink/Runtime/README.md`](../src/WindowsDeviceLink/Runtime/README.md).
 

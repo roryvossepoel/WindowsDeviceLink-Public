@@ -3,7 +3,7 @@ using namespace System.Net
 param($Request, $TriggerMetadata)
 
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'BackendAuth.ps1')
+. (Join-Path $PSScriptRoot '..\shared\BackendAuth.ps1')
 
 function Get-HeaderValue {
     param([Parameter(Mandatory)][object]$Headers,[Parameter(Mandatory)][string]$Name)

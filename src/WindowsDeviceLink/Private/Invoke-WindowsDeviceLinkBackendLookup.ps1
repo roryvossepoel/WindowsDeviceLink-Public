@@ -4,6 +4,7 @@ function Invoke-WindowsDeviceLinkBackendLookup {
         [Parameter(Mandatory)][ValidateNotNull()][uri]$BackendUri,
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$BackendApiKey,
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$SerialNumber,
+        [ValidateRange(5,600)][int]$TimeoutSeconds = 120,
         [scriptblock]$RequestScript
     )
 
@@ -15,10 +16,10 @@ function Invoke-WindowsDeviceLinkBackendLookup {
 
     try {
         if ($RequestScript) {
-            $response = & $RequestScript $builder.Uri $headers
+            $response = & $RequestScript $builder.Uri $headers $TimeoutSeconds
         }
         else {
-            $response = Invoke-RestMethod -Method GET -Uri $builder.Uri -Headers $headers -ErrorAction Stop
+            $response = Invoke-RestMethod -Method GET -Uri $builder.Uri -Headers $headers -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         }
 
         if ($null -eq $response) {
