@@ -154,7 +154,7 @@ Reconcile only manages **tenant-side Device Association state**.
 
 It never resets local DeviceLink firmware.
 
-For a fully associated device, local `4/4` firmware state may require a deliberate device-side reset/reboot lifecycle before the device can be treated as a new identity. That remains a separate operation.
+For an associated device, local `4/4` firmware state may require a deliberate device-side reset/reboot lifecycle before the device can be treated as a new identity. That remains a separate operation.
 
 ## Response examples
 

@@ -93,8 +93,8 @@ foreach ($required in @(
     'Get-WindowsDeviceLinkTenantCatalog',
     'WindowsManagementServicePath',
     'Windows PE',
-    'Full registration is not available in Windows PE',
-    'btnFullAssociateHost',
+    'Association is not available in Windows PE',
+    'btnAssociateHost',
     'Get-WindowsDeviceLinkLocalAssociation',
     'Get-GuiOperationParameters',
     'Get-WindowsDeviceLinkStatus',
@@ -102,7 +102,7 @@ foreach ($required in @(
     'Initialize-WindowsDeviceLink',
     'Remove-WindowsDeviceLinkAssociation',
     'Reset-WindowsDeviceLinkFirmwareState',
-    'FullAssociation',
+    'Associate',
     'Full DeviceLink offboarding',
     'No cloud association was found. Nothing was removed.',
     'Set-WindowsDeviceLinkTenant',
@@ -111,7 +111,7 @@ foreach ($required in @(
     'Invoke-WindowsDeviceLinkBackendOffboard',
     'Cloud offboarding completed and verified',
     'Full offboarding completed and verified',
-    '$offboardingStatePresent = $cloudPresent -or $localFullyAssociated',
+    '$offboardingStatePresent = $cloudPresent -or $localAssociated',
     'Get-WindowsDeviceLinkBackendTenant',
     'Backend mode',
     'Direct mode',
@@ -129,7 +129,7 @@ foreach ($required in @(
     'Last checked',
     'Target tenant',
     'Pre-register',
-    'Full register',
+    'Associate',
     'Remove cloud',
     'Reset local',
     'Remove both',
@@ -251,28 +251,28 @@ foreach ($layoutContract in @(
     }
 }
 
-$fullAssociationGuardPattern = '(?s)\$canFullAssociation\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
-if ($source -notmatch $fullAssociationGuardPattern) {
-    throw 'FAIL: Full association must remain capability-disabled in Windows PE.'
+$associationGuardPattern = '(?s)\$canAssociate\s*=\s*\$runtimeReady\s*-and\s*\[string\]\$support\.Environment\s*-ne\s*''WindowsPE'''
+if ($source -notmatch $associationGuardPattern) {
+    throw 'FAIL: Association must remain capability-disabled in Windows PE.'
 }
 
-if ($source -notmatch '(?s)\$btnFullAssociate\.Enabled\s*=.*\$canFullAssociation') {
-    throw 'FAIL: Full register button must use the Windows PE-aware full-association capability.'
+if ($source -notmatch '(?s)\$btnAssociate\.Enabled\s*=.*\$canAssociate') {
+    throw 'FAIL: Associate button must use the Windows PE-aware association capability.'
 }
 
 if ($source -notmatch '(?s)if \(\$backendMode\).*Set-WindowsDeviceLinkTenant.*Complete-WindowsDeviceLinkAssociation') {
-    throw 'FAIL: Backend full registration must ensure tenant assignment before completing the local association.'
+    throw 'FAIL: Backend association must ensure tenant assignment before completing the local association.'
 }
 
 foreach ($requiredPolish in @(
     'cloudKnownAbsent',
-    'alreadyFullyAssociated',
+    'alreadyAssociated',
     "-Caption 'Link ID'",
     "-Caption 'Created'",
     "'RegistrationResult'",
     "'BeforeStatus'",
     "'AfterStatus'",
-    "'FullAssociationDetails'"
+    "'AssociationDetails'"
 )) {
     if ($source -notmatch [regex]::Escape($requiredPolish)) {
         throw "FAIL: Show-WindowsDeviceLink is missing expected GUI polish contract '$requiredPolish'."

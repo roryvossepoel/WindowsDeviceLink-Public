@@ -9,12 +9,12 @@ function Initialize-WindowsDeviceLink {
     health, and creates a preassociation only when the validated state is LocalOnly.
 
     By default, existing preassociated or associated records are left unchanged. Specify
-    -FullAssociation to opt in to full association after the state has been verified as
+    -Associate to opt in to association after the state has been verified as
     Preassociated.
 
     Direct mode uses the selected Microsoft Graph authentication method. Backend mode uses
     the WindowsDeviceLink Azure Function App for authoritative multitenant cloud lookup and
-    pre-association, while native full association still runs locally on the device.
+    pre-association, while native association still runs locally on the device.
 
     Backend mode never performs an implicit tenant move. If the current association is found
     in a different tenant than -TargetTenantId, initialization is blocked and an explicit
@@ -58,7 +58,8 @@ function Initialize-WindowsDeviceLink {
         [Parameter(ParameterSetName = 'Direct')][ValidateRange(1, 600)][double]$ClientTimeout = 100,
         [ValidateNotNullOrEmpty()][string]$WindowsManagementServicePath,
         [ValidateRange(5, 600)][int]$TimeoutSeconds = 120,
-        [switch]$FullAssociation
+        [Alias('FullAssociation')]
+        [switch]$Associate
     )
 
     if ($PSCmdlet.ParameterSetName -eq 'Backend') {
@@ -83,9 +84,9 @@ function Initialize-WindowsDeviceLink {
                 PSTypeName='Windows.DeviceLink.InitializationResult'
                 Action='Blocked'
                 Changed=$false
-                FullAssociationRequested=[bool]$FullAssociation
-                FullAssociationResult=$null
-                FullAssociationDetails=$null
+                AssociationRequested=[bool]$Associate
+                AssociationResult=$null
+                AssociationDetails=$null
                 BeforeState='AssociationInDifferentTenant'
                 AfterState='AssociationInDifferentTenant'
                 Severity='Warning'
@@ -105,7 +106,7 @@ function Initialize-WindowsDeviceLink {
         $changed = $false
         $registration = $null
         $completion = $null
-        $fullAssociationResult = $null
+        $associationResult = $null
         $afterStatus = $beforeStatus
         $afterHealth = $beforeHealth
         $message = $beforeHealth.Summary
@@ -143,7 +144,7 @@ function Initialize-WindowsDeviceLink {
                 }
                 else {
                     $message = 'The DeviceLink is locally valid and not associated; Function-backed pre-association would be performed.'
-                    if ($FullAssociation) { $fullAssociationResult = 'WouldPreassociateAndComplete' }
+                    if ($Associate) { $associationResult = 'WouldPreassociateAndComplete' }
                 }
             }
             default {
@@ -151,45 +152,45 @@ function Initialize-WindowsDeviceLink {
             }
         }
 
-        if ($FullAssociation -and $afterHealth.State -eq 'Preassociated') {
+        if ($Associate -and $afterHealth.State -eq 'Preassociated') {
             $target = if ($afterStatus.SerialNumber) { $afterStatus.SerialNumber } else { 'DeviceLink' }
-            if ($PSCmdlet.ShouldProcess($target, 'Perform full DeviceLink association on this device')) {
+            if ($PSCmdlet.ShouldProcess($target, 'Associate this device with the tenant')) {
                 $completeParameters = @{ TimeoutSeconds = $TimeoutSeconds; Confirm = $false }
                 if ($PSBoundParameters.ContainsKey('WindowsManagementServicePath')) {
                     $completeParameters.WindowsManagementServicePath = $WindowsManagementServicePath
                 }
 
                 $completion = Complete-WindowsDeviceLinkAssociation @completeParameters
-                $fullAssociationResult = [string]$completion.Result
+                $associationResult = [string]$completion.Result
                 if ($completion.Changed) { $changed = $true }
 
                 $afterStatus = Get-WindowsDeviceLinkBackendStatus @statusParameters
                 $afterHealth = $afterStatus | Test-WindowsDeviceLinkHealth
                 if ($afterHealth.State -ne 'Associated') {
-                    throw "DeviceLink full association returned, but Function-backed verification did not reach Associated. Verified state: $($afterHealth.State)."
+                    throw "DeviceLink association returned, but Function-backed verification did not reach Associated. Verified state: $($afterHealth.State)."
                 }
                 if (([string]$afterStatus.TenantId).Trim().ToLowerInvariant() -ne $targetTenant) {
-                    throw 'Full-association verification returned an unexpected target tenant.'
+                    throw 'Association verification returned an unexpected target tenant.'
                 }
-                $message = 'DeviceLink full association succeeded and the final Function-backed cloud state was verified as Associated.'
+                $message = 'DeviceLink association succeeded and the final Function-backed cloud state was verified as Associated.'
             }
-            elseif (-not $fullAssociationResult) {
-                $fullAssociationResult = 'WouldComplete'
-                $message = 'The DeviceLink is preassociated; full association would be performed.'
+            elseif (-not $associationResult) {
+                $associationResult = 'WouldComplete'
+                $message = 'The DeviceLink is preassociated; association would be performed.'
             }
         }
-        elseif ($FullAssociation -and $afterHealth.State -eq 'Associated') {
-            $fullAssociationResult = 'AlreadyAssociated'
-            $message = 'The DeviceLink is already fully associated in the requested target tenant. No full-association change was required.'
+        elseif ($Associate -and $afterHealth.State -eq 'Associated') {
+            $associationResult = 'AlreadyAssociated'
+            $message = 'The DeviceLink is already associated in the requested target tenant. No association change was required.'
         }
 
         return [pscustomobject]@{
             PSTypeName='Windows.DeviceLink.InitializationResult'
             Action=$action
             Changed=$changed
-            FullAssociationRequested=[bool]$FullAssociation
-            FullAssociationResult=$fullAssociationResult
-            FullAssociationDetails=$completion
+            AssociationRequested=[bool]$Associate
+            AssociationResult=$associationResult
+            AssociationDetails=$completion
             BeforeState=$beforeHealth.State
             AfterState=$afterHealth.State
             Severity=$afterHealth.Severity
@@ -244,7 +245,7 @@ function Initialize-WindowsDeviceLink {
         $changed = $false
         $registration = $null
         $completion = $null
-        $fullAssociationResult = $null
+        $associationResult = $null
         $afterStatus = $beforeStatus
         $afterHealth = $beforeHealth
         $message = $beforeHealth.Summary
@@ -286,7 +287,7 @@ function Initialize-WindowsDeviceLink {
             }
         }
 
-        if ($FullAssociation -and $afterHealth.State -eq 'Preassociated') {
+        if ($Associate -and $afterHealth.State -eq 'Preassociated') {
             $target = if ($afterStatus.SerialNumber) { $afterStatus.SerialNumber } else { 'DeviceLink' }
             if ($PSCmdlet.ShouldProcess($target, 'Complete the tenant DeviceLink association on this device')) {
                 $completeParameters = @{ TimeoutSeconds = $TimeoutSeconds; Confirm = $false }
@@ -294,7 +295,7 @@ function Initialize-WindowsDeviceLink {
                     $completeParameters.WindowsManagementServicePath = $WindowsManagementServicePath
                 }
                 $completion = Complete-WindowsDeviceLinkAssociation @completeParameters
-                $fullAssociationResult = [string]$completion.Result
+                $associationResult = [string]$completion.Result
                 if ($completion.Changed) { $changed = $true }
 
                 $afterStatus = Get-WindowsDeviceLinkStatus @statusParameters
@@ -302,20 +303,20 @@ function Initialize-WindowsDeviceLink {
                 if ($afterHealth.State -ne 'Associated') {
                     throw "DeviceLink completion returned, but verification did not reach Associated. Verified state: $($afterHealth.State)."
                 }
-                $message = 'DeviceLink full association succeeded and the final state was verified as Associated.'
+                $message = 'DeviceLink association succeeded and the final state was verified as Associated.'
             }
             else {
-                $fullAssociationResult = 'WouldComplete'
-                $message = 'The DeviceLink is preassociated; device-side full association would be performed.'
+                $associationResult = 'WouldComplete'
+                $message = 'The DeviceLink is preassociated; device-side association would be performed.'
             }
         }
-        elseif ($FullAssociation -and $afterHealth.State -eq 'Associated') {
+        elseif ($Associate -and $afterHealth.State -eq 'Associated') {
             if ($completion) {
-                $fullAssociationResult = [string]$completion.Result
-                $message = 'DeviceLink full association succeeded and the final state was verified as Associated.'
+                $associationResult = [string]$completion.Result
+                $message = 'DeviceLink association succeeded and the final state was verified as Associated.'
             }
             else {
-                $fullAssociationResult = 'AlreadyAssociated'
+                $associationResult = 'AlreadyAssociated'
                 $message = 'The DeviceLink is already associated. No completion change was required.'
             }
         }
@@ -324,9 +325,9 @@ function Initialize-WindowsDeviceLink {
             PSTypeName='Windows.DeviceLink.InitializationResult'
             Action=$action
             Changed=$changed
-            FullAssociationRequested=[bool]$FullAssociation
-            FullAssociationResult=$fullAssociationResult
-            FullAssociationDetails=$completion
+            AssociationRequested=[bool]$Associate
+            AssociationResult=$associationResult
+            AssociationDetails=$completion
             BeforeState=$beforeHealth.State
             AfterState=$afterHealth.State
             Severity=$afterHealth.Severity

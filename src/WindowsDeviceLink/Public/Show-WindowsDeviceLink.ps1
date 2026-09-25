@@ -607,7 +607,7 @@ function Show-WindowsDeviceLink {
     $assignmentRow.Controls.Add($assignmentTitle)
 
     $assignmentDescription = New-Object System.Windows.Forms.Label
-    $assignmentDescription.Text = 'Select the destination and choose pre-registration or full registration.'
+    $assignmentDescription.Text = 'Select the destination and choose Pre-register or Associate.'
     $assignmentDescription.Font = New-GuiFont -Size 8.2 -Style Regular
     $assignmentDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
     $assignmentDescription.Location = [System.Drawing.Point]::new(14,23)
@@ -636,10 +636,10 @@ function Show-WindowsDeviceLink {
     $tenantSelector.Visible = $showTenantSelector
     if (-not $showTenantSelector) {
         $assignmentDescription.Text = if ($outerBoundParameters.ContainsKey('TenantId')) {
-            'The destination tenant is fixed by the supplied tenant ID. Choose pre-registration or full registration.'
+            'The destination tenant is fixed by the supplied tenant ID. Choose Pre-register or Associate.'
         }
         else {
-            'The destination tenant is determined by sign-in. Choose pre-registration or full registration.'
+            'The destination tenant is determined by sign-in. Choose Pre-register or Associate.'
         }
     }
     $assignmentRow.Controls.Add($tenantSelector)
@@ -653,23 +653,23 @@ function Show-WindowsDeviceLink {
     $btnAssign.UseVisualStyleBackColor = $true
     $assignmentRow.Controls.Add($btnAssign)
 
-    # Host the full-registration button in an enabled panel. WinForms does not
+    # Host the Associate button in an enabled panel. WinForms does not
     # display ToolTips for disabled controls, while the host can still receive
-    # hover messages when Full register is capability-disabled in Windows PE.
-    $btnFullAssociateHost = New-Object System.Windows.Forms.Panel
-    $btnFullAssociateHost.Size = [System.Drawing.Size]::new(96,28)
-    $btnFullAssociateHost.Location = [System.Drawing.Point]::new(918,9)
-    $btnFullAssociateHost.BackColor = [System.Drawing.Color]::Transparent
-    $assignmentRow.Controls.Add($btnFullAssociateHost)
+    # hover messages when Associate is capability-disabled in Windows PE.
+    $btnAssociateHost = New-Object System.Windows.Forms.Panel
+    $btnAssociateHost.Size = [System.Drawing.Size]::new(96,28)
+    $btnAssociateHost.Location = [System.Drawing.Point]::new(918,9)
+    $btnAssociateHost.BackColor = [System.Drawing.Color]::Transparent
+    $assignmentRow.Controls.Add($btnAssociateHost)
 
-    $btnFullAssociate = New-Object System.Windows.Forms.Button
-    $btnFullAssociate.Text = 'Full register'
-    $btnFullAssociate.Font = New-GuiFont -Size 8.6 -Style Regular
-    $btnFullAssociate.Size = [System.Drawing.Size]::new(96,28)
-    $btnFullAssociate.Location = [System.Drawing.Point]::new(0,0)
-    $btnFullAssociate.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
-    $btnFullAssociate.UseVisualStyleBackColor = $true
-    $btnFullAssociateHost.Controls.Add($btnFullAssociate)
+    $btnAssociate = New-Object System.Windows.Forms.Button
+    $btnAssociate.Text = 'Associate'
+    $btnAssociate.Font = New-GuiFont -Size 8.6 -Style Regular
+    $btnAssociate.Size = [System.Drawing.Size]::new(96,28)
+    $btnAssociate.Location = [System.Drawing.Point]::new(0,0)
+    $btnAssociate.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+    $btnAssociate.UseVisualStyleBackColor = $true
+    $btnAssociateHost.Controls.Add($btnAssociate)
 
     $assignmentSeparator = New-Object System.Windows.Forms.Panel
     $assignmentSeparator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
@@ -722,7 +722,7 @@ function Show-WindowsDeviceLink {
         $btnRefresh,
         $btnOnline,
         $btnExport,
-        $btnFullAssociate,
+        $btnAssociate,
         $btnCloudOffboard,
         $btnLocalOffboard,
         $btnFullOffboard
@@ -828,7 +828,7 @@ function Show-WindowsDeviceLink {
                 'RegistrationResult',
                 'BeforeStatus',
                 'AfterStatus',
-                'FullAssociationDetails'
+                'AssociationDetails'
             )
 
             foreach ($property in $properties) {
@@ -941,7 +941,7 @@ function Show-WindowsDeviceLink {
         $cloud = $script:WdlGuiCloudStatus
 
         $runtimeReady = $support -and [bool]$support.Supported
-        $canFullAssociation = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'
+        $canAssociate = $runtimeReady -and [string]$support.Environment -ne 'WindowsPE'
 
         $cloudState = if ($cloud) { ([string]$cloud.AssociationState).Trim().ToLowerInvariant() } else { '' }
         $cloudKnownAbsent = $cloud -and (
@@ -950,13 +950,13 @@ function Show-WindowsDeviceLink {
         )
         $cloudPresent = $cloud -and $cloud.AssociationPresent -eq $true
         $localStatePresent = $local -and ([string]$local.FirmwareState -in @('2/4','4/4'))
-        $localFullyAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
-        $offboardingStatePresent = $cloudPresent -or $localFullyAssociated
+        $localAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
+        $offboardingStatePresent = $cloudPresent -or $localAssociated
         $selectedTenantId = Get-SelectedTenantId
         $selectedMatchesCloud = $cloudPresent -and -not [string]::IsNullOrWhiteSpace($selectedTenantId) -and
             [string]$cloud.TenantId -ieq $selectedTenantId
         $alreadyRegisteredInTarget = $selectedMatchesCloud -and $cloudState -in @('associated','preassociated')
-        $alreadyFullyAssociatedInTarget = $localFullyAssociated -and $selectedMatchesCloud -and $cloudState -eq 'associated'
+        $alreadyAssociatedInTarget = $localAssociated -and $selectedMatchesCloud -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
         $directTenantReady = -not $hasDirectTenantCatalog -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
@@ -965,7 +965,7 @@ function Show-WindowsDeviceLink {
         $btnExport.Enabled = $runtimeReady
         $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
         $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister -and -not $alreadyRegisteredInTarget
-        $btnFullAssociate.Enabled = $canFullAssociation -and $targetReadyToRegister -and -not $alreadyFullyAssociatedInTarget
+        $btnAssociate.Enabled = $canAssociate -and $targetReadyToRegister -and -not $alreadyAssociatedInTarget
         $btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent -and ($backendMode -or $directTenantReady)
         $btnLocalOffboard.Enabled = $runtimeReady -and $localStatePresent -and $cloudKnownAbsent
         $btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent -and ($backendMode -or $directTenantReady)
@@ -982,19 +982,19 @@ function Show-WindowsDeviceLink {
         }
         $toolTip.SetToolTip($btnLocalOffboard, $localResetToolTip)
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and local DeviceLink firmware state.')
-        $toolTip.SetToolTip($btnFullAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
+        $toolTip.SetToolTip($btnAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
         $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
         if ($hasDirectTenantCatalog -and -not $directTenantReady) {
             $toolTip.SetToolTip($btnSignIn, 'Select a target tenant first. Sign-in will be scoped to that tenant.')
             $toolTip.SetToolTip($btnAssign, 'Select a target tenant first. Direct mode applies New or no-op only in that selected tenant.')
-            $toolTip.SetToolTip($btnFullAssociate, 'Select a target tenant first, then sign in to perform full registration.')
+            $toolTip.SetToolTip($btnAssociate, 'Select a target tenant first, then sign in to associate the device.')
         }
         elseif (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when no catalog is configured.') }
         elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
 
-        if ($alreadyFullyAssociatedInTarget) {
-            $toolTip.SetToolTip($btnFullAssociate, 'The device is already fully registered.')
+        if ($alreadyAssociatedInTarget) {
+            $toolTip.SetToolTip($btnAssociate, 'The device is already associated.')
         }
         if ($alreadyRegisteredInTarget) {
             $toolTip.SetToolTip($btnAssign, 'The device is already registered in the selected tenant. Select another tenant to move it.')
@@ -1005,9 +1005,9 @@ function Show-WindowsDeviceLink {
         }
 
         if ($support -and [string]$support.Environment -eq 'WindowsPE') {
-            $winPeFullRegistrationToolTip = 'Full registration is not available in Windows PE. Pre-register the device now; full registration is completed automatically during Windows OOBE.'
-            $toolTip.SetToolTip($btnFullAssociate,$winPeFullRegistrationToolTip)
-            $toolTip.SetToolTip($btnFullAssociateHost,$winPeFullRegistrationToolTip)
+            $winPeAssociationToolTip = 'Association is not available in Windows PE. Pre-register the device now; association is completed automatically during Windows OOBE.'
+            $toolTip.SetToolTip($btnAssociate,$winPeAssociationToolTip)
+            $toolTip.SetToolTip($btnAssociateHost,$winPeAssociationToolTip)
             $onlineToolTip = if ($backendMode) {
                 'Windows PE online operations are performed through the configured Function backend.'
             }
@@ -1025,7 +1025,7 @@ function Show-WindowsDeviceLink {
                 [string]$support.Reason
             }
 
-            foreach ($button in @($btnAssign,$btnFullAssociate,$btnOnline,$btnExport,$btnFullOffboard)) {
+            foreach ($button in @($btnAssign,$btnAssociate,$btnOnline,$btnExport,$btnFullOffboard)) {
                 $toolTip.SetToolTip($button,$runtimeReason)
             }
         }
@@ -1154,7 +1154,7 @@ function Show-WindowsDeviceLink {
         $ui.Firmware.Text = [string]$local.FirmwareState
 
         $friendlyLocalState = switch ([string]$local.LocalAssociationState) {
-            'CompleteAssociationFirmwareState' { 'Full association' }
+            'CompleteAssociationFirmwareState' { 'Associated' }
             'BaseIdentity' { 'Base identity' }
             'NoFirmwareState' { 'No firmware state' }
             'IncompleteFirmwareState' { 'Incomplete firmware state' }
@@ -1479,11 +1479,11 @@ function Show-WindowsDeviceLink {
         }
     }
 
-    function Invoke-GuiFullAssociate {
+    function Invoke-GuiAssociate {
         if ($script:WdlGuiBusy) { return }
 
         if ($isWinPE) {
-            Show-GuiError 'Full registration is not available in Windows PE. Pre-register the device now; full registration is completed automatically during Windows OOBE.'
+            Show-GuiError 'Association is not available in Windows PE. Pre-register the device now; association is completed automatically during Windows OOBE.'
             return
         }
 
@@ -1493,7 +1493,7 @@ function Show-WindowsDeviceLink {
             return
         }
 
-        Set-GuiBusy -Busy $true -StatusText 'Performing full registration...'
+        Set-GuiBusy -Busy $true -StatusText 'Associating device...'
         try {
             if ($backendMode) {
                 $assignmentParameters = Get-GuiBackendParameters
@@ -1527,10 +1527,10 @@ function Show-WindowsDeviceLink {
                 $parameters = Get-GuiAuthParameters
                 $runtimeParameters = Get-GuiOperationParameters
                 foreach ($key in $runtimeParameters.Keys) { $parameters[$key] = $runtimeParameters[$key] }
-                $parameters.FullAssociation = $true
+                $parameters.Associate = $true
                 $parameters.Confirm = $false
 
-                Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method -FullAssociation" -Command
+                Write-GuiConsole -Message "Initialize-WindowsDeviceLink -Method $Method -Associate" -Command
                 $resultObjects = New-Object System.Collections.Generic.List[object]
                 & {
                     Initialize-WindowsDeviceLink @parameters
@@ -1551,10 +1551,10 @@ function Show-WindowsDeviceLink {
             Refresh-LocalView
             $verifiedCloud = Refresh-CloudView -WriteCommand
             Write-GuiObject $verifiedCloud
-            Set-GuiStatus 'Full registration completed and verified'
+            Set-GuiStatus 'Association completed and verified'
         }
         catch {
-            Set-GuiStatus 'Full registration failed or requires verification'
+            Set-GuiStatus 'Association failed or requires verification'
             Show-GuiError $_.Exception.Message
         }
         finally { Set-GuiBusy -Busy $false }
@@ -1811,7 +1811,7 @@ function Show-WindowsDeviceLink {
     $btnAssign.Add_Click({ Invoke-GuiTenantAssignment })
     $btnOnline.Add_Click({ Invoke-GuiOnline })
     $btnExport.Add_Click({ Invoke-GuiExport })
-    $btnFullAssociate.Add_Click({ Invoke-GuiFullAssociate })
+    $btnAssociate.Add_Click({ Invoke-GuiAssociate })
     $btnCloudOffboard.Add_Click({ Invoke-GuiCloudOffboard })
     $btnLocalOffboard.Add_Click({ Invoke-GuiLocalOffboard })
     $btnFullOffboard.Add_Click({ Invoke-GuiFullOffboard })
@@ -1910,8 +1910,8 @@ function Show-WindowsDeviceLink {
         $actionsPanel.Width = $fullWidth
 
         $assignmentRow.Width = $fullWidth
-        $btnFullAssociateHost.Left = $fullWidth - 16 - $btnFullAssociateHost.Width
-        $btnAssign.Left = $btnFullAssociateHost.Left - 8 - $btnAssign.Width
+        $btnAssociateHost.Left = $fullWidth - 16 - $btnAssociateHost.Width
+        $btnAssign.Left = $btnAssociateHost.Left - 8 - $btnAssign.Width
         if ($showTenantSelector) {
             $tenantSelector.Left = $btnAssign.Left - 8 - $tenantSelector.Width
             $tenantCaption.Left = $tenantSelector.Left - 88

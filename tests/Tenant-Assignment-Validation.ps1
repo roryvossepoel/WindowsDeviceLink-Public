@@ -132,7 +132,7 @@ Reset-Scenario stale-new
 $result = Set-WindowsDeviceLinkTenant @common -TargetTenantId $tenantB
 $state = Read-State
 Assert-True ($result.Decision -eq 'New' -and $state.Reset -and $result.PreviousLinkId -ne $result.NewLinkId -and $state.Count -eq 1) 'New with stale 4/4 local affinity must renew identity before registration.'
-Write-Host 'PASS: New renews stale fully-associated local identity'
+Write-Host 'PASS: New renews stale associated local identity'
 
 Reset-Scenario same
 $result = Set-WindowsDeviceLinkTenant @common -TargetTenantName 'tenant b'

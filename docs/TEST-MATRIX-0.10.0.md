@@ -161,8 +161,8 @@ Azure-hosted Windows environment with an assigned identity.
 Capture screenshots only after the final release UI has passed the matrix.
 
 - [ ] initial and loading state;
-- [ ] Windows 11 full association;
-- [ ] Windows PE pre-association with **Full register** unavailable;
+- [ ] Windows 11 association;
+- [ ] Windows PE pre-association with **Associate** unavailable;
 - [ ] generic tenant selection and registration actions;
 - [ ] offboarding actions in a representative state;
 - [ ] successful CSV export;

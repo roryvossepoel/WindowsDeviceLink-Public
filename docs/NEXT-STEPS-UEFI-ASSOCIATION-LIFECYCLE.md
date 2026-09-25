@@ -37,9 +37,9 @@ Never log or publish raw `DeviceLinkJwtCompressed` content.
 Validated on physical Windows 11 hardware:
 
 - clean baseline: all four variables absent;
-- fully associated device: all four variables present;
+- associated device: all four variables present;
 - deleting the server-side Device Association record does not clear local firmware state;
-- deleting only `DeviceLinkId` is insufficient on a fully associated device;
+- deleting only `DeviceLinkId` is insufficient on an associated device;
 - deleting all four known variables succeeds;
 - immediate readback confirms all four are absent with Win32 error `203` (`ERROR_ENVVAR_NOT_FOUND`).
 

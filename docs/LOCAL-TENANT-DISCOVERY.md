@@ -55,7 +55,7 @@ Historical entries are not treated as active tenant state.
 
 ### Association JWT
 
-After full Device Association completion, the UEFI variable:
+After Device Association completion, the UEFI variable:
 
 ```text
 DeviceLinkJwtCompressed

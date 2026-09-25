@@ -56,7 +56,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Native-Manager-Contract-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
-      - name: Validate initializer full-association opt-in contract
+      - name: Validate initializer association opt-in contract
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'

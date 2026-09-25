@@ -119,7 +119,7 @@ Remove-WindowsDeviceLinkAssociation `
 
 for the server-side Intune/Graph record.
 
-For a fully associated device, a complete decommissioning or tenant-move workflow can require both:
+For an associated device, a complete decommissioning or tenant-move workflow can require both:
 
 1. remove the server-side Device Association record;
 2. reset the local DeviceLink firmware state.
@@ -214,9 +214,9 @@ native completion
 
 Creating the server-side preassociation did not add the JWT variables. Local state remained the DeviceLink identity state above.
 
-### Fully associated device
+### Associated device
 
-A fully associated device contained all four variables:
+An associated device contained all four variables:
 
 ```text
 DeviceLinkId
@@ -248,7 +248,7 @@ Controlled testing established the reset behavior more precisely:
 
 This demonstrates that reset removes the old local DeviceLink identity. A reboot alone does not necessarily recreate the base identity. A later DeviceLink identity retrieval can materialize a **new** base identity. The presence of `DeviceLinkId` and `DeviceLinkCreationTimeUtc` alone must not be interpreted as restoration of the old identity or proof of an active tenant association.
 
-In the validated fully associated state, the two JWT-related variables were also present. Their exact semantics should not be inferred beyond the observed lifecycle behavior without additional Microsoft documentation or testing.
+In the validated associated state, the two JWT-related variables were also present. Their exact semantics should not be inferred beyond the observed lifecycle behavior without additional Microsoft documentation or testing.
 
 ## Windows PE
 

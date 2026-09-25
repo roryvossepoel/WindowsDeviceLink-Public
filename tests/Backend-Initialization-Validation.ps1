@@ -16,7 +16,7 @@ Import-Module (Resolve-Path -LiteralPath $ModulePath).Path -Force -ErrorAction S
 $command = Get-Command Initialize-WindowsDeviceLink -Module WindowsDeviceLink -ErrorAction Stop
 $source = $command.ScriptBlock.ToString()
 
-foreach ($name in @('BackendUri','BackendApiKey','TargetTenantId','FullAssociation')) {
+foreach ($name in @('BackendUri','BackendApiKey','TargetTenantId','Associate')) {
     Assert-True ($command.Parameters.ContainsKey($name)) "Initialize-WindowsDeviceLink is missing -$name."
 }
 

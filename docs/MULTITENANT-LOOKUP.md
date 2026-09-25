@@ -14,7 +14,7 @@ Get-WindowsDeviceLinkLocalAssociation
 This command is cloud-independent and can identify the source tenant from local DeviceLink metadata:
 
 - after successful native discovery, the exact current-LinkId registry value `<LinkId>_TenantIdHint`;
-- after full association, the `tenantId` claim in `DeviceLinkJwtCompressed`;
+- after association, the `tenantId` claim in `DeviceLinkJwtCompressed`;
 - when both are present, WindowsDeviceLink correlates them and fails closed if they disagree.
 
 Recommended decision path:
