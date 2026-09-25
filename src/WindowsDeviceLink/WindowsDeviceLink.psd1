@@ -1,6 +1,6 @@
 @{
     RootModule        = 'WindowsDeviceLink.psm1'
-    ModuleVersion     = '0.10.0'
+    ModuleVersion     = '0.10.1'
     GUID              = '776a2252-d4f4-495d-9445-ac3195ebbf46'
     Author            = 'Rory Vossepoel'
     CompanyName       = 'Community'

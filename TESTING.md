@@ -199,7 +199,7 @@ Validated on physical AMD64 Windows PE:
 
 The default Direct-mode authentication in Windows PE is `DeviceCode`, not
 `Interactive`. Broader Direct-mode GUI authentication testing is tracked separately
-from the focused `0.10.0-preview1` release gate.
+from the focused `0.10.1-preview1` release gate.
 
 The GUI must remain usable when the DeviceLink runtime is unavailable: runtime-dependent actions are disabled and the blocking reason is surfaced through Activity/tooltips rather than terminating the dashboard.
 
@@ -348,7 +348,7 @@ See [`docs/WEBHOOK-SCHEMA-v1.md`](docs/WEBHOOK-SCHEMA-v1.md).
 
 ## Published preview
 
-The repository validation described above covers the `0.10.0-preview1` candidate,
+The repository validation described above covers the `0.10.1-preview1` candidate,
 including the operator GUI on physical AMD64 Windows 11 and AMD64 Windows PE hardware.
 The GUI lifecycle tests cover pre-association, association, idempotency,
 cloud/local/full offboarding, stale local/cloud combinations, tenant-source correlation,
@@ -361,7 +361,7 @@ preview backend delivery route; the Bicep/ARM Deploy to Azure path remains exper
 - Trusted code signing; the initial SignPath Foundation application was reviewed but not approved because the project does not yet have enough external adoption/visibility signals. Revisit SignPath or another trusted signing path later.
 - Retest normal WinPE `Install-Module` without `-SkipPublisherCheck` after signing.
 - Retest and optimize the beta Device Association serial-number server-side lookup; the current client-side fallback is functionally correct.
-- Complete the Direct-mode `0.10.0-preview1` smoke-test matrix without the Function App,
+- Complete the Direct-mode `0.10.1-preview1` smoke-test matrix without the Function App,
   including implicit sign-in tenant, explicit tenant selection, local/HTTPS JSON catalog,
   New and target-present no-op behavior in Windows 11 and AMD64 Windows PE.
 - Harden and validate the experimental Bicep/ARM Deploy to Azure route tracked in issue #43.
