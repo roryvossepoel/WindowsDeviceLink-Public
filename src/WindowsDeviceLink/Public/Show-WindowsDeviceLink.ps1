@@ -439,12 +439,17 @@ function Show-WindowsDeviceLink {
 
                 $script:WdlGuiSessionAccessToken = ConvertTo-SecureString ([string]$token.AccessToken) -AsPlainText -Force
                 $script:WdlGuiSessionTenantId = [string]$token.TenantId
+                if ($selectedTenant -and (
+                    [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionTenantId) -or
+                    [string]$script:WdlGuiSessionTenantId -ine [string]$selectedTenant)) {
+                    throw 'The authenticated tenant does not match the selected target tenant.'
+                }
                 $expiresIn = if ($token.ExpiresIn) { [int]$token.ExpiresIn } else { 3600 }
                 $script:WdlGuiSessionExpiresUtc = [DateTime]::UtcNow.AddSeconds([Math]::Max(60,$expiresIn - 120))
                 $script:WdlGuiSessionAuthenticated = $true
                 $token = $null
                 $ui.Authentication.Text = "$Method - Signed in"
-                if ($btnSignIn) { $btnSignIn.Text = 'Change account' }
+                if ($btnSignIn) { $btnSignIn.Text = 'Sign out' }
                 Update-GuiTargetTenantDisplay
                 Write-GuiConsole -Message 'Direct-mode session authenticated; the in-memory token will be reused for cloud actions.'
             }
@@ -481,6 +486,10 @@ function Show-WindowsDeviceLink {
     }
 
     function Clear-GuiSessionAuthentication {
+        $disconnectGraphSession = $Method -eq 'Interactive' -and $script:WdlGuiSessionAuthenticated
+        if ($disconnectGraphSession -and (Get-Command Disconnect-MgGraph -ErrorAction SilentlyContinue)) {
+            try { Disconnect-MgGraph -ErrorAction Stop | Out-Null } catch {}
+        }
         if ($script:WdlGuiSessionAccessToken -is [System.IDisposable]) {
             try { $script:WdlGuiSessionAccessToken.Dispose() } catch {}
         }
@@ -1047,7 +1056,8 @@ function Show-WindowsDeviceLink {
         else {
             $tenantSelectionReady
         }
-        $btnSignIn.Enabled = $usesInteractiveUserAuthentication -and $tenantSelectionReady
+        $btnSignIn.Enabled = $usesInteractiveUserAuthentication -and
+            ($script:WdlGuiSessionAuthenticated -or $tenantSelectionReady)
         $btnOnline.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
         $btnExport.Enabled = $runtimeReady
         $targetReadyForAssociation = if ($backendMode) {
@@ -1082,7 +1092,13 @@ function Show-WindowsDeviceLink {
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and local DeviceLink firmware state.')
         $toolTip.SetToolTip($btnAssociate, 'Pre-associate the device with the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-associate the device with the selected target tenant. Backend mode safely applies New, no-op, or Move.')
-        $toolTip.SetToolTip($btnSignIn, 'Sign in once to establish the target tenant and load the cloud association.')
+        $signInToolTip = if ($script:WdlGuiSessionAuthenticated) {
+            'Sign out and clear the in-memory tenant authentication context.'
+        }
+        else {
+            'Sign in once to establish the target tenant and load the cloud association.'
+        }
+        $toolTip.SetToolTip($btnSignIn, $signInToolTip)
         if ($hasDirectTenantCatalog -and -not $tenantSelectionReady) {
             $toolTip.SetToolTip($btnSignIn, 'Select a target tenant first. Sign-in will be scoped to that tenant.')
             $toolTip.SetToolTip($btnAssign, 'Select a target tenant first. Direct mode applies New or no-op only in that selected tenant.')
@@ -1153,7 +1169,8 @@ function Show-WindowsDeviceLink {
         }
         else {
             $actionsPanel.Enabled = $true
-            $tenantSelector.Enabled = $showTenantSelector
+            $tenantSelector.Enabled = $showTenantSelector -and
+                -not ($usesInteractiveUserAuthentication -and $script:WdlGuiSessionAuthenticated)
             Set-GuiCapabilities
         }
 
@@ -1342,12 +1359,27 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiCloudStatus = $cloud
 
         if ($usesInteractiveUserAuthentication) {
+            $authenticatedTenantId = if ($Method -eq 'Interactive' -and (Get-Command Get-MgContext -ErrorAction SilentlyContinue)) {
+                [string](Get-MgContext).TenantId
+            }
+            elseif ($cloud.TenantId) {
+                [string]$cloud.TenantId
+            }
+            else {
+                [string]$script:WdlGuiSessionTenantId
+            }
+            $selectedTenantId = Get-SelectedTenantId
             $script:WdlGuiSessionAuthenticated = $true
-            if ($cloud.TenantId) {
-                $script:WdlGuiSessionTenantId = [string]$cloud.TenantId
+            if ($selectedTenantId -and (
+                [string]::IsNullOrWhiteSpace($authenticatedTenantId) -or
+                $authenticatedTenantId -ine [string]$selectedTenantId)) {
+                throw 'The authenticated tenant does not match the selected target tenant.'
+            }
+            if (-not [string]::IsNullOrWhiteSpace($authenticatedTenantId)) {
+                $script:WdlGuiSessionTenantId = $authenticatedTenantId
             }
             $ui.Authentication.Text = "$Method - Signed in"
-            $btnSignIn.Text = 'Change account'
+            $btnSignIn.Text = 'Sign out'
             Update-GuiTargetTenantDisplay
         }
 
@@ -1394,6 +1426,14 @@ function Show-WindowsDeviceLink {
 
     function Invoke-GuiSignIn {
         if ($script:WdlGuiBusy -or $backendMode) { return }
+
+        if ($script:WdlGuiSessionAuthenticated) {
+            Clear-GuiSessionAuthentication
+            Set-GuiCapabilities
+            Set-GuiStatus 'Signed out'
+            Write-GuiConsole -Message 'Direct-mode session signed out; the in-memory authentication context was cleared.'
+            return
+        }
 
         Clear-GuiSessionAuthentication
         Set-GuiBusy -Busy $true -StatusText 'Signing in...'

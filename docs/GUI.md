@@ -55,7 +55,10 @@ when required, cleared when the selected tenant changes, and discarded when the 
 closes. Backend mode continues to load cloud state automatically because it does not
 require an interactive Graph sign-in on the device.
 
-After a successful Direct-mode sign-in, **Sign in** changes to **Change account**.
+After a successful Direct-mode sign-in, **Sign in** changes to **Sign out**. Signing
+out clears the in-memory authentication context and unlocks a configured tenant
+selector. While signed in, that selector remains locked so a token cannot be reused
+silently for another target tenant.
 Single-tenant Direct mode deliberately has no tenant selector: the authenticated tenant
 is authoritative unless `-TenantId` fixed it explicitly. When a local tenant catalog is
 configured, selecting a target tenant is mandatory before sign-in or any cloud action;
@@ -246,7 +249,7 @@ The DLL must come from an administrator-controlled compatible Windows source. Se
 - **Pre-associate** — ensure the device is pre-associated with the selected target. In Backend mode this can perform a verified New, no-op, Move, or same-tenant Repair as required.
 - **Associate** — first ensure the selected tenant assignment, then explicitly complete and verify the device-side association on supported full Windows. This action is disabled in WinPE.
 - **Sign in** — establish the target tenant for the current Direct-mode UI session and immediately load the cloud association.
-- **Change account** — discard the current Direct-mode GUI session and authenticate again; with a tenant catalog, the new session is created for the selected tenant.
+- **Sign out** — clear the current Direct-mode authentication context; with a tenant catalog, this also unlocks target selection for the next sign-in.
 - **Refresh local** — refresh local DeviceLink identity and firmware information.
 - **Refresh cloud** — refresh tenant-side Device Association state using the selected tenant context.
 - **Export CSV** — export the Microsoft-generated DeviceLink CSV.
