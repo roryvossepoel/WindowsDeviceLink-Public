@@ -49,8 +49,8 @@ an authentication and deployment model. Backend is recommended for structural
 multitenant use.
 
 The GUI uses one operator view: Device, Connection, Local association, and Cloud
-association are shown together. Select a target tenant and choose **Pre-register** or, on supported full Windows, **Associate**. In Backend mode
-that one action performs the complete lookup, decision, identity renewal, registration,
+association are shown together. Select a target tenant and choose **Pre-associate** or, on supported full Windows, **Associate**. In Backend mode
+that one action performs the complete lookup, decision, identity renewal, pre-association,
 and verification workflow. Diagnostic, export, recovery, and offboarding actions remain
 available below the primary assignment action.
 
@@ -161,7 +161,7 @@ flowchart LR
     C["Associated<br/>Tenant affinity stored in UEFI"]
     D["Offboarded<br/>Association removed"]
 
-    A -->|"Register"| B
+    A -->|"Pre-associate"| B
     B -->|"Association"| C
     B -->|"Remove cloud record"| D
     C -->|"Offboard"| D
@@ -304,7 +304,7 @@ Initialize-WindowsDeviceLink `
 Expected lifecycle:
 
 ```text
-LocalOnly -> Register -> Preassociated -> Complete -> Associated
+LocalOnly -> Pre-associate -> Preassociated -> Complete -> Associated
 ```
 
 For removal, firmware reset, tenant moves, discovery troubleshooting and detailed state transitions, use the [FAQ](docs/FAQ.md) and dedicated documentation instead of treating the README as the operational manual.

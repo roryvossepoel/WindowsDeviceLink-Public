@@ -19,7 +19,7 @@ The GUI provides:
 - optional tenant-side cloud state;
 - tenant selection by friendly name when `-Tenants` is supplied;
 - CSV export;
-- pre-registration and association;
+- pre-association and association;
 - cloud-only, local-only and full DeviceLink offboarding;
 - live activity output.
 
@@ -86,7 +86,7 @@ Show-WindowsDeviceLink `
 
 On Windows 11, `Interactive` is the default GUI authentication method. In Windows PE, the GUI defaults to `DeviceCode` because interactive browser authentication is unavailable.
 
-Windows PE supports local inspection, online lookup, CSV export, pre-registration and offboarding actions when their prerequisites are available. **Associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-register the device and let Windows complete Device Association during OOBE.
+Windows PE supports local inspection, online lookup, CSV export, pre-association and offboarding actions when their prerequisites are available. **Associate** remains disabled because native DeviceLink completion is not currently supported in Windows PE; pre-associate the device and let Windows complete Device Association during OOBE.
 
 For the complete GUI parameter reference, tenant JSON examples and Windows 11 / Windows PE comparison, see [GUI.md](GUI.md).
 

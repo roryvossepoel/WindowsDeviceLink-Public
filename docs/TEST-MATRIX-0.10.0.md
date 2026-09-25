@@ -105,7 +105,7 @@ returned object as well as the console presentation.
 | Azure host | Direct | ManagedIdentity | Automation | identity selection, lookup and permitted mutation without prompts | Not yet scheduled |
 | Windows PE AMD64 | Backend | Function API key | Operator | runtime, public catalog and assignment commands; status/offboarding remain GUI-backed in 0.10.0 | Pending |
 | Windows PE AMD64 | Backend | Function API key | Automation | unattended catalog/assignment, no-op, time-out and retry behavior | Pending |
-| Windows PE AMD64 | Direct | DeviceCode | Operator | sign-in, status and pre-registration using BYO-DLL | Pending |
+| Windows PE AMD64 | Direct | DeviceCode | Operator | sign-in, status and pre-association using BYO-DLL | Pending |
 
 For `Certificate`, `CertificateThumbprint`, and `CertificateSubjectName`, automated
 tests must validate each parameter set. At least one certificate-based route must be
@@ -150,8 +150,8 @@ behavior where supported.
 | Windows 11 | Direct | CertificateThumbprint | automatic app-only session and action lifecycle | Pending |
 | Windows 11 | Direct | AccessToken | cloud refresh and at least one verified mutation | Pending |
 | Windows 11 | Direct | EnvironmentVariable | automatic app-only session without prompts | Pending |
-| Windows PE AMD64 | Backend | Function API key | automatic load, pre-registration and move | Complete; repeat for release build |
-| Windows PE AMD64 | Direct | DeviceCode | sign in, status and pre-registration using BYO-DLL | Pending |
+| Windows PE AMD64 | Backend | Function API key | automatic load, pre-association and move | Complete; repeat for release build |
+| Windows PE AMD64 | Direct | DeviceCode | sign in, status and pre-association using BYO-DLL | Pending |
 
 Managed identity is not considered live GUI-validated unless the GUI is run on an
 Azure-hosted Windows environment with an assigned identity.
@@ -163,7 +163,7 @@ Capture screenshots only after the final release UI has passed the matrix.
 - [ ] initial and loading state;
 - [ ] Windows 11 association;
 - [ ] Windows PE pre-association with **Associate** unavailable;
-- [ ] generic tenant selection and registration actions;
+- [ ] generic tenant selection and association actions;
 - [ ] offboarding actions in a representative state;
 - [ ] successful CSV export;
 - [ ] optional successful repair or move result.

@@ -189,7 +189,7 @@ Validated on physical AMD64 Windows PE:
 - explicit administrator-supplied `Windows.Management.Service.dll` activation;
 - local refresh and backend Device Association lookup;
 - DeviceLink CSV export;
-- backend pre-registration and verified tenant reassignment;
+- backend pre-association and verified tenant reassignment;
 - **Associate** visible but disabled because device-side completion belongs to
   full Windows/OOBE;
 - cloud-only offboarding;

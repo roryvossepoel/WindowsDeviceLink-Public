@@ -125,7 +125,7 @@ performs a complete lookup first and chooses New, no-op, or Move. A Move renews 
 local DeviceLink identity before the backend removes the proven source record and
 creates the target record. Mutations are not blindly retried.
 
-The same assignment flow is exposed by **Pre-register** and forms the first phase of **Associate** in `Show-WindowsDeviceLink`.
+The same assignment flow is exposed by **Pre-associate** and forms the first phase of **Associate** in `Show-WindowsDeviceLink`.
 
 ### Lower-level initialization
 

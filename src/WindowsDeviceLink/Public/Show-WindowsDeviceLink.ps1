@@ -21,7 +21,7 @@ function Show-WindowsDeviceLink {
 
     Backend mode retrieves its authoritative tenant catalog from the Function App.
     The dashboard presents device, local-association, and cloud-association state in
-    one view. Register performs the complete guarded assignment workflow; diagnostic,
+    one view. Pre-associate performs the complete guarded assignment workflow; diagnostic,
     export, recovery, and offboarding actions remain available below it.
 
     .EXAMPLE
@@ -600,14 +600,14 @@ function Show-WindowsDeviceLink {
     $actionsPanel.Controls.Add($assignmentRow)
 
     $assignmentTitle = New-Object System.Windows.Forms.Label
-    $assignmentTitle.Text = 'Tenant assignment'
+    $assignmentTitle.Text = 'Device association'
     $assignmentTitle.Font = New-GuiFont -Size 8.5 -Style Bold
     $assignmentTitle.Location = [System.Drawing.Point]::new(14,5)
     $assignmentTitle.AutoSize = $true
     $assignmentRow.Controls.Add($assignmentTitle)
 
     $assignmentDescription = New-Object System.Windows.Forms.Label
-    $assignmentDescription.Text = 'Select the destination and choose Pre-register or Associate.'
+    $assignmentDescription.Text = 'Select the destination and choose Pre-associate or Associate.'
     $assignmentDescription.Font = New-GuiFont -Size 8.2 -Style Regular
     $assignmentDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
     $assignmentDescription.Location = [System.Drawing.Point]::new(14,23)
@@ -636,16 +636,16 @@ function Show-WindowsDeviceLink {
     $tenantSelector.Visible = $showTenantSelector
     if (-not $showTenantSelector) {
         $assignmentDescription.Text = if ($outerBoundParameters.ContainsKey('TenantId')) {
-            'The destination tenant is fixed by the supplied tenant ID. Choose Pre-register or Associate.'
+            'The destination tenant is fixed by the supplied tenant ID. Choose Pre-associate or Associate.'
         }
         else {
-            'The destination tenant is determined by sign-in. Choose Pre-register or Associate.'
+            'The destination tenant is determined by sign-in. Choose Pre-associate or Associate.'
         }
     }
     $assignmentRow.Controls.Add($tenantSelector)
 
     $btnAssign = New-Object System.Windows.Forms.Button
-    $btnAssign.Text = 'Pre-register'
+    $btnAssign.Text = 'Pre-associate'
     $btnAssign.Font = New-GuiFont -Size 8.6 -Style Regular
     $btnAssign.Size = [System.Drawing.Size]::new(94,28)
     $btnAssign.Location = [System.Drawing.Point]::new(816,9)
@@ -955,7 +955,7 @@ function Show-WindowsDeviceLink {
         $selectedTenantId = Get-SelectedTenantId
         $selectedMatchesCloud = $cloudPresent -and -not [string]::IsNullOrWhiteSpace($selectedTenantId) -and
             [string]$cloud.TenantId -ieq $selectedTenantId
-        $alreadyRegisteredInTarget = $selectedMatchesCloud -and $cloudState -in @('associated','preassociated')
+        $alreadyPreassociatedOrAssociatedInTarget = $selectedMatchesCloud -and $cloudState -in @('associated','preassociated')
         $alreadyAssociatedInTarget = $localAssociated -and $selectedMatchesCloud -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
@@ -963,9 +963,9 @@ function Show-WindowsDeviceLink {
         $btnSignIn.Enabled = $usesInteractiveUserAuthentication -and $directTenantReady
         $btnOnline.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
         $btnExport.Enabled = $runtimeReady
-        $targetReadyToRegister = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
-        $btnAssign.Enabled = $runtimeReady -and $targetReadyToRegister -and -not $alreadyRegisteredInTarget
-        $btnAssociate.Enabled = $canAssociate -and $targetReadyToRegister -and -not $alreadyAssociatedInTarget
+        $targetReadyForAssociation = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
+        $btnAssign.Enabled = $runtimeReady -and $targetReadyForAssociation -and -not $alreadyPreassociatedOrAssociatedInTarget
+        $btnAssociate.Enabled = $canAssociate -and $targetReadyForAssociation -and -not $alreadyAssociatedInTarget
         $btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent -and ($backendMode -or $directTenantReady)
         $btnLocalOffboard.Enabled = $runtimeReady -and $localStatePresent -and $cloudKnownAbsent
         $btnFullOffboard.Enabled = $runtimeReady -and $offboardingStatePresent -and ($backendMode -or $directTenantReady)
@@ -975,15 +975,15 @@ function Show-WindowsDeviceLink {
             'Check cloud state before resetting the local DeviceLink firmware state.'
         }
         elseif (-not $cloudKnownAbsent) {
-            'Local reset is blocked while a cloud association exists. Use registration, move, or Remove both to keep both states consistent.'
+            'Local reset is blocked while a cloud association exists. Use pre-association, move, or Remove both to keep both states consistent.'
         }
         else {
             'Reset the local DeviceLink firmware state. Windows may create a new base identity automatically.'
         }
         $toolTip.SetToolTip($btnLocalOffboard, $localResetToolTip)
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and local DeviceLink firmware state.')
-        $toolTip.SetToolTip($btnAssociate, 'Register in the selected tenant and complete Device Association on this Windows device.')
-        $toolTip.SetToolTip($btnAssign, 'Pre-register the device in the selected target tenant. Backend mode safely applies New, no-op, or Move.')
+        $toolTip.SetToolTip($btnAssociate, 'Pre-associate the device with the selected tenant and complete Device Association on this Windows device.')
+        $toolTip.SetToolTip($btnAssign, 'Pre-associate the device with the selected target tenant. Backend mode safely applies New, no-op, or Move.')
         $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
         if ($hasDirectTenantCatalog -and -not $directTenantReady) {
             $toolTip.SetToolTip($btnSignIn, 'Select a target tenant first. Sign-in will be scoped to that tenant.')
@@ -991,13 +991,13 @@ function Show-WindowsDeviceLink {
             $toolTip.SetToolTip($btnAssociate, 'Select a target tenant first, then sign in to associate the device.')
         }
         elseif (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when no catalog is configured.') }
-        elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and register the device in the selected target tenant.') }
+        elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and pre-associate the device with the selected target tenant.') }
 
         if ($alreadyAssociatedInTarget) {
             $toolTip.SetToolTip($btnAssociate, 'The device is already associated.')
         }
-        if ($alreadyRegisteredInTarget) {
-            $toolTip.SetToolTip($btnAssign, 'The device is already registered in the selected tenant. Select another tenant to move it.')
+        if ($alreadyPreassociatedOrAssociatedInTarget) {
+            $toolTip.SetToolTip($btnAssign, 'The device is already pre-associated or associated with the selected tenant. Select another tenant to move it.')
         }
 
         if ($cloudKnownAbsent) {
@@ -1005,7 +1005,7 @@ function Show-WindowsDeviceLink {
         }
 
         if ($support -and [string]$support.Environment -eq 'WindowsPE') {
-            $winPeAssociationToolTip = 'Association is not available in Windows PE. Pre-register the device now; association is completed automatically during Windows OOBE.'
+            $winPeAssociationToolTip = 'Association is not available in Windows PE. Pre-associate the device now; association is completed automatically during Windows OOBE.'
             $toolTip.SetToolTip($btnAssociate,$winPeAssociationToolTip)
             $toolTip.SetToolTip($btnAssociateHost,$winPeAssociationToolTip)
             $onlineToolTip = if ($backendMode) {
@@ -1297,7 +1297,7 @@ function Show-WindowsDeviceLink {
         if ($script:WdlGuiBusy) { return }
         $targetId = Get-SelectedTenantId
         if ($backendMode -and [string]::IsNullOrWhiteSpace($targetId)) { Show-GuiError 'Select a target tenant first.'; return }
-        if ($hasDirectTenantCatalog -and [string]::IsNullOrWhiteSpace($targetId)) { Show-GuiError 'Select a target tenant first. Direct-mode sign-in and registration will use that tenant.'; return }
+        if ($hasDirectTenantCatalog -and [string]::IsNullOrWhiteSpace($targetId)) { Show-GuiError 'Select a target tenant first. Direct-mode sign-in and pre-association will use that tenant.'; return }
         $targetLabel = if ($targetId) { [string]$tenantSelector.SelectedItem } else { 'Tenant determined by sign-in' }
         $sourceText = if ($script:WdlGuiCloudStatus -and $script:WdlGuiCloudStatus.TenantId) { [string]$script:WdlGuiCloudStatus.TenantId } else { 'determined automatically' }
         $modeText = if ($backendMode) {
@@ -1306,9 +1306,9 @@ function Show-WindowsDeviceLink {
             'Direct mode checks only the chosen sign-in tenant and can perform New or no-op; it cannot prove absence from other tenants.'
         }
         $message = @("Current cloud tenant: $sourceText","Target tenant: $targetLabel",'',$modeText,'','Continue?') -join [Environment]::NewLine
-        if (-not $backendMode -and -not (Confirm-GuiAction -Title 'Register tenant assignment' -Message $message)) { return }
+        if (-not $backendMode -and -not (Confirm-GuiAction -Title 'Pre-associate device' -Message $message)) { return }
 
-        Set-GuiBusy -Busy $true -StatusText $(if ($backendMode) { 'Checking cloud state and registering device...' } else { 'Applying tenant assignment...' })
+        Set-GuiBusy -Busy $true -StatusText $(if ($backendMode) { 'Checking cloud state and pre-associating device...' } else { 'Applying device association...' })
         try {
             $parameters = if ($backendMode) { Get-GuiBackendParameters } else { Get-GuiAuthParameters }
             if ($backendMode) { $parameters.TargetTenantId = [guid]$targetId }
@@ -1483,7 +1483,7 @@ function Show-WindowsDeviceLink {
         if ($script:WdlGuiBusy) { return }
 
         if ($isWinPE) {
-            Show-GuiError 'Association is not available in Windows PE. Pre-register the device now; association is completed automatically during Windows OOBE.'
+            Show-GuiError 'Association is not available in Windows PE. Pre-associate the device now; association is completed automatically during Windows OOBE.'
             return
         }
 
