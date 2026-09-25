@@ -1436,12 +1436,21 @@ function Show-WindowsDeviceLink {
                 [string]$script:WdlGuiSessionTenantId
             }
             $selectedTenantId = Get-SelectedTenantId
-            $script:WdlGuiSessionAuthenticated = $true
+            if ($Method -eq 'Interactive' -and [string]::IsNullOrWhiteSpace($authenticatedTenantId)) {
+                $authenticationDetail = if ($cloud -and -not [string]::IsNullOrWhiteSpace([string]$cloud.AssociationError)) {
+                    [string]$cloud.AssociationError
+                }
+                else {
+                    'No authenticated Microsoft Graph context was returned.'
+                }
+                throw "Interactive authentication did not complete. $authenticationDetail"
+            }
             if ($selectedTenantId -and (
                 [string]::IsNullOrWhiteSpace($authenticatedTenantId) -or
                 $authenticatedTenantId -ine [string]$selectedTenantId)) {
                 throw 'The authenticated tenant does not match the selected target tenant.'
             }
+            $script:WdlGuiSessionAuthenticated = $true
             if (-not [string]::IsNullOrWhiteSpace($authenticatedTenantId)) {
                 $script:WdlGuiSessionTenantId = $authenticatedTenantId
             }
@@ -1518,10 +1527,20 @@ function Show-WindowsDeviceLink {
             [void](Get-GuiAuthParameters)
             $cloud = Refresh-CloudView -WriteCommand
             Write-GuiObject $cloud
-            Set-GuiStatus 'Signed in; cloud association loaded'
+            if ($cloud -and -not [string]::IsNullOrWhiteSpace([string]$cloud.AssociationError)) {
+                Set-GuiStatus 'Signed in; cloud association check failed'
+            }
+            else {
+                Set-GuiStatus 'Signed in; cloud association loaded'
+            }
         }
         catch {
             Clear-GuiSessionAuthentication
+            $script:WdlGuiCloudStatus = $null
+            $ui.CloudState.Text = 'Not checked'
+            $ui.CloudTenant.Text = 'Not checked'
+            $ui.CloudId.Text = 'Not checked'
+            $ui.CloudChecked.Text = 'Not checked'
             Set-GuiStatus 'Sign-in failed'
             Show-GuiError $_.Exception.Message
         }
