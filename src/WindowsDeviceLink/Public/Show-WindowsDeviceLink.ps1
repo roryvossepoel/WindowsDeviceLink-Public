@@ -424,6 +424,7 @@ function Show-WindowsDeviceLink {
 
             if (-not $cacheValid) {
                 Clear-GuiSessionAuthentication
+                Set-GuiSigningInState
                 Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.' -Command
 
                 $tokenParameters = @{}
@@ -687,7 +688,28 @@ function Show-WindowsDeviceLink {
     $targetTenantRow.Controls.Add($targetTenantSeparator)
 
     function Update-GuiTargetTenantDisplay {
-        if (-not $targetTenantValue -or $showTenantSelector) { return }
+        if (-not $targetTenantValue) { return }
+
+        $targetTenantDescription.Text = if ($backendMode) {
+            'Select the destination tenant.'
+        }
+        elseif ($script:WdlGuiSessionAuthenticated) {
+            if ($showTenantSelector) { 'Actions will target the selected tenant.' } else { 'Actions will target the signed-in tenant.' }
+        }
+        elseif ($showTenantSelector) {
+            'Select the destination tenant, then sign in.'
+        }
+        elseif ($outerBoundParameters.ContainsKey('TenantId')) {
+            'The destination tenant is fixed by the supplied tenant ID.'
+        }
+        elseif ($usesInteractiveUserAuthentication) {
+            'Sign in to select the destination tenant.'
+        }
+        else {
+            'The destination tenant is determined by the authentication context.'
+        }
+
+        if ($showTenantSelector) { return }
 
         $targetTenantId = if ($outerBoundParameters.ContainsKey('TenantId')) {
             [string]$TenantId
@@ -712,6 +734,19 @@ function Show-WindowsDeviceLink {
             'Authentication context'
         }
         $toolTip.SetToolTip($targetTenantValue, $(if ($targetTenantId) { $targetTenantId } else { $targetTenantValue.Text }))
+    }
+
+    function Set-GuiSigningInState {
+        if (-not $usesInteractiveUserAuthentication) { return }
+
+        $btnSignIn.Text = 'Signing in...'
+        $ui.Authentication.Text = "$Method - Signing in..."
+        $ui.Endpoint.Text = 'Waiting for sign-in...'
+        $targetTenantDescription.Text = 'Waiting for authentication to establish the destination tenant.'
+        foreach ($control in @($ui.CloudState,$ui.CloudTenant,$ui.CloudId,$ui.CloudChecked)) {
+            $control.Text = 'Waiting for sign-in...'
+        }
+        [System.Windows.Forms.Application]::DoEvents()
     }
 
     Update-GuiTargetTenantDisplay
@@ -1348,10 +1383,16 @@ function Show-WindowsDeviceLink {
             [switch]$WriteCommand
         )
 
-        $ui.CloudState.Text = 'Checking...'
-        $ui.CloudTenant.Text = 'Checking...'
-        $ui.CloudId.Text = 'Checking...'
-        $ui.CloudChecked.Text = 'Checking...'
+        $cloudPendingText = if ($usesInteractiveUserAuthentication -and -not $script:WdlGuiSessionAuthenticated) {
+            'Waiting for sign-in...'
+        }
+        else {
+            'Checking...'
+        }
+        $ui.CloudState.Text = $cloudPendingText
+        $ui.CloudTenant.Text = $cloudPendingText
+        $ui.CloudId.Text = $cloudPendingText
+        $ui.CloudChecked.Text = $cloudPendingText
         [System.Windows.Forms.Application]::DoEvents()
 
         if ($backendMode) {
@@ -1471,6 +1512,8 @@ function Show-WindowsDeviceLink {
 
         Clear-GuiSessionAuthentication
         Set-GuiBusy -Busy $true -StatusText 'Signing in...'
+        Set-GuiSigningInState
+        Write-GuiConsole -Message "Waiting for $Method authentication..."
         try {
             [void](Get-GuiAuthParameters)
             $cloud = Refresh-CloudView -WriteCommand
@@ -2112,12 +2155,9 @@ function Show-WindowsDeviceLink {
             }
         }
         else {
-            $targetTenantValue.Left = if ($usesInteractiveUserAuthentication) {
-                $btnSignIn.Left - 8 - $targetTenantValue.Width
-            }
-            else {
-                $fullWidth - 16 - $targetTenantValue.Width
-            }
+            $targetTenantValue.Left = [Math]::Max(360,$targetTenantDescription.Right + 20)
+            $targetValueRight = if ($usesInteractiveUserAuthentication) { $btnSignIn.Left - 8 } else { $fullWidth - 16 }
+            $targetTenantValue.Width = [Math]::Max(220,$targetValueRight - $targetTenantValue.Left)
         }
         $targetTenantSeparator.Width = [Math]::Max(480,$fullWidth - 28)
 
