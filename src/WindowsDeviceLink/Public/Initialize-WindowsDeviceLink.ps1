@@ -58,7 +58,6 @@ function Initialize-WindowsDeviceLink {
         [Parameter(ParameterSetName = 'Direct')][ValidateRange(1, 600)][double]$ClientTimeout = 100,
         [ValidateNotNullOrEmpty()][string]$WindowsManagementServicePath,
         [ValidateRange(5, 600)][int]$TimeoutSeconds = 120,
-        [Alias('FullAssociation')]
         [switch]$Associate
     )
 

@@ -35,7 +35,8 @@ Assert-True ($parameterNames -contains 'TargetTenantId') 'Initialize-WindowsDevi
 
 $source=[IO.File]::ReadAllText($path)
 Assert-True ($source -match '\[switch\]\$Associate') '-Associate must remain an explicit switch parameter.'
-Assert-True ($source -match '\[Alias\(''FullAssociation''\)\]') '-FullAssociation must remain a compatibility alias for -Associate during the preview transition.'
+$retiredTerm = 'Full' + 'Association'
+Assert-True ($source -notmatch $retiredTerm) 'The retired preview terminology must not remain as a parameter or alias.'
 Assert-True ($source -match 'if\s*\(\s*\$Associate\s+-and\s+\$afterHealth\.State\s+-eq\s+''Preassociated''\s*\)') 'Association must be gated by -Associate and verified Preassociated state.'
 Assert-True ($source -match 'Complete-WindowsDeviceLinkAssociation\s+@completeParameters') 'Initializer must delegate the device-side operation to Complete-WindowsDeviceLinkAssociation.'
 Assert-True ($source -match 'AssociationRequested=\[bool\]\$Associate') 'Initialization result must expose whether association was requested.'
