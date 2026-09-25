@@ -913,13 +913,14 @@ function Show-WindowsDeviceLink {
         param(
             [AllowNull()][AllowEmptyString()][string]$Message,
             [switch]$Command,
+            [switch]$Warning,
             [switch]$ErrorMessage
         )
 
         if ([string]::IsNullOrWhiteSpace($Message)) { return }
 
         $timestamp = (Get-Date).ToString('HH:mm:ss')
-        $prefix = if ($Command) { '>' } elseif ($ErrorMessage) { '!' } else { '-' }
+        $prefix = if ($Command) { '>' } elseif ($Warning -or $ErrorMessage) { '!' } else { '-' }
         $line = "[$timestamp] $prefix $Message"
 
         $consoleBox.AppendText($line + [Environment]::NewLine)
@@ -1523,6 +1524,9 @@ function Show-WindowsDeviceLink {
         Set-GuiBusy -Busy $true -StatusText 'Signing in...'
         Set-GuiSigningInState
         Write-GuiConsole -Message "Waiting for $Method authentication..."
+        if ($Method -eq 'Interactive') {
+            Write-GuiConsole -Message 'Sign-in uses Web Account Manager (WAM). The sign-in window may open behind this dashboard; check the taskbar or other open windows.' -Warning
+        }
         try {
             [void](Get-GuiAuthParameters)
             $cloud = Refresh-CloudView -WriteCommand

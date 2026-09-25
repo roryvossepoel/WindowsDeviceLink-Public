@@ -138,6 +138,8 @@ foreach ($required in @(
     'Sign out',
     'Signing in...',
     'Waiting for sign-in...',
+    '[switch]$Warning',
+    'The sign-in window may open behind this dashboard',
     'Actions will target the signed-in tenant.',
     'Disconnect-MgGraph',
     'The authenticated tenant does not match the selected target tenant.',
