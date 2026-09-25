@@ -59,6 +59,11 @@ After a successful Direct-mode sign-in, **Sign in** changes to **Sign out**. Sig
 out clears the in-memory authentication context and unlocks a configured tenant
 selector. While signed in, that selector remains locked so a token cannot be reused
 silently for another target tenant.
+The Connection card shows the signed-in account for delegated Direct mode. Interactive
+authentication reads it from the Microsoft Graph session; Device Code authentication
+uses the identity-token claims returned during sign-in. The tenant scope shows a
+configured catalog name when available and otherwise shows the authenticated tenant ID.
+No additional Graph request or permission is used only to resolve a tenant display name.
 Single-tenant Direct mode deliberately has no tenant selector: the authenticated tenant
 is authoritative unless `-TenantId` fixed it explicitly. When a local tenant catalog is
 configured, selecting a target tenant is mandatory before sign-in or any cloud action;

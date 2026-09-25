@@ -29,6 +29,14 @@ Assert-True ($redacted -notmatch 'CLIENT-SECRET|ACCESS-TOKEN|DEVICE-JWT') 'redac
 Assert-True ($redacted -match '\[REDACTED\]') 'redaction helper did not emit a redaction marker.'
 Write-Host 'PASS: sensitive-text redaction helper'
 
+$accountPayload=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('{"preferred_username":"operator@example.invalid","upn":"fallback@example.invalid"}')).TrimEnd('=').Replace('+','-').Replace('/','_')
+$accountToken="header.$accountPayload.signature"
+$resolvedAccount=& $module {param($Token) Resolve-WindowsDeviceLinkTokenAccountName -Token $Token} $accountToken
+Assert-True ($resolvedAccount -eq 'operator@example.invalid') 'token account-name helper did not prefer preferred_username.'
+$invalidAccount=& $module { Resolve-WindowsDeviceLinkTokenAccountName -Token 'not-a-jwt' }
+Assert-True ([string]::IsNullOrWhiteSpace([string]$invalidAccount)) 'token account-name helper must fail closed for malformed tokens.'
+Write-Host 'PASS: token account-name metadata extraction'
+
 $clientSecretMarker='WDL-CLIENT-SECRET-MARKER'
 $secureClientSecret=ConvertTo-SecureString $clientSecretMarker -AsPlainText -Force
 $clientSecretRequest={param($Uri,$Body)throw "Synthetic OAuth failure containing $($Body.client_secret)"}

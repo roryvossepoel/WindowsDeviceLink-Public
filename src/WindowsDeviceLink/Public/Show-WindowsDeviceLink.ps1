@@ -439,6 +439,7 @@ function Show-WindowsDeviceLink {
 
                 $script:WdlGuiSessionAccessToken = ConvertTo-SecureString ([string]$token.AccessToken) -AsPlainText -Force
                 $script:WdlGuiSessionTenantId = [string]$token.TenantId
+                $script:WdlGuiSessionAccountName = [string]$token.AccountName
                 if ($selectedTenant -and (
                     [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionTenantId) -or
                     [string]$script:WdlGuiSessionTenantId -ine [string]$selectedTenant)) {
@@ -495,10 +496,16 @@ function Show-WindowsDeviceLink {
         }
         $script:WdlGuiSessionAccessToken = $null
         $script:WdlGuiSessionTenantId = $null
+        $script:WdlGuiSessionAccountName = $null
         $script:WdlGuiSessionExpiresUtc = $null
         $script:WdlGuiSessionAuthenticated = $false
         if ($ui -and $ui.Authentication -and -not $backendMode) {
             $ui.Authentication.Text = if ($usesInteractiveUserAuthentication) { "$Method - Signed out" } else { "$Method - Non-interactive" }
+            $ui.Endpoint.Text = if ($usesInteractiveUserAuthentication) { 'Not signed in' } else { 'Not applicable' }
+            $toolTip.SetToolTip($ui.Endpoint,$ui.Endpoint.Text)
+            $signedOutTenantId = Get-SelectedTenantId
+            $ui.TenantScope.Text = if ($signedOutTenantId) { Get-TenantDisplayName -TenantId $signedOutTenantId } elseif ($usesInteractiveUserAuthentication) { 'Determined by sign-in' } else { 'Authentication context' }
+            $toolTip.SetToolTip($ui.TenantScope,$(if ($signedOutTenantId) { $signedOutTenantId } else { $ui.TenantScope.Text }))
         }
         if ($btnSignIn) { $btnSignIn.Text = 'Sign in' }
         Update-GuiTargetTenantDisplay
@@ -531,6 +538,7 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiSupport = $null
     $script:WdlGuiSessionAccessToken = $null
     $script:WdlGuiSessionTenantId = $null
+    $script:WdlGuiSessionAccountName = $null
     $script:WdlGuiSessionExpiresUtc = $null
     $script:WdlGuiSessionAuthenticated = $false
 
@@ -575,6 +583,7 @@ function Show-WindowsDeviceLink {
     $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 105 -ValueWidth 335
     $ui.Authentication = New-ValuePair -Parent $connectionCard -Caption 'Authentication' -Y 56 -CaptionWidth 105 -ValueWidth 335
     $ui.Endpoint       = New-ValuePair -Parent $connectionCard -Caption 'Endpoint' -Y 78 -CaptionWidth 105 -ValueWidth 335
+    $ui.EndpointCaption = $connectionCard.Controls | Where-Object { [string]$_.Tag -eq 'Caption:Endpoint' } | Select-Object -First 1
     $ui.TenantScope    = New-ValuePair -Parent $connectionCard -Caption 'Tenant scope' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
     $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
@@ -1256,12 +1265,14 @@ function Show-WindowsDeviceLink {
         if ($backendMode) {
             $ui.ConnectionMode.Text = 'Backend'
             $ui.Authentication.Text = 'Function API key'
+            $ui.EndpointCaption.Text = 'Endpoint'
             $ui.Endpoint.Text = [string]$BackendUri.Host
             $ui.TenantScope.Text = "$($effectiveTenants.Count) available tenants"
             $toolTip.SetToolTip($ui.Endpoint,[string]$BackendUri.AbsoluteUri)
         }
         else {
             $ui.ConnectionMode.Text = 'Direct'
+            $ui.EndpointCaption.Text = 'Account'
             if ($usesInteractiveUserAuthentication) {
                 $sessionState = if ($script:WdlGuiSessionAuthenticated) { 'Signed in' } else { 'Signed out' }
                 $ui.Authentication.Text = "$Method - $sessionState"
@@ -1269,7 +1280,16 @@ function Show-WindowsDeviceLink {
             else {
                 $ui.Authentication.Text = "$Method - Non-interactive"
             }
-            $ui.Endpoint.Text = 'Microsoft Graph'
+            $ui.Endpoint.Text = if (-not [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionAccountName)) {
+                [string]$script:WdlGuiSessionAccountName
+            }
+            elseif ($usesInteractiveUserAuthentication) {
+                'Not signed in'
+            }
+            else {
+                'Not applicable'
+            }
+            $toolTip.SetToolTip($ui.Endpoint,$ui.Endpoint.Text)
             $connectionTenant = if ($selectedTenant) { $selectedTenant } else { [string]$script:WdlGuiSessionTenantId }
             $ui.TenantScope.Text = if ($connectionTenant) {
                 Get-TenantDisplayName -TenantId $connectionTenant
@@ -1359,8 +1379,14 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiCloudStatus = $cloud
 
         if ($usesInteractiveUserAuthentication) {
+            $graphContext = if ($Method -eq 'Interactive' -and (Get-Command Get-MgContext -ErrorAction SilentlyContinue)) {
+                Get-MgContext
+            }
+            else {
+                $null
+            }
             $authenticatedTenantId = if ($Method -eq 'Interactive' -and (Get-Command Get-MgContext -ErrorAction SilentlyContinue)) {
-                [string](Get-MgContext).TenantId
+                [string]$graphContext.TenantId
             }
             elseif ($cloud.TenantId) {
                 [string]$cloud.TenantId
@@ -1378,9 +1404,17 @@ function Show-WindowsDeviceLink {
             if (-not [string]::IsNullOrWhiteSpace($authenticatedTenantId)) {
                 $script:WdlGuiSessionTenantId = $authenticatedTenantId
             }
+            if ($graphContext -and -not [string]::IsNullOrWhiteSpace([string]$graphContext.Account)) {
+                $script:WdlGuiSessionAccountName = [string]$graphContext.Account
+            }
             $ui.Authentication.Text = "$Method - Signed in"
+            $ui.Endpoint.Text = if (-not [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionAccountName)) { [string]$script:WdlGuiSessionAccountName } else { 'Signed-in account' }
+            $toolTip.SetToolTip($ui.Endpoint,$ui.Endpoint.Text)
             $btnSignIn.Text = 'Sign out'
             Update-GuiTargetTenantDisplay
+            $connectionTenantId = if ($selectedTenantId) { $selectedTenantId } else { [string]$script:WdlGuiSessionTenantId }
+            $ui.TenantScope.Text = if ($connectionTenantId) { Get-TenantDisplayName -TenantId $connectionTenantId } else { 'Signed-in tenant' }
+            $toolTip.SetToolTip($ui.TenantScope,$(if ($connectionTenantId) { $connectionTenantId } else { $ui.TenantScope.Text }))
         }
 
         $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
