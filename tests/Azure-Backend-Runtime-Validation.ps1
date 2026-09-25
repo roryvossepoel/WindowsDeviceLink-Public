@@ -67,6 +67,7 @@ function Invoke-RestMethod {
         $scenario = $global:wdlBackendTest_scenario
         if ($Method -eq 'DELETE') {
             Assert-True ($tenant -eq $global:wdlBackendTest_sourceTenant -and $Uri.EndsWith("/association-$tenant")) 'Delete must target the exact source record.'
+            $global:wdlBackendTest_deleteAttempted = $true
             if ($scenario -eq 'operation-delete403') {
                 Throw-UpstreamTestError 403 '{"error":{"code":"Authorization_RequestDenied","message":"DO-NOT-EXPOSE-UPSTREAM-BODY"}}'
             }
@@ -90,7 +91,9 @@ function Invoke-RestMethod {
             return @{ id = "association-$tenant"; associationState = 'preassociated' }
         }
         Assert-True ($Method -eq 'GET') 'Unexpected operation method.'
-        if ($scenario -eq 'operation-lookup403' -or ($scenario -eq 'operation-verify503' -and $global:wdlBackendTest_postAttempted)) {
+        if ($scenario -eq 'operation-lookup403' -or
+            ($scenario -eq 'operation-verify503' -and $global:wdlBackendTest_postAttempted) -or
+            ($scenario -eq 'operation-deleteVerify503' -and $global:wdlBackendTest_deleteAttempted)) {
             Throw-UpstreamTestError 503 '{"error":{"code":"ServiceNotAvailable","message":"DO-NOT-EXPOSE-UPSTREAM-BODY"}}'
         }
         if ($global:wdlBackendTest_graphState[$tenant]) {
@@ -154,6 +157,7 @@ function Invoke-WorkflowTest {
     $global:wdlBackendTest_httpCalls.Clear()
     $global:wdlBackendTest_response = $null
     $global:wdlBackendTest_postAttempted = $false
+    $global:wdlBackendTest_deleteAttempted = $false
     $global:wdlBackendTest_graphState = @{}
     $global:wdlBackendTest_graphState[$global:wdlBackendTest_tenantA] = $SourcePresent
     $global:wdlBackendTest_graphState[$global:wdlBackendTest_tenantB] = $false
@@ -332,6 +336,8 @@ try {
     Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'Move' -and $result.DeleteCount -eq 1 -and $result.ImportCount -eq 1) 'Successful Move regressed.'
     $result = Invoke-WorkflowTest Reconcile 'operation-success' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA -TargetTenantId $global:wdlBackendTest_tenantA -RepairExistingAssociation
     Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'Repair' -and $result.DeleteCount -eq 1 -and $result.ImportCount -eq 1) 'Successful same-tenant Repair regressed.'
+    $result = Invoke-WorkflowTest Reconcile 'operation-import403' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA -TargetTenantId $global:wdlBackendTest_tenantA -RepairExistingAssociation
+    Assert-True ($result.StatusCode -eq 502 -and $result.Body.error -eq 'RepairIncomplete' -and $result.Body.decision -eq 'Repair') 'Failed same-tenant Repair must retain its own decision and error contract.'
     $result = Invoke-WorkflowTest Reconcile 'operation-committed500' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
     Assert-True ($result.StatusCode -eq 200 -and $result.Body.success -and $result.ImportCount -eq 1) 'A committed target must be verified without a repeated POST.'
     Write-Host 'PASS: successful Move and ambiguous POST with verified commit'
@@ -346,6 +352,8 @@ try {
     Assert-True ($result.StatusCode -eq 200 -and $result.Body.decision -eq 'None' -and -not $result.Body.changed -and $result.DeleteCount -eq 0) 'Backend offboarding must be idempotent when no cloud association exists.'
     $result = Invoke-WorkflowTest Offboard 'operation-delete403' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
     Assert-True ($result.StatusCode -eq 502 -and $result.Body.error -eq 'RemovalUncertain' -and $result.DeleteCount -eq 1) 'Backend offboarding must not retry an unsuccessful DELETE.'
+    $result = Invoke-WorkflowTest Offboard 'operation-deleteVerify503' -SourcePresent $true -SourceTenantId $global:wdlBackendTest_tenantA
+    Assert-True ($result.StatusCode -eq 502 -and $result.Body.error -eq 'RemovalVerificationFailed' -and $result.Body.stage -eq 'GraphVerify' -and $result.DeleteCount -eq 1) 'Backend offboarding must return a structured fail-closed result when DELETE verification cannot be read.'
     Write-Host 'PASS: backend offboarding removal, idempotency and DELETE guard'
 
     foreach ($present in @($false,$true)) {

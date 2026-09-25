@@ -37,7 +37,7 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
     }
 
     function script:Invoke-WindowsDeviceLinkBackendTenantCatalog {
-        param($BackendUri,$BackendApiKey)
+        param($BackendUri,$BackendApiKey,$TimeoutSeconds)
         [pscustomobject]@{ success=$true; tenantCount=2; tenants=@(
             [pscustomobject]@{ name='Tenant A'; tenantId='11111111-1111-1111-1111-111111111111' },
             [pscustomobject]@{ name='Tenant B'; tenantId='22222222-2222-2222-2222-222222222222' }
@@ -53,7 +53,7 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
     }
     function script:Reset-WindowsDeviceLinkFirmwareState { param($Confirm) $script:AssignmentReset=$true; [pscustomobject]@{ Success=$true } }
     function script:Invoke-WindowsDeviceLinkBackendLookup {
-        param($BackendUri,$BackendApiKey,$SerialNumber)
+        param($BackendUri,$BackendApiKey,$SerialNumber,$TimeoutSeconds)
         $rows = @(
             [pscustomobject]@{ tenantId='11111111-1111-1111-1111-111111111111'; success=$true },
             [pscustomobject]@{ tenantId='22222222-2222-2222-2222-222222222222'; success=$true }
@@ -73,7 +73,7 @@ $secureKey = ConvertTo-SecureString $apiMarker -AsPlainText -Force
         [pscustomobject]@{ success=$true; searchedTenantCount=2; successfulTenantCount=2; failedTenantCount=0; tenantErrors=@(); tenants=$rows; matchCount=$matches.Count; matches=$matches }
     }
     function script:Invoke-WindowsDeviceLinkBackendReconcile {
-        param($BackendUri,$BackendApiKey,$InputObject,$SourceTenantId,$TargetTenantId,$RepairExistingAssociation)
+        param($BackendUri,$BackendApiKey,$InputObject,$SourceTenantId,$TargetTenantId,$RepairExistingAssociation,$TimeoutSeconds)
         $script:AssignmentReconcileCount++
         $script:AssignmentSource=$SourceTenantId
         $script:AssignmentTarget=$TargetTenantId

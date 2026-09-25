@@ -10,14 +10,15 @@ function Get-WindowsDeviceLinkBackendTenant {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][ValidateNotNull()][uri]$BackendUri,
-        [Parameter(Mandatory)][ValidateNotNull()][securestring]$BackendApiKey
+        [Parameter(Mandatory)][ValidateNotNull()][securestring]$BackendApiKey,
+        [ValidateRange(5,600)][int]$TimeoutSeconds = 120
     )
 
     $credential = New-Object System.Management.Automation.PSCredential('api-key',$BackendApiKey)
     $plainKey = $null
     try {
         $plainKey = $credential.GetNetworkCredential().Password
-        $catalog = Invoke-WindowsDeviceLinkBackendTenantCatalog -BackendUri $BackendUri -BackendApiKey $plainKey
+        $catalog = Invoke-WindowsDeviceLinkBackendTenantCatalog -BackendUri $BackendUri -BackendApiKey $plainKey -TimeoutSeconds $TimeoutSeconds
         foreach ($tenant in @($catalog.tenants)) {
             [pscustomobject]@{
                 PSTypeName = 'Windows.DeviceLink.BackendTenant'

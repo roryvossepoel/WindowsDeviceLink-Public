@@ -42,6 +42,7 @@ function Get-WindowsDeviceLinkBackendStatus {
                 BackendUri = $BackendUri
                 BackendApiKey = $BackendApiKey
                 SerialNumber = [string]$local.SerialNumber
+                TimeoutSeconds = $TimeoutSeconds
             }
             if ($PSBoundParameters.ContainsKey('RequestScript')) { $lookupParameters.RequestScript = $RequestScript }
             $lookup = Invoke-WindowsDeviceLinkBackendLookup @lookupParameters

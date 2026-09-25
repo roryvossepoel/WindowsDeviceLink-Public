@@ -5,6 +5,7 @@ function Invoke-WindowsDeviceLinkBackendOffboard {
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$BackendApiKey,
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$SerialNumber,
         [AllowNull()][AllowEmptyString()][string]$SourceTenantId,
+        [ValidateRange(5,600)][int]$TimeoutSeconds = 120,
         [scriptblock]$RequestScript
     )
 
@@ -25,8 +26,8 @@ function Invoke-WindowsDeviceLinkBackendOffboard {
     }
     $body = $payload | ConvertTo-Json -Depth 4 -Compress
     try {
-        $response = if ($RequestScript) { & $RequestScript $endpoint $headers $body } else {
-            Invoke-RestMethod -Method Post -Uri $endpoint -Headers $headers -ContentType 'application/json' -Body $body -ErrorAction Stop
+        $response = if ($RequestScript) { & $RequestScript $endpoint $headers $body $TimeoutSeconds } else {
+            Invoke-RestMethod -Method Post -Uri $endpoint -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         }
         if (-not $response -or $response.success -ne $true) { throw 'The Function offboarding operation did not return success.' }
         Protect-WindowsDeviceLinkObject -InputObject $response -SensitiveValue @($BackendApiKey)

@@ -3,6 +3,7 @@ function Invoke-WindowsDeviceLinkBackendTenantCatalog {
     param(
         [Parameter(Mandatory)][ValidateNotNull()][uri]$BackendUri,
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$BackendApiKey,
+        [ValidateRange(5,600)][int]$TimeoutSeconds = 120,
         [scriptblock]$RequestScript
     )
 
@@ -10,8 +11,8 @@ function Invoke-WindowsDeviceLinkBackendTenantCatalog {
     $endpoint = Resolve-WindowsDeviceLinkBackendEndpoint -BackendUri $BackendUri -Route tenants
     $headers = @{ 'X-WindowsDeviceLink-Key' = $BackendApiKey }
     try {
-        $response = if ($RequestScript) { & $RequestScript $endpoint $headers } else {
-            Invoke-RestMethod -Method Get -Uri $endpoint -Headers $headers -ErrorAction Stop
+        $response = if ($RequestScript) { & $RequestScript $endpoint $headers $TimeoutSeconds } else {
+            Invoke-RestMethod -Method Get -Uri $endpoint -Headers $headers -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         }
         if (-not $response -or $response.success -ne $true) { throw 'The Function tenant catalog did not succeed.' }
         if ([string]$response.apiVersion -ne '1.0') {

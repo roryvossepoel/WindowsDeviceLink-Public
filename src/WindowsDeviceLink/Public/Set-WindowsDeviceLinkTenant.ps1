@@ -97,7 +97,7 @@ function Set-WindowsDeviceLinkTenant {
     $plainKey = $null
     try {
         $plainKey = $credential.GetNetworkCredential().Password
-        $catalog = Invoke-WindowsDeviceLinkBackendTenantCatalog -BackendUri $BackendUri -BackendApiKey $plainKey
+        $catalog = Invoke-WindowsDeviceLinkBackendTenantCatalog -BackendUri $BackendUri -BackendApiKey $plainKey -TimeoutSeconds $TimeoutSeconds
         $catalogTenants = @($catalog.tenants)
 
         if ($PSCmdlet.ParameterSetName -eq 'BackendByName') {
@@ -124,7 +124,7 @@ function Set-WindowsDeviceLinkTenant {
             throw "Local firmware state '$($localBefore.FirmwareState)' isn't safe for tenant assignment. No state was changed."
         }
 
-        $lookup = Invoke-WindowsDeviceLinkBackendLookup -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $currentDeviceLink.SerialNumber
+        $lookup = Invoke-WindowsDeviceLinkBackendLookup -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $currentDeviceLink.SerialNumber -TimeoutSeconds $TimeoutSeconds
         $tenantRows = @($lookup.tenants)
         $matches = @($lookup.matches)
         if ($lookup.success -ne $true -or [int]$lookup.failedTenantCount -ne 0 -or
@@ -212,6 +212,7 @@ function Set-WindowsDeviceLinkTenant {
                 BackendApiKey = $plainKey
                 InputObject = $deviceLinkForTarget
                 TargetTenantId = $targetId
+                TimeoutSeconds = $TimeoutSeconds
             }
             if (-not [string]::IsNullOrWhiteSpace($sourceId)) {
                 $reconcileParameters.SourceTenantId = $sourceId
@@ -228,7 +229,7 @@ function Set-WindowsDeviceLinkTenant {
             throw
         }
 
-        $verified = Invoke-WindowsDeviceLinkBackendLookup -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $deviceLinkForTarget.SerialNumber
+        $verified = Invoke-WindowsDeviceLinkBackendLookup -BackendUri $BackendUri -BackendApiKey $plainKey -SerialNumber $deviceLinkForTarget.SerialNumber -TimeoutSeconds $TimeoutSeconds
         $verifiedMatches = @($verified.matches)
         $verifiedTenantRows = @($verified.tenants)
         $verifiedTenantIds = @($verifiedTenantRows | ForEach-Object { ([guid][string]$_.tenantId).ToString().ToLowerInvariant() } | Sort-Object)

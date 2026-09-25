@@ -141,9 +141,16 @@ try {
     Remove-WindowsDeviceLinkBackendAssociation -AssociationId $current.AssociationId -AccessToken $token
 }
 catch {
-    $verifyAfterError = Get-WindowsDeviceLinkTenantAssociation -TenantId $current.TenantId -SerialNumber $serialNumber -ClientId $clientId
+    $deleteError = $_
+    try {
+        $verifyAfterError = Get-WindowsDeviceLinkTenantAssociation -TenantId $current.TenantId -SerialNumber $serialNumber -ClientId $clientId
+    }
+    catch {
+        Write-OffboardError -StatusCode 502 -Error 'RemovalVerificationFailed' -Message 'Cloud removal was attempted, but the resulting state could not be read. Verify cloud state before retrying.' -RequestId $requestId -SourceTenantId $current.TenantId -Stage 'GraphVerify' -UpstreamError $_
+        return
+    }
     if (@($verifyAfterError.Matches).Count -ne 0) {
-        Write-OffboardError -StatusCode 502 -Error 'RemovalUncertain' -Message 'Cloud removal failed or remains uncertain. Verify cloud state before retrying.' -RequestId $requestId -SourceTenantId $current.TenantId -Stage 'GraphDelete' -UpstreamError $_
+        Write-OffboardError -StatusCode 502 -Error 'RemovalUncertain' -Message 'Cloud removal failed or remains uncertain. Verify cloud state before retrying.' -RequestId $requestId -SourceTenantId $current.TenantId -Stage 'GraphDelete' -UpstreamError $deleteError
         return
     }
 }

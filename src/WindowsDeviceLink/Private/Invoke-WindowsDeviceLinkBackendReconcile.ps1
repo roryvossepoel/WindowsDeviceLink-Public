@@ -7,6 +7,7 @@ function Invoke-WindowsDeviceLinkBackendReconcile {
         [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string]$TargetTenantId,
         [AllowNull()][AllowEmptyString()][string]$SourceTenantId,
         [switch]$RepairExistingAssociation,
+        [ValidateRange(5,600)][int]$TimeoutSeconds = 120,
         [scriptblock]$RequestScript
     )
 
@@ -29,8 +30,8 @@ function Invoke-WindowsDeviceLinkBackendReconcile {
     }
     $body = $payload | ConvertTo-Json -Depth 5 -Compress
     try {
-        $response = if ($RequestScript) { & $RequestScript $endpoint $headers $body } else {
-            Invoke-RestMethod -Method Post -Uri $endpoint -Headers $headers -ContentType 'application/json' -Body $body -ErrorAction Stop
+        $response = if ($RequestScript) { & $RequestScript $endpoint $headers $body $TimeoutSeconds } else {
+            Invoke-RestMethod -Method Post -Uri $endpoint -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         }
         if (-not $response -or $response.success -ne $true) { throw 'The Function reconcile operation did not return success.' }
         Protect-WindowsDeviceLinkObject -InputObject $response -SensitiveValue @($BackendApiKey,[string]$InputObject.DeviceLink)

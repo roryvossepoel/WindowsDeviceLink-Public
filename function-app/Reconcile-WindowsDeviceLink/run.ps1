@@ -258,6 +258,7 @@ if ($decision -eq 'New') {
 
 # Move or same-tenant repair. Both operations replace one proven association with
 # the supplied DeviceLink identity and verify every boundary without blind retries.
+$incompleteError = if ($decision -eq 'Repair') { 'RepairIncomplete' } else { 'MoveIncomplete' }
 $sourceLookup = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
 $sourceMatches = @($sourceLookup.Matches)
 if ($sourceMatches.Count -ne 1 -or [string]$sourceMatches[0].id -ne $current.AssociationId) {
@@ -271,9 +272,16 @@ try {
 }
 catch {
     # A DELETE transport failure can be ambiguous. Verify state, but never issue a second DELETE automatically.
-    $verifySourceAfterError = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
+    $deleteError = $_
+    try {
+        $verifySourceAfterError = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
+    }
+    catch {
+        Write-ReconcileError -StatusCode 502 -Error 'SourceVerificationFailed' -Message 'Source removal was attempted, but the resulting source state could not be read. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphVerifySource' -UpstreamError $_
+        return
+    }
     if (@($verifySourceAfterError.Matches).Count -ne 0) {
-        Write-ReconcileError -StatusCode 502 -Error 'SourceRemovalUncertain' -Message 'Source removal failed or remains uncertain. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphDeleteSource' -UpstreamError $_
+        Write-ReconcileError -StatusCode 502 -Error 'SourceRemovalUncertain' -Message 'Source removal failed or remains uncertain. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphDeleteSource' -UpstreamError $deleteError
         return
     }
 }
@@ -281,15 +289,27 @@ finally {
     $sourceToken = $null
 }
 
-$verifySource = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
+try {
+    $verifySource = Get-WindowsDeviceLinkTenantAssociation -TenantId $sourceTenantId -SerialNumber $serialNumber -ClientId $clientId
+}
+catch {
+    Write-ReconcileError -StatusCode 502 -Error 'SourceVerificationFailed' -Message 'The source association was removed, but the resulting source state could not be verified. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphVerifySource' -UpstreamError $_
+    return
+}
 if (@($verifySource.Matches).Count -ne 0) {
-    Write-ReconcileError -StatusCode 502 -Error 'SourceVerificationFailed' -Message 'The source association is still present after removal. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+    Write-ReconcileError -StatusCode 502 -Error 'SourceVerificationFailed' -Message 'The source association is still present after removal. No target registration was attempted.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision
     return
 }
 
-$targetLookup = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+try {
+    $targetLookup = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
+}
+catch {
+    Write-ReconcileError -StatusCode 502 -Error $incompleteError -Message 'The source association was removed, but the target state could not be read before registration. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphLookupTarget' -UpstreamError $_
+    return
+}
 if (@($targetLookup.Matches).Count -gt 0) {
-    Write-ReconcileError -StatusCode 409 -Error 'TargetStateChanged' -Message 'The target tenant now contains an association. The source was removed; verify final state before another mutation.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+    Write-ReconcileError -StatusCode 409 -Error 'TargetStateChanged' -Message 'The target tenant now contains an association. The source was removed; verify final state before another mutation.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision
     return
 }
 
@@ -309,16 +329,16 @@ try {
     $verifyTarget = Get-WindowsDeviceLinkTenantAssociation -TenantId $targetTenantId -SerialNumber $serialNumber -ClientId $clientId
 }
 catch {
-    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed and target creation was attempted, but the resulting target state could not be read. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move' -Stage 'GraphVerifyTarget' -UpstreamError $_
+    Write-ReconcileError -StatusCode 502 -Error $incompleteError -Message 'The source association was removed and target creation was attempted, but the resulting target state could not be read. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphVerifyTarget' -UpstreamError $_
     return
 }
 if ($targetCreateError -and @($verifyTarget.Matches).Count -eq 0) {
-    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but target creation failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move' -Stage 'GraphImportTarget' -UpstreamError $targetCreateError
+    Write-ReconcileError -StatusCode 502 -Error $incompleteError -Message 'The source association was removed, but target creation failed and the target state could not be proven. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision -Stage 'GraphImportTarget' -UpstreamError $targetCreateError
     return
 }
 $targetMatches = @($verifyTarget.Matches)
 if ($targetMatches.Count -ne 1) {
-    Write-ReconcileError -StatusCode 502 -Error 'MoveIncomplete' -Message 'The source association was removed, but the target association could not be verified. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision 'Move'
+    Write-ReconcileError -StatusCode 502 -Error $incompleteError -Message 'The source association was removed, but the target association could not be verified. Re-run lookup before retrying.' -RequestId $requestId -SourceTenantId $sourceTenantId -TargetTenantId $targetTenantId -Decision $decision
     return
 }
 

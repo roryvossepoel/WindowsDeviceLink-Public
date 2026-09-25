@@ -92,6 +92,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           .\tests\Backend-Initialization-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
 
+      - name: Validate Function backend timeout propagation
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Backend-Timeout-Validation.ps1 -ModulePath $env:WDL_MODULE_PATH
+
       - name: Validate centralized tenant assignment orchestration
         shell: powershell
         run: |
