@@ -868,6 +868,13 @@ function Show-WindowsDeviceLink {
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
 
+    $btnCopyActivity = New-Object System.Windows.Forms.Button
+    $btnCopyActivity.Text = 'Copy'
+    $btnCopyActivity.Font = New-GuiFont -Size 8.3 -Style Regular
+    $btnCopyActivity.Size = [System.Drawing.Size]::new(64,24)
+    $btnCopyActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+    $content.Controls.Add($btnCopyActivity)
+
     $btnClearActivity = New-Object System.Windows.Forms.Button
     $btnClearActivity.Text = 'Clear'
     $btnClearActivity.Font = New-GuiFont -Size 8.3 -Style Regular
@@ -1223,6 +1230,7 @@ function Show-WindowsDeviceLink {
             Set-GuiCapabilities
         }
 
+        $btnCopyActivity.Enabled = -not $Busy
         $btnClearActivity.Enabled = -not $Busy
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
@@ -2103,6 +2111,27 @@ function Show-WindowsDeviceLink {
         Write-GuiConsole -Message 'Activity log cleared.'
     })
 
+    $btnCopyActivity.Add_Click({
+        if ([string]::IsNullOrWhiteSpace($consoleBox.Text)) {
+            Set-GuiStatus 'Activity log is empty.'
+            return
+        }
+
+        try {
+            [System.Windows.Forms.Clipboard]::SetText($consoleBox.Text)
+            Set-GuiStatus 'Activity log copied to clipboard.'
+        }
+        catch {
+            Set-GuiStatus 'Could not copy the activity log.'
+            [System.Windows.Forms.MessageBox]::Show(
+                "Could not copy the activity log to the clipboard.`r`n`r`n$($_.Exception.Message)",
+                'WindowsDeviceLink',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error
+            ) | Out-Null
+        }
+    })
+
     $form.Add_FormClosing({
         param($sender,$eventArgs)
 
@@ -2202,11 +2231,13 @@ function Show-WindowsDeviceLink {
         $activityY = $actionsPanel.Bottom + 14
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
 
-        # Align Clear to the same right edge used by the action buttons.
+        # Align Copy and Clear to the same right edge used by the action buttons.
         # Action buttons sit 16 px inside the right edge of the Actions panel.
         $clearX = $actionsPanel.Right - 16 - $btnClearActivity.Width
         $clearY = $activityY - 5
         $btnClearActivity.Location = [System.Drawing.Point]::new($clearX,$clearY)
+        $copyX = $clearX - 8 - $btnCopyActivity.Width
+        $btnCopyActivity.Location = [System.Drawing.Point]::new($copyX,$clearY)
 
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth

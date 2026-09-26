@@ -128,6 +128,8 @@ foreach ($required in @(
     'Export',
     'Offboarding',
     'Last checked',
+    'Activity log copied to clipboard.',
+    '[System.Windows.Forms.Clipboard]::SetText($consoleBox.Text)',
     'Target tenant',
     'Pre-associate',
     'Associate',
