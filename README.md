@@ -31,7 +31,7 @@ WindowsDeviceLink can:
 
 ## Current version
 
-The current development release line is `0.10.0-preview1`.
+The current development release line is `0.10.1-preview1`.
 
 WindowsDeviceLink has two explicit execution routes:
 
@@ -49,7 +49,9 @@ an authentication and deployment model. Backend is recommended for structural
 multitenant use.
 
 The GUI uses one operator view: Device, Connection, Local association, and Cloud
-association are shown together. Select a target tenant and choose **Pre-associate** or, on supported full Windows, **Associate**. In Backend mode
+association are shown together. The dedicated **Target tenant** action row keeps tenant
+selection or sign-in separate from the lifecycle operation. After the tenant context is
+ready, choose **Pre-associate** or, on supported full Windows, **Associate**. In Backend mode
 that one action performs the complete lookup, decision, identity renewal, pre-association,
 and verification workflow. Diagnostic, export, recovery, and offboarding actions remain
 available below the primary assignment action.
@@ -353,7 +355,7 @@ It provides:
 - safe New / Update / Move reconciliation;
 - backend-side Graph authentication and verification.
 
-For `0.10.0-preview1`, the supported preview route is to configure the Azure resources
+For `0.10.1-preview1`, the supported preview route is to configure the Azure resources
 and deploy the supplied Function App package manually. The repository also contains
 experimental Bicep/ARM infrastructure code, but that route is not yet presented as a
 supported Deploy to Azure experience. Its hardening and end-to-end validation are
@@ -435,7 +437,7 @@ See:
 
 ## Scope
 
-Preview release line: `0.10.0-preview1`.
+Preview release line: `0.10.1-preview1`.
 
 In scope: AMD64 Windows 11/WinPE, DeviceLink generation, official CSV export, Device Association query/pre-association/removal, native association discovery/completion on supported full Windows builds, local firmware inspection/reset, diagnostics/health, safe initialization, the optional full-Windows operator GUI, multiple authentication methods, webhook transport and the optional Azure Function reference backend.
 

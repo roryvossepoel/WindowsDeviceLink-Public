@@ -3,7 +3,7 @@
 This guide covers installation of WindowsDeviceLink from the PowerShell Gallery on Windows 11 and AMD64 Windows PE, including PowerShellGet, PackageManagement, prerelease handling, the WinPE publisher-check workaround, and the separately supplied Windows runtime DLL. For the intended pre-association -> Windows 11 OOBE lifecycle and the WinPE native-completion boundary, see [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 > [!IMPORTANT]
-> WindowsDeviceLink is currently preview software. This guide targets the `0.10.0-preview1` development release line.
+> WindowsDeviceLink is currently preview software. This guide targets the `0.10.1-preview1` development release line.
 
 ## Quick start - Windows 11
 
@@ -59,7 +59,7 @@ This distinction matters when multiple PowerShellGet versions are present. A Pow
 
 ## Prerelease support
 
-WindowsDeviceLink `0.10.0-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
+WindowsDeviceLink `0.10.1-preview1` is a prerelease package. Install it with `-AllowPrerelease`:
 
 ```powershell
 Install-Module WindowsDeviceLink `
@@ -125,7 +125,7 @@ Get-Command -Module WindowsDeviceLink |
     Select-Object Name
 ```
 
-For `0.10.0-preview1`, verify the exported command set directly:
+For `0.10.1-preview1`, verify the exported command set directly:
 
 ```powershell
 Get-Command -Module WindowsDeviceLink |
@@ -184,7 +184,7 @@ The current preview remains unsigned while the project remains unsigned. In the 
 
 This is documented as a WinPE installation limitation/workaround for the unsigned preview, not as a WindowsDeviceLink runtime failure.
 
-### Recommended WinPE installation for 0.10.0-preview1
+### Recommended WinPE installation for 0.10.1-preview1
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -214,10 +214,10 @@ Save-Module WindowsDeviceLink `
     -Force
 ```
 
-Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.10.0`:
+Then import the saved version explicitly. PowerShell Gallery prerelease metadata is separate from the module folder's base version, so the saved folder is normally `0.10.1`:
 
 ```powershell
-Import-Module 'X:\Temp\WindowsDeviceLink\0.10.0\WindowsDeviceLink.psd1' -Force
+Import-Module 'X:\Temp\WindowsDeviceLink\0.10.1\WindowsDeviceLink.psd1' -Force
 ```
 
 ## Bring Your Own DLL (BYO-DLL) in WinPE
@@ -237,7 +237,7 @@ A compatible AMD64 copy must be supplied by the user for DeviceLink runtime acti
 For example:
 
 ```text
-X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.10.0\Runtime\Windows.Management.Service.dll
+X:\Program Files\WindowsPowerShell\Modules\WindowsDeviceLink\0.10.1\Runtime\Windows.Management.Service.dll
 ```
 
 Or pass the DLL explicitly to commands that expose `-WindowsManagementServicePath`.

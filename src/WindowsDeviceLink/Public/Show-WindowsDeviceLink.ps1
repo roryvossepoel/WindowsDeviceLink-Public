@@ -424,7 +424,8 @@ function Show-WindowsDeviceLink {
 
             if (-not $cacheValid) {
                 Clear-GuiSessionAuthentication
-                Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.' -Command
+                Set-GuiSigningInState
+                Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.'
 
                 $tokenParameters = @{}
                 if ($selectedTenant) { $tokenParameters.TenantId = $selectedTenant }
@@ -439,12 +440,19 @@ function Show-WindowsDeviceLink {
 
                 $script:WdlGuiSessionAccessToken = ConvertTo-SecureString ([string]$token.AccessToken) -AsPlainText -Force
                 $script:WdlGuiSessionTenantId = [string]$token.TenantId
+                $script:WdlGuiSessionAccountName = [string]$token.AccountName
+                if ($selectedTenant -and (
+                    [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionTenantId) -or
+                    [string]$script:WdlGuiSessionTenantId -ine [string]$selectedTenant)) {
+                    throw 'The authenticated tenant does not match the selected target tenant.'
+                }
                 $expiresIn = if ($token.ExpiresIn) { [int]$token.ExpiresIn } else { 3600 }
                 $script:WdlGuiSessionExpiresUtc = [DateTime]::UtcNow.AddSeconds([Math]::Max(60,$expiresIn - 120))
                 $script:WdlGuiSessionAuthenticated = $true
                 $token = $null
                 $ui.Authentication.Text = "$Method - Signed in"
-                if ($btnSignIn) { $btnSignIn.Text = 'Switch account' }
+                if ($btnSignIn) { $btnSignIn.Text = 'Sign out' }
+                Update-GuiTargetTenantDisplay
                 Write-GuiConsole -Message 'Direct-mode session authenticated; the in-memory token will be reused for cloud actions.'
             }
 
@@ -480,17 +488,32 @@ function Show-WindowsDeviceLink {
     }
 
     function Clear-GuiSessionAuthentication {
+        param([switch]$ForceGraphDisconnect)
+
+        $disconnectGraphSession = $Method -eq 'Interactive' -and (
+            $script:WdlGuiSessionAuthenticated -or $ForceGraphDisconnect
+        )
+        if ($disconnectGraphSession -and (Get-Command Disconnect-MgGraph -ErrorAction SilentlyContinue)) {
+            try { Disconnect-MgGraph -ErrorAction Stop | Out-Null } catch {}
+        }
         if ($script:WdlGuiSessionAccessToken -is [System.IDisposable]) {
             try { $script:WdlGuiSessionAccessToken.Dispose() } catch {}
         }
         $script:WdlGuiSessionAccessToken = $null
         $script:WdlGuiSessionTenantId = $null
+        $script:WdlGuiSessionAccountName = $null
         $script:WdlGuiSessionExpiresUtc = $null
         $script:WdlGuiSessionAuthenticated = $false
         if ($ui -and $ui.Authentication -and -not $backendMode) {
             $ui.Authentication.Text = if ($usesInteractiveUserAuthentication) { "$Method - Signed out" } else { "$Method - Non-interactive" }
+            $ui.Endpoint.Text = if ($usesInteractiveUserAuthentication) { 'Not signed in' } else { 'Not applicable' }
+            $toolTip.SetToolTip($ui.Endpoint,$ui.Endpoint.Text)
+            $signedOutTenantId = Get-SelectedTenantId
+            $ui.TenantScope.Text = if ($signedOutTenantId) { Get-TenantDisplayName -TenantId $signedOutTenantId } elseif ($usesInteractiveUserAuthentication) { 'Determined by sign-in' } else { 'Authentication context' }
+            $toolTip.SetToolTip($ui.TenantScope,$(if ($signedOutTenantId) { $signedOutTenantId } else { $ui.TenantScope.Text }))
         }
         if ($btnSignIn) { $btnSignIn.Text = 'Sign in' }
+        Update-GuiTargetTenantDisplay
     }
 
     function Get-GuiBackendParameters {
@@ -520,6 +543,7 @@ function Show-WindowsDeviceLink {
     $script:WdlGuiSupport = $null
     $script:WdlGuiSessionAccessToken = $null
     $script:WdlGuiSessionTenantId = $null
+    $script:WdlGuiSessionAccountName = $null
     $script:WdlGuiSessionExpiresUtc = $null
     $script:WdlGuiSessionAuthenticated = $false
 
@@ -564,6 +588,7 @@ function Show-WindowsDeviceLink {
     $ui.ConnectionMode = New-ValuePair -Parent $connectionCard -Caption 'Mode' -Y 34 -CaptionWidth 105 -ValueWidth 335
     $ui.Authentication = New-ValuePair -Parent $connectionCard -Caption 'Authentication' -Y 56 -CaptionWidth 105 -ValueWidth 335
     $ui.Endpoint       = New-ValuePair -Parent $connectionCard -Caption 'Endpoint' -Y 78 -CaptionWidth 105 -ValueWidth 335
+    $ui.EndpointCaption = $connectionCard.Controls | Where-Object { [string]$_.Tag -eq 'Caption:Endpoint' } | Select-Object -First 1
     $ui.TenantScope    = New-ValuePair -Parent $connectionCard -Caption 'Tenant scope' -Y 100 -CaptionWidth 105 -ValueWidth 335
 
     $ui.LocalState = New-ValuePair -Parent $associationCard -Caption 'State' -Y 34 -CaptionWidth 105 -ValueWidth 335
@@ -591,10 +616,147 @@ function Show-WindowsDeviceLink {
     $actionsTitle.AutoSize = $true
     $content.Controls.Add($actionsTitle)
 
-    $actionsPanel = New-Card -Title '' -X 14 -Y 176 -Width 1030 -Height 196
+    $actionsPanel = New-Card -Title '' -X 14 -Y 176 -Width 1030 -Height 230
+
+    $targetTenantRow = New-Object System.Windows.Forms.Panel
+    $targetTenantRow.Location = [System.Drawing.Point]::new(0,0)
+    $targetTenantRow.Size = [System.Drawing.Size]::new(1030,46)
+    $targetTenantRow.BackColor = [System.Drawing.Color]::White
+    $actionsPanel.Controls.Add($targetTenantRow)
+
+    $targetTenantTitle = New-Object System.Windows.Forms.Label
+    $targetTenantTitle.Text = 'Target tenant'
+    $targetTenantTitle.Font = New-GuiFont -Size 8.5 -Style Bold
+    $targetTenantTitle.Location = [System.Drawing.Point]::new(14,5)
+    $targetTenantTitle.AutoSize = $true
+    $targetTenantRow.Controls.Add($targetTenantTitle)
+
+    $targetTenantDescription = New-Object System.Windows.Forms.Label
+    $targetTenantDescription.Text = if ($backendMode) {
+        'Select the destination tenant.'
+    }
+    elseif ($showTenantSelector) {
+        'Select the destination tenant, then sign in.'
+    }
+    elseif ($outerBoundParameters.ContainsKey('TenantId')) {
+        'The destination tenant is fixed by the supplied tenant ID.'
+    }
+    elseif ($usesInteractiveUserAuthentication) {
+        'Sign in to select the destination tenant.'
+    }
+    else {
+        'The destination tenant is determined by the authentication context.'
+    }
+    $targetTenantDescription.Font = New-GuiFont -Size 8.2 -Style Regular
+    $targetTenantDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
+    $targetTenantDescription.Location = [System.Drawing.Point]::new(14,23)
+    $targetTenantDescription.AutoSize = $true
+    $targetTenantRow.Controls.Add($targetTenantDescription)
+
+    $tenantSelector = New-Object System.Windows.Forms.ComboBox
+    $tenantSelector.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+    $tenantSelector.Font = New-GuiFont -Size 8.5 -Style Regular
+    $tenantSelector.Location = [System.Drawing.Point]::new(660,9)
+    $tenantSelector.ItemHeight = 22
+    $tenantSelector.Size = [System.Drawing.Size]::new(220,28)
+    foreach ($choice in $tenantChoices) {
+        [void]$tenantSelector.Items.Add($choice)
+    }
+    $tenantSelector.SelectedIndex = 0
+    $tenantSelector.Visible = $showTenantSelector
+    $targetTenantRow.Controls.Add($tenantSelector)
+
+    $targetTenantValue = New-Object System.Windows.Forms.Label
+    $targetTenantValue.Font = New-GuiFont -Size 9 -Style Bold
+    $targetTenantValue.Location = [System.Drawing.Point]::new(660,13)
+    $targetTenantValue.Size = [System.Drawing.Size]::new(220,20)
+    $targetTenantValue.AutoEllipsis = $true
+    $targetTenantValue.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+    $targetTenantValue.Visible = -not $showTenantSelector
+    $targetTenantRow.Controls.Add($targetTenantValue)
+
+    $btnSignIn = New-Object System.Windows.Forms.Button
+    $btnSignIn.Text = 'Sign in'
+    $btnSignIn.Font = New-GuiFont -Size 8.6 -Style Regular
+    $btnSignIn.Size = [System.Drawing.Size]::new(118,28)
+    $btnSignIn.Location = [System.Drawing.Point]::new(888,9)
+    $btnSignIn.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+    $btnSignIn.UseVisualStyleBackColor = $true
+    $btnSignIn.Visible = $usesInteractiveUserAuthentication
+    $targetTenantRow.Controls.Add($btnSignIn)
+
+    $targetTenantSeparator = New-Object System.Windows.Forms.Panel
+    $targetTenantSeparator.BackColor = [System.Drawing.Color]::FromArgb(232,232,232)
+    $targetTenantSeparator.Location = [System.Drawing.Point]::new(14,45)
+    $targetTenantSeparator.Size = [System.Drawing.Size]::new(1002,1)
+    $targetTenantRow.Controls.Add($targetTenantSeparator)
+
+    function Update-GuiTargetTenantDisplay {
+        if (-not $targetTenantValue) { return }
+
+        $targetTenantDescription.Text = if ($backendMode) {
+            'Select the destination tenant.'
+        }
+        elseif ($script:WdlGuiSessionAuthenticated) {
+            if ($showTenantSelector) { 'Actions will target the selected tenant.' } else { 'Actions will target the signed-in tenant.' }
+        }
+        elseif ($showTenantSelector) {
+            'Select the destination tenant, then sign in.'
+        }
+        elseif ($outerBoundParameters.ContainsKey('TenantId')) {
+            'The destination tenant is fixed by the supplied tenant ID.'
+        }
+        elseif ($usesInteractiveUserAuthentication) {
+            'Sign in to select the destination tenant.'
+        }
+        else {
+            'The destination tenant is determined by the authentication context.'
+        }
+
+        if ($showTenantSelector) { return }
+
+        $targetTenantId = if ($outerBoundParameters.ContainsKey('TenantId')) {
+            [string]$TenantId
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionTenantId)) {
+            [string]$script:WdlGuiSessionTenantId
+        }
+        else {
+            $null
+        }
+
+        $targetTenantValue.Text = if ($targetTenantId) {
+            Get-TenantDisplayName -TenantId $targetTenantId
+        }
+        elseif ($script:WdlGuiSessionAuthenticated) {
+            'Signed-in tenant'
+        }
+        elseif ($usesInteractiveUserAuthentication) {
+            'Determined by sign-in'
+        }
+        else {
+            'Authentication context'
+        }
+        $toolTip.SetToolTip($targetTenantValue, $(if ($targetTenantId) { $targetTenantId } else { $targetTenantValue.Text }))
+    }
+
+    function Set-GuiSigningInState {
+        if (-not $usesInteractiveUserAuthentication) { return }
+
+        $btnSignIn.Text = 'Signing in...'
+        $ui.Authentication.Text = "$Method - Signing in..."
+        $ui.Endpoint.Text = 'Waiting for sign-in...'
+        $targetTenantDescription.Text = 'Waiting for authentication to establish the destination tenant.'
+        foreach ($control in @($ui.CloudState,$ui.CloudTenant,$ui.CloudId,$ui.CloudChecked)) {
+            $control.Text = 'Waiting for sign-in...'
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+
+    Update-GuiTargetTenantDisplay
 
     $assignmentRow = New-Object System.Windows.Forms.Panel
-    $assignmentRow.Location = [System.Drawing.Point]::new(0,0)
+    $assignmentRow.Location = [System.Drawing.Point]::new(0,46)
     $assignmentRow.Size = [System.Drawing.Size]::new(1030,46)
     $assignmentRow.BackColor = [System.Drawing.Color]::White
     $actionsPanel.Controls.Add($assignmentRow)
@@ -607,42 +769,12 @@ function Show-WindowsDeviceLink {
     $assignmentRow.Controls.Add($assignmentTitle)
 
     $assignmentDescription = New-Object System.Windows.Forms.Label
-    $assignmentDescription.Text = 'Select the destination and choose Pre-associate or Associate.'
+    $assignmentDescription.Text = 'Pre-associate or associate the device with the selected tenant.'
     $assignmentDescription.Font = New-GuiFont -Size 8.2 -Style Regular
     $assignmentDescription.ForeColor = [System.Drawing.Color]::FromArgb(108,108,108)
     $assignmentDescription.Location = [System.Drawing.Point]::new(14,23)
     $assignmentDescription.AutoSize = $true
     $assignmentRow.Controls.Add($assignmentDescription)
-
-    $tenantCaption = New-Object System.Windows.Forms.Label
-    $tenantCaption.Text = 'Target tenant'
-    $tenantCaption.Font = New-GuiFont -Size 8.5 -Style Regular
-    $tenantCaption.ForeColor = [System.Drawing.Color]::FromArgb(102,102,102)
-    $tenantCaption.Location = [System.Drawing.Point]::new(500,14)
-    $tenantCaption.Size = [System.Drawing.Size]::new(88,18)
-    $assignmentRow.Controls.Add($tenantCaption)
-
-    $tenantSelector = New-Object System.Windows.Forms.ComboBox
-    $tenantSelector.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    $tenantSelector.Font = New-GuiFont -Size 8.5 -Style Regular
-    $tenantSelector.Location = [System.Drawing.Point]::new(588,9)
-    $tenantSelector.ItemHeight = 22
-    $tenantSelector.Size = [System.Drawing.Size]::new(220,28)
-    foreach ($choice in $tenantChoices) {
-        [void]$tenantSelector.Items.Add($choice)
-    }
-    $tenantSelector.SelectedIndex = 0
-    $tenantCaption.Visible = $showTenantSelector
-    $tenantSelector.Visible = $showTenantSelector
-    if (-not $showTenantSelector) {
-        $assignmentDescription.Text = if ($outerBoundParameters.ContainsKey('TenantId')) {
-            'The destination tenant is fixed by the supplied tenant ID. Choose Pre-associate or Associate.'
-        }
-        else {
-            'The destination tenant is determined by sign-in. Choose Pre-associate or Associate.'
-        }
-    }
-    $assignmentRow.Controls.Add($tenantSelector)
 
     $btnAssign = New-Object System.Windows.Forms.Button
     $btnAssign.Text = 'Pre-associate'
@@ -677,9 +809,9 @@ function Show-WindowsDeviceLink {
     $assignmentSeparator.Size = [System.Drawing.Size]::new(1002,1)
     $assignmentRow.Controls.Add($assignmentSeparator)
 
-    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status' -Description 'Sign in for cloud actions, or refresh local or cloud state.' -Y 46 -Buttons @('Sign in','Refresh cloud','Refresh local')
-    $rowExport = New-ActionRow -Parent $actionsPanel -Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 92 -Buttons @('Export CSV')
-    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or both.' -Y 138 -Buttons @('Remove cloud','Reset local','Remove both')
+    $rowTools = New-ActionRow -Parent $actionsPanel -Title 'Status' -Description 'Refresh local or cloud state.' -Y 92 -Buttons @('Refresh cloud','Refresh local')
+    $rowExport = New-ActionRow -Parent $actionsPanel -Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 138 -Buttons @('Export CSV')
+    $rowOffboard = New-ActionRow -Parent $actionsPanel -Title 'Offboarding' -Description 'Remove the cloud association, reset local state, or both.' -Y 184 -Buttons @('Remove cloud','Reset local','Remove both')
 
     $offboardSeparator = @(
         $rowOffboard.Panel.Controls |
@@ -708,7 +840,6 @@ function Show-WindowsDeviceLink {
         $button
     }
 
-    $btnSignIn = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Sign in'
     $btnRefresh = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh local'
     $btnOnline = Get-ActionButtonByText -Row $rowTools.Panel -Text 'Refresh cloud'
     $btnExport = Get-ActionButtonByText -Row $rowExport.Panel -Text 'Export CSV'
@@ -728,11 +859,7 @@ function Show-WindowsDeviceLink {
         $btnFullOffboard
     )
 
-    $btnSignIn.Visible = $usesInteractiveUserAuthentication
-    if (-not $usesInteractiveUserAuthentication) {
-        $rowTools.Description.Text = 'Refresh local or cloud state.'
-    }
-    $actionsPanel.Height = 184
+    $actionsPanel.Height = 230
 
     $activityTitle = New-Object System.Windows.Forms.Label
     $activityTitle.Text = 'Activity'
@@ -740,6 +867,13 @@ function Show-WindowsDeviceLink {
     $activityTitle.Location = [System.Drawing.Point]::new(16,564)
     $activityTitle.AutoSize = $true
     $content.Controls.Add($activityTitle)
+
+    $btnCopyActivity = New-Object System.Windows.Forms.Button
+    $btnCopyActivity.Text = 'Copy'
+    $btnCopyActivity.Font = New-GuiFont -Size 8.3 -Style Regular
+    $btnCopyActivity.Size = [System.Drawing.Size]::new(64,24)
+    $btnCopyActivity.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard
+    $content.Controls.Add($btnCopyActivity)
 
     $btnClearActivity = New-Object System.Windows.Forms.Button
     $btnClearActivity.Text = 'Clear'
@@ -790,13 +924,14 @@ function Show-WindowsDeviceLink {
         param(
             [AllowNull()][AllowEmptyString()][string]$Message,
             [switch]$Command,
+            [switch]$Warning,
             [switch]$ErrorMessage
         )
 
         if ([string]::IsNullOrWhiteSpace($Message)) { return }
 
         $timestamp = (Get-Date).ToString('HH:mm:ss')
-        $prefix = if ($Command) { '>' } elseif ($ErrorMessage) { '!' } else { '-' }
+        $prefix = if ($Command) { '>' } elseif ($Warning -or $ErrorMessage) { '!' } else { '-' }
         $line = "[$timestamp] $prefix $Message"
 
         $consoleBox.AppendText($line + [Environment]::NewLine)
@@ -953,17 +1088,46 @@ function Show-WindowsDeviceLink {
         $localAssociated = $local -and [string]$local.FirmwareState -eq '4/4'
         $offboardingStatePresent = $cloudPresent -or $localAssociated
         $selectedTenantId = Get-SelectedTenantId
-        $selectedMatchesCloud = $cloudPresent -and -not [string]::IsNullOrWhiteSpace($selectedTenantId) -and
-            [string]$cloud.TenantId -ieq $selectedTenantId
+        $effectiveTargetTenantId = if (-not [string]::IsNullOrWhiteSpace($selectedTenantId)) {
+            $selectedTenantId
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionTenantId)) {
+            [string]$script:WdlGuiSessionTenantId
+        }
+        else {
+            $null
+        }
+        $selectedMatchesCloud = $cloudPresent -and -not [string]::IsNullOrWhiteSpace($effectiveTargetTenantId) -and
+            [string]$cloud.TenantId -ieq $effectiveTargetTenantId
         $alreadyPreassociatedOrAssociatedInTarget = $selectedMatchesCloud -and $cloudState -in @('associated','preassociated')
         $alreadyAssociatedInTarget = $localAssociated -and $selectedMatchesCloud -and $cloudState -eq 'associated'
 
         $btnRefresh.Enabled = $true
-        $directTenantReady = -not $hasDirectTenantCatalog -or -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId))
-        $btnSignIn.Enabled = $usesInteractiveUserAuthentication -and $directTenantReady
+        $tenantSelectionReady = -not $hasDirectTenantCatalog -or -not [string]::IsNullOrWhiteSpace($selectedTenantId)
+        $interactiveTenantReady = $usesInteractiveUserAuthentication -and
+            $script:WdlGuiSessionAuthenticated
+        $directTenantReady = if ($usesInteractiveUserAuthentication) {
+            $tenantSelectionReady -and $interactiveTenantReady
+        }
+        else {
+            $tenantSelectionReady
+        }
+        $btnSignIn.Enabled = $usesInteractiveUserAuthentication -and
+            ($script:WdlGuiSessionAuthenticated -or $tenantSelectionReady)
         $btnOnline.Enabled = $runtimeReady -and ($backendMode -or $directTenantReady)
         $btnExport.Enabled = $runtimeReady
-        $targetReadyForAssociation = if ($backendMode -or $hasDirectTenantCatalog) { -not [string]::IsNullOrWhiteSpace((Get-SelectedTenantId)) } else { $true }
+        $targetReadyForAssociation = if ($backendMode) {
+            -not [string]::IsNullOrWhiteSpace($selectedTenantId)
+        }
+        elseif ($usesInteractiveUserAuthentication) {
+            $directTenantReady
+        }
+        elseif ($hasDirectTenantCatalog) {
+            -not [string]::IsNullOrWhiteSpace($selectedTenantId)
+        }
+        else {
+            $true
+        }
         $btnAssign.Enabled = $runtimeReady -and $targetReadyForAssociation -and -not $alreadyPreassociatedOrAssociatedInTarget
         $btnAssociate.Enabled = $canAssociate -and $targetReadyForAssociation -and -not $alreadyAssociatedInTarget
         $btnCloudOffboard.Enabled = $runtimeReady -and $cloudPresent -and ($backendMode -or $directTenantReady)
@@ -984,11 +1148,24 @@ function Show-WindowsDeviceLink {
         $toolTip.SetToolTip($btnFullOffboard, 'Remove the cloud association and local DeviceLink firmware state.')
         $toolTip.SetToolTip($btnAssociate, 'Pre-associate the device with the selected tenant and complete Device Association on this Windows device.')
         $toolTip.SetToolTip($btnAssign, 'Pre-associate the device with the selected target tenant. Backend mode safely applies New, no-op, or Move.')
-        $toolTip.SetToolTip($btnSignIn, 'Authenticate once for this Direct-mode UI session and load the cloud association.')
-        if ($hasDirectTenantCatalog -and -not $directTenantReady) {
+        $signInToolTip = if ($script:WdlGuiSessionAuthenticated) {
+            'Sign out and clear the in-memory tenant authentication context.'
+        }
+        else {
+            'Sign in once to establish the target tenant and load the cloud association.'
+        }
+        $toolTip.SetToolTip($btnSignIn, $signInToolTip)
+        if ($hasDirectTenantCatalog -and -not $tenantSelectionReady) {
             $toolTip.SetToolTip($btnSignIn, 'Select a target tenant first. Sign-in will be scoped to that tenant.')
             $toolTip.SetToolTip($btnAssign, 'Select a target tenant first. Direct mode applies New or no-op only in that selected tenant.')
             $toolTip.SetToolTip($btnAssociate, 'Select a target tenant first, then sign in to associate the device.')
+            $toolTip.SetToolTip($btnAssociateHost, 'Select a target tenant first, then sign in to associate the device.')
+        }
+        elseif ($usesInteractiveUserAuthentication -and -not $interactiveTenantReady) {
+            $signInRequiredToolTip = 'Sign in to the target tenant first.'
+            $toolTip.SetToolTip($btnAssign, $signInRequiredToolTip)
+            $toolTip.SetToolTip($btnAssociate, $signInRequiredToolTip)
+            $toolTip.SetToolTip($btnAssociateHost, $signInRequiredToolTip)
         }
         elseif (-not $backendMode) { $toolTip.SetToolTip($btnAssign, 'Direct mode applies New or no-op in the selected tenant, or in the tenant determined by sign-in when no catalog is configured.') }
         elseif (-not $cloud) { $toolTip.SetToolTip($btnAssign, 'Check all configured tenants, renew the local identity when required, and pre-associate the device with the selected target tenant.') }
@@ -1048,10 +1225,12 @@ function Show-WindowsDeviceLink {
         }
         else {
             $actionsPanel.Enabled = $true
-            $tenantSelector.Enabled = $showTenantSelector
+            $tenantSelector.Enabled = $showTenantSelector -and
+                -not ($usesInteractiveUserAuthentication -and $script:WdlGuiSessionAuthenticated)
             Set-GuiCapabilities
         }
 
+        $btnCopyActivity.Enabled = -not $Busy
         $btnClearActivity.Enabled = -not $Busy
         $statusProgress.Visible = $Busy
         $form.UseWaitCursor = $Busy
@@ -1134,12 +1313,14 @@ function Show-WindowsDeviceLink {
         if ($backendMode) {
             $ui.ConnectionMode.Text = 'Backend'
             $ui.Authentication.Text = 'Function API key'
+            $ui.EndpointCaption.Text = 'Endpoint'
             $ui.Endpoint.Text = [string]$BackendUri.Host
             $ui.TenantScope.Text = "$($effectiveTenants.Count) available tenants"
             $toolTip.SetToolTip($ui.Endpoint,[string]$BackendUri.AbsoluteUri)
         }
         else {
             $ui.ConnectionMode.Text = 'Direct'
+            $ui.EndpointCaption.Text = 'Account'
             if ($usesInteractiveUserAuthentication) {
                 $sessionState = if ($script:WdlGuiSessionAuthenticated) { 'Signed in' } else { 'Signed out' }
                 $ui.Authentication.Text = "$Method - $sessionState"
@@ -1147,8 +1328,26 @@ function Show-WindowsDeviceLink {
             else {
                 $ui.Authentication.Text = "$Method - Non-interactive"
             }
-            $ui.Endpoint.Text = 'Microsoft Graph'
-            $ui.TenantScope.Text = if ($selectedTenant) { Get-TenantDisplayName -TenantId $selectedTenant } else { 'Determined by sign-in' }
+            $ui.Endpoint.Text = if (-not [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionAccountName)) {
+                [string]$script:WdlGuiSessionAccountName
+            }
+            elseif ($usesInteractiveUserAuthentication) {
+                'Not signed in'
+            }
+            else {
+                'Not applicable'
+            }
+            $toolTip.SetToolTip($ui.Endpoint,$ui.Endpoint.Text)
+            $connectionTenant = if ($selectedTenant) { $selectedTenant } else { [string]$script:WdlGuiSessionTenantId }
+            $ui.TenantScope.Text = if ($connectionTenant) {
+                Get-TenantDisplayName -TenantId $connectionTenant
+            }
+            elseif ($usesInteractiveUserAuthentication) {
+                if ($script:WdlGuiSessionAuthenticated) { 'Signed-in tenant' } else { 'Determined by sign-in' }
+            }
+            else {
+                'Authentication context'
+            }
         }
 
         $ui.Firmware.Text = [string]$local.FirmwareState
@@ -1197,10 +1396,16 @@ function Show-WindowsDeviceLink {
             [switch]$WriteCommand
         )
 
-        $ui.CloudState.Text = 'Checking...'
-        $ui.CloudTenant.Text = 'Checking...'
-        $ui.CloudId.Text = 'Checking...'
-        $ui.CloudChecked.Text = 'Checking...'
+        $cloudPendingText = if ($usesInteractiveUserAuthentication -and -not $script:WdlGuiSessionAuthenticated) {
+            'Waiting for sign-in...'
+        }
+        else {
+            'Checking...'
+        }
+        $ui.CloudState.Text = $cloudPendingText
+        $ui.CloudTenant.Text = $cloudPendingText
+        $ui.CloudId.Text = $cloudPendingText
+        $ui.CloudChecked.Text = $cloudPendingText
         [System.Windows.Forms.Application]::DoEvents()
 
         if ($backendMode) {
@@ -1228,9 +1433,51 @@ function Show-WindowsDeviceLink {
         $script:WdlGuiCloudStatus = $cloud
 
         if ($usesInteractiveUserAuthentication) {
+            $graphContext = if ($Method -eq 'Interactive' -and (Get-Command Get-MgContext -ErrorAction SilentlyContinue)) {
+                Get-MgContext
+            }
+            else {
+                $null
+            }
+            $authenticatedTenantId = if ($Method -eq 'Interactive' -and (Get-Command Get-MgContext -ErrorAction SilentlyContinue)) {
+                [string]$graphContext.TenantId
+            }
+            elseif ($cloud.TenantId) {
+                [string]$cloud.TenantId
+            }
+            else {
+                [string]$script:WdlGuiSessionTenantId
+            }
+            $selectedTenantId = Get-SelectedTenantId
+            if ($Method -eq 'Interactive' -and [string]::IsNullOrWhiteSpace($authenticatedTenantId)) {
+                $authenticationDetail = if ($cloud -and -not [string]::IsNullOrWhiteSpace([string]$cloud.AssociationError)) {
+                    [string]$cloud.AssociationError
+                }
+                else {
+                    'No authenticated Microsoft Graph context was returned.'
+                }
+                throw "Interactive authentication did not complete. $authenticationDetail"
+            }
+            if ($selectedTenantId -and (
+                [string]::IsNullOrWhiteSpace($authenticatedTenantId) -or
+                $authenticatedTenantId -ine [string]$selectedTenantId)) {
+                throw 'The authenticated tenant does not match the selected target tenant.'
+            }
             $script:WdlGuiSessionAuthenticated = $true
+            if (-not [string]::IsNullOrWhiteSpace($authenticatedTenantId)) {
+                $script:WdlGuiSessionTenantId = $authenticatedTenantId
+            }
+            if ($graphContext -and -not [string]::IsNullOrWhiteSpace([string]$graphContext.Account)) {
+                $script:WdlGuiSessionAccountName = [string]$graphContext.Account
+            }
             $ui.Authentication.Text = "$Method - Signed in"
-            $btnSignIn.Text = 'Switch account'
+            $ui.Endpoint.Text = if (-not [string]::IsNullOrWhiteSpace([string]$script:WdlGuiSessionAccountName)) { [string]$script:WdlGuiSessionAccountName } else { 'Signed-in account' }
+            $toolTip.SetToolTip($ui.Endpoint,$ui.Endpoint.Text)
+            $btnSignIn.Text = 'Sign out'
+            Update-GuiTargetTenantDisplay
+            $connectionTenantId = if ($selectedTenantId) { $selectedTenantId } else { [string]$script:WdlGuiSessionTenantId }
+            $ui.TenantScope.Text = if ($connectionTenantId) { Get-TenantDisplayName -TenantId $connectionTenantId } else { 'Signed-in tenant' }
+            $toolTip.SetToolTip($ui.TenantScope,$(if ($connectionTenantId) { $connectionTenantId } else { $ui.TenantScope.Text }))
         }
 
         $ui.CloudState.Text = Get-GuiCloudStateText -State $cloud.AssociationState
@@ -1277,16 +1524,45 @@ function Show-WindowsDeviceLink {
     function Invoke-GuiSignIn {
         if ($script:WdlGuiBusy -or $backendMode) { return }
 
-        Clear-GuiSessionAuthentication
+        if ($script:WdlGuiSessionAuthenticated) {
+            Clear-GuiSessionAuthentication
+            Set-GuiCapabilities
+            Set-GuiStatus 'Signed out'
+            Write-GuiConsole -Message 'Direct-mode session signed out; the in-memory authentication context was cleared.'
+            return
+        }
+
+        if ($Method -eq 'Interactive') {
+            Clear-GuiSessionAuthentication -ForceGraphDisconnect
+        }
+        else {
+            Clear-GuiSessionAuthentication
+        }
         Set-GuiBusy -Busy $true -StatusText 'Signing in...'
+        Set-GuiSigningInState
+        Write-GuiConsole -Message "Waiting for $Method authentication..."
+        if ($Method -eq 'Interactive') {
+            Write-GuiConsole -Message 'Sign-in uses Web Account Manager (WAM). The sign-in window may open behind this window; check the taskbar or other open windows.' -Warning
+            Write-GuiConsole -Message "If Windows asks whether to sign in to all apps, select 'No, this app only' to avoid registering this device in the signed-in tenant." -Warning
+        }
         try {
             [void](Get-GuiAuthParameters)
             $cloud = Refresh-CloudView -WriteCommand
             Write-GuiObject $cloud
-            Set-GuiStatus 'Signed in; cloud association loaded'
+            if ($cloud -and -not [string]::IsNullOrWhiteSpace([string]$cloud.AssociationError)) {
+                Set-GuiStatus 'Signed in; cloud association check failed'
+            }
+            else {
+                Set-GuiStatus 'Signed in; cloud association loaded'
+            }
         }
         catch {
-            Clear-GuiSessionAuthentication
+            Clear-GuiSessionAuthentication -ForceGraphDisconnect
+            $script:WdlGuiCloudStatus = $null
+            $ui.CloudState.Text = 'Not checked'
+            $ui.CloudTenant.Text = 'Not checked'
+            $ui.CloudId.Text = 'Not checked'
+            $ui.CloudChecked.Text = 'Not checked'
             Set-GuiStatus 'Sign-in failed'
             Show-GuiError $_.Exception.Message
         }
@@ -1835,6 +2111,27 @@ function Show-WindowsDeviceLink {
         Write-GuiConsole -Message 'Activity log cleared.'
     })
 
+    $btnCopyActivity.Add_Click({
+        if ([string]::IsNullOrWhiteSpace($consoleBox.Text)) {
+            Set-GuiStatus 'Activity log is empty.'
+            return
+        }
+
+        try {
+            [System.Windows.Forms.Clipboard]::SetText($consoleBox.Text)
+            Set-GuiStatus 'Activity log copied to clipboard.'
+        }
+        catch {
+            Set-GuiStatus 'Could not copy the activity log.'
+            [System.Windows.Forms.MessageBox]::Show(
+                "Could not copy the activity log to the clipboard.`r`n`r`n$($_.Exception.Message)",
+                'WindowsDeviceLink',
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error
+            ) | Out-Null
+        }
+    })
+
     $form.Add_FormClosing({
         param($sender,$eventArgs)
 
@@ -1909,23 +2206,38 @@ function Show-WindowsDeviceLink {
         $actionsPanel.Location = [System.Drawing.Point]::new(14,($actionsY + 26))
         $actionsPanel.Width = $fullWidth
 
+        $targetTenantRow.Width = $fullWidth
+        $btnSignIn.Left = $fullWidth - 16 - $btnSignIn.Width
+        if ($showTenantSelector) {
+            $tenantSelector.Left = if ($usesInteractiveUserAuthentication) {
+                $btnSignIn.Left - 8 - $tenantSelector.Width
+            }
+            else {
+                $fullWidth - 16 - $tenantSelector.Width
+            }
+        }
+        else {
+            $targetTenantValue.Left = [Math]::Max(360,$targetTenantDescription.Right + 20)
+            $targetValueRight = if ($usesInteractiveUserAuthentication) { $btnSignIn.Left - 8 } else { $fullWidth - 16 }
+            $targetTenantValue.Width = [Math]::Max(220,$targetValueRight - $targetTenantValue.Left)
+        }
+        $targetTenantSeparator.Width = [Math]::Max(480,$fullWidth - 28)
+
         $assignmentRow.Width = $fullWidth
         $btnAssociateHost.Left = $fullWidth - 16 - $btnAssociateHost.Width
         $btnAssign.Left = $btnAssociateHost.Left - 8 - $btnAssign.Width
-        if ($showTenantSelector) {
-            $tenantSelector.Left = $btnAssign.Left - 8 - $tenantSelector.Width
-            $tenantCaption.Left = $tenantSelector.Left - 88
-        }
         $assignmentSeparator.Width = [Math]::Max(480,$fullWidth - 28)
 
         $activityY = $actionsPanel.Bottom + 14
         $activityTitle.Location = [System.Drawing.Point]::new(16,$activityY)
 
-        # Align Clear to the same right edge used by the action buttons.
+        # Align Copy and Clear to the same right edge used by the action buttons.
         # Action buttons sit 16 px inside the right edge of the Actions panel.
         $clearX = $actionsPanel.Right - 16 - $btnClearActivity.Width
         $clearY = $activityY - 5
         $btnClearActivity.Location = [System.Drawing.Point]::new($clearX,$clearY)
+        $copyX = $clearX - 8 - $btnCopyActivity.Width
+        $btnCopyActivity.Location = [System.Drawing.Point]::new($copyX,$clearY)
 
         $activityCard.Location = [System.Drawing.Point]::new(14,($activityY + 26))
         $activityCard.Width = $fullWidth

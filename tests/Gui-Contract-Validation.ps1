@@ -122,11 +122,14 @@ foreach ($required in @(
     "-Caption 'Manufacturer'",
     "-Caption 'Operating system'",
     "-Caption 'Tenant scope'",
+    "'Caption:Endpoint'",
     'Device association',
     'Status',
     'Export',
     'Offboarding',
     'Last checked',
+    'Activity log copied to clipboard.',
+    '[System.Windows.Forms.Clipboard]::SetText($consoleBox.Text)',
     'Target tenant',
     'Pre-associate',
     'Associate',
@@ -134,26 +137,44 @@ foreach ($required in @(
     'Reset local',
     'Remove both',
     'Sign in',
-    'Switch account',
+    'Sign out',
+    'Signing in...',
+    'Waiting for sign-in...',
+    '[switch]$Warning',
+    'The sign-in window may open behind this window',
+    "select 'No, this app only' to avoid registering this device",
+    'Actions will target the signed-in tenant.',
+    'Disconnect-MgGraph',
+    'The authenticated tenant does not match the selected target tenant.',
     '$usesInteractiveUserAuthentication',
     'Non-interactive',
     'Invoke-GuiSignIn',
     'Signed out',
+    'Interactive authentication did not complete.',
+    'No authenticated Microsoft Graph context was returned.',
+    'Signed in; cloud association check failed',
     'Signed in; cloud association loaded',
     'Local state loaded; sign in to check the cloud association',
     'WdlGuiSessionAccessToken',
     'WdlGuiSessionTenantId',
+    'WdlGuiSessionAccountName',
     'WdlGuiSessionExpiresUtc',
     'Clear-GuiSessionAuthentication',
+    'Clear-GuiSessionAuthentication -ForceGraphDisconnect',
+    '[switch]$ForceGraphDisconnect',
     "Method = 'AccessToken'",
-    'Authenticating once for this Direct-mode UI session.',
+    "Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.'",
     'the in-memory token will be reused for cloud actions.',
     'Target tenant changed; sign in again to create a Direct-mode session for the selected tenant.',
     'Select a target tenant before signing in or performing a cloud action.',
     'Direct mode uses either one explicit -TenantId or a tenant catalog; do not combine them.',
     '$hasDirectTenantCatalog',
     '$showTenantSelector',
-    'The destination tenant is determined by sign-in',
+    'Sign in to select the destination tenant.',
+    '$targetTenantRow.Controls.Add($btnSignIn)',
+    '$interactiveTenantReady',
+    '-not ($usesInteractiveUserAuthentication -and $script:WdlGuiSessionAuthenticated)',
+    '$targetTenantValue.Width = [Math]::Max(220,$targetValueRight - $targetTenantValue.Left)',
     '$activityCard.Height = $activityHeight',
     '$btnAssign.FlatStyle = [System.Windows.Forms.FlatStyle]::Standard',
     'New-GuiFont',
@@ -218,8 +239,14 @@ foreach ($inconsistentCloudPlaceholder in @('Not checked yet','Not yet')) {
 }
 
 foreach ($cloudField in @('CloudState','CloudTenant','CloudId','CloudChecked')) {
-    if ($source -notmatch [regex]::Escape("`$ui.$cloudField.Text = 'Checking...'")) {
-        throw "FAIL: Cloud association field '$cloudField' must show the shared 'Checking...' state during lookup."
+    if ($source -notmatch [regex]::Escape("`$ui.$cloudField.Text = `$cloudPendingText")) {
+        throw "FAIL: Cloud association field '$cloudField' must use the shared pending state during lookup."
+    }
+}
+
+foreach ($cloudPendingState in @('Waiting for sign-in...','Checking...')) {
+    if ($source -notmatch [regex]::Escape($cloudPendingState)) {
+        throw "FAIL: Cloud association pending state '$cloudPendingState' is missing."
     }
 }
 
@@ -232,19 +259,21 @@ foreach ($localField in @('LocalState','Firmware','LinkId','LocalCreated')) {
     }
 }
 
-if ($source -notmatch [regex]::Escape("-Buttons @('Sign in','Refresh cloud','Refresh local')")) {
-    throw 'FAIL: Status actions must present cloud before local, matching the Offboarding action order.'
+if ($source -notmatch [regex]::Escape("-Title 'Status' -Description 'Refresh local or cloud state.' -Y 92 -Buttons @('Refresh cloud','Refresh local')")) {
+    throw 'FAIL: Status actions must contain only cloud and local refresh, in the same order as Offboarding.'
 }
 
-if ($source -notmatch [regex]::Escape("-Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 92 -Buttons @('Export CSV')")) {
+if ($source -notmatch [regex]::Escape("-Title 'Export' -Description 'Export DeviceLink CSV for manual import in Intune.' -Y 138 -Buttons @('Export CSV')")) {
     throw 'FAIL: CSV export must use its own compact action row with the manual Intune import explanation.'
 }
 
 foreach ($layoutContract in @(
+    '$targetTenantRow.Size = [System.Drawing.Size]::new(1030,46)',
+    '$btnSignIn.Size = [System.Drawing.Size]::new(118,28)',
     '$assignmentRow.Size = [System.Drawing.Size]::new(1030,46)',
     '$tenantSelector.ItemHeight = 22',
     '$tenantSelector.Size = [System.Drawing.Size]::new(220,28)',
-    '$actionsPanel.Height = 184'
+    '$actionsPanel.Height = 230'
 )) {
     if ($source -notmatch [regex]::Escape($layoutContract)) {
         throw "FAIL: Unified action-row layout contract is missing '$layoutContract'."

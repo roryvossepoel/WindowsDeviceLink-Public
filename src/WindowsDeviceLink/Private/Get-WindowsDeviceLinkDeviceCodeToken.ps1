@@ -48,8 +48,11 @@ function Get-WindowsDeviceLinkDeviceCodeToken {
             if ($tokenResponse.access_token) {
                 Write-Information -InformationAction Continue -MessageData 'Device code authentication succeeded.'
                 $effectiveTenantId = Resolve-WindowsDeviceLinkAccessTokenTenantId -AccessToken ([string]$tokenResponse.access_token)
+                $accountToken = if ($tokenResponse.id_token) { [string]$tokenResponse.id_token } else { [string]$tokenResponse.access_token }
+                $accountName = Resolve-WindowsDeviceLinkTokenAccountName -Token $accountToken
+                $accountToken = $null
                 if (-not $effectiveTenantId) { $effectiveTenantId = $TenantId }
-                return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$effectiveTenantId }
+                return [pscustomobject]@{ AccessToken=$tokenResponse.access_token; TokenType=$tokenResponse.token_type; ExpiresIn=$tokenResponse.expires_in; Scope=$tokenResponse.scope; ClientId=$ClientId; TenantId=$effectiveTenantId; AccountName=$accountName }
             }
         }
         catch {

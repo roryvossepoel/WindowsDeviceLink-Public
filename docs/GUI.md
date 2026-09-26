@@ -27,8 +27,10 @@ Show-WindowsDeviceLink `
 
 The GUI retrieves the allowed tenant catalog from the Function App and automatically
 checks the current cloud association when it opens. Device, Local association, and
-Cloud association are shown together. Select a target tenant and choose
-**Pre-associate** or, on supported full Windows, **Associate**. Each action performs its own fresh cloud check before changing state.
+Cloud association are shown together. The dedicated **Target tenant** row contains the
+backend selector. After selecting a tenant, choose **Pre-associate** or, on supported
+full Windows, **Associate** in the separate **Device association** row. Each action
+performs its own fresh cloud check before changing state.
 Diagnostic, export, recovery, and offboarding actions are available in the same view.
 
 Backend mode and Direct-mode Graph authentication are deliberately separate. Do not combine
@@ -46,14 +48,22 @@ On Windows PE, `DeviceCode` is used by default because interactive browser authe
 Windows PE also requires the **Bring Your Own DLL (BYO-DLL)** compatibility path unless the environment already provides a usable registered DeviceLink runtime. Supply a compatible `Windows.Management.Service.dll` in the module `Runtime` directory or pass `-WindowsManagementServicePath`. The GUI disables **Associate** in WinPE because normal WinPE usage ends at pre-association; Windows 11 OOBE completes the association. See [WINPE-WORKFLOW.md](WINPE-WORKFLOW.md).
 
 Direct mode opens without authenticating and initially loads only local device and
-firmware state. Choose **Sign in**, **Refresh cloud**, **Pre-associate**, or **Associate** when a
-cloud action is needed. After successful authentication, the GUI reuses that session
+firmware state. Choose **Sign in** in the **Target tenant** row first. After
+successful authentication, the GUI reuses that session
 for subsequent cloud actions. DeviceCode tokens are retained only in memory, renewed
 when required, cleared when the selected tenant changes, and discarded when the GUI
 closes. Backend mode continues to load cloud state automatically because it does not
 require an interactive Graph sign-in on the device.
 
-After a successful Direct-mode sign-in, **Sign in** changes to **Switch account**.
+After a successful Direct-mode sign-in, **Sign in** changes to **Sign out**. Signing
+out clears the in-memory authentication context and unlocks a configured tenant
+selector. While signed in, that selector remains locked so a token cannot be reused
+silently for another target tenant.
+The Connection card shows the signed-in account for delegated Direct mode. Interactive
+authentication reads it from the Microsoft Graph session; Device Code authentication
+uses the identity-token claims returned during sign-in. The tenant scope shows a
+configured catalog name when available and otherwise shows the authenticated tenant ID.
+No additional Graph request or permission is used only to resolve a tenant display name.
 Single-tenant Direct mode deliberately has no tenant selector: the authenticated tenant
 is authoritative unless `-TenantId` fixed it explicitly. When a local tenant catalog is
 configured, selecting a target tenant is mandatory before sign-in or any cloud action;
@@ -243,8 +253,8 @@ The DLL must come from an administrator-controlled compatible Windows source. Se
 
 - **Pre-associate** — ensure the device is pre-associated with the selected target. In Backend mode this can perform a verified New, no-op, Move, or same-tenant Repair as required.
 - **Associate** — first ensure the selected tenant assignment, then explicitly complete and verify the device-side association on supported full Windows. This action is disabled in WinPE.
-- **Sign in** — authenticate for the current Direct-mode UI session and immediately load the cloud association.
-- **Switch account** — discard the current Direct-mode GUI session and authenticate again; with a tenant catalog, the new session is created for the selected tenant.
+- **Sign in** — establish the target tenant for the current Direct-mode UI session and immediately load the cloud association.
+- **Sign out** — clear the current Direct-mode authentication context; with a tenant catalog, this also unlocks target selection for the next sign-in.
 - **Refresh local** — refresh local DeviceLink identity and firmware information.
 - **Refresh cloud** — refresh tenant-side Device Association state using the selected tenant context.
 - **Export CSV** — export the Microsoft-generated DeviceLink CSV.
