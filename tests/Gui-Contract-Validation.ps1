@@ -239,8 +239,14 @@ foreach ($inconsistentCloudPlaceholder in @('Not checked yet','Not yet')) {
 }
 
 foreach ($cloudField in @('CloudState','CloudTenant','CloudId','CloudChecked')) {
-    if ($source -notmatch [regex]::Escape("`$ui.$cloudField.Text = 'Checking...'")) {
-        throw "FAIL: Cloud association field '$cloudField' must show the shared 'Checking...' state during lookup."
+    if ($source -notmatch [regex]::Escape("`$ui.$cloudField.Text = `$cloudPendingText")) {
+        throw "FAIL: Cloud association field '$cloudField' must use the shared pending state during lookup."
+    }
+}
+
+foreach ($cloudPendingState in @('Waiting for sign-in...','Checking...')) {
+    if ($source -notmatch [regex]::Escape($cloudPendingState)) {
+        throw "FAIL: Cloud association pending state '$cloudPendingState' is missing."
     }
 }
 
