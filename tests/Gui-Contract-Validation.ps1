@@ -140,6 +140,7 @@ foreach ($required in @(
     'Waiting for sign-in...',
     '[switch]$Warning',
     'The sign-in window may open behind this window',
+    "select 'No, this app only' to avoid registering this device",
     'Actions will target the signed-in tenant.',
     'Disconnect-MgGraph',
     'The authenticated tenant does not match the selected target tenant.',

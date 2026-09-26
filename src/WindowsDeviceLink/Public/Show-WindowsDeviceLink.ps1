@@ -1535,6 +1535,7 @@ function Show-WindowsDeviceLink {
         Write-GuiConsole -Message "Waiting for $Method authentication..."
         if ($Method -eq 'Interactive') {
             Write-GuiConsole -Message 'Sign-in uses Web Account Manager (WAM). The sign-in window may open behind this window; check the taskbar or other open windows.' -Warning
+            Write-GuiConsole -Message "If Windows asks whether to sign in to all apps, select 'No, this app only' to avoid registering this device in the signed-in tenant." -Warning
         }
         try {
             [void](Get-GuiAuthParameters)
