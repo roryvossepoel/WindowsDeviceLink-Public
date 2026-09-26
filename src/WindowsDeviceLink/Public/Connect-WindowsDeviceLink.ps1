@@ -61,7 +61,11 @@ function Connect-WindowsDeviceLink {
         if($PSCmdlet.ParameterSetName -eq 'AccessToken' -and $AccessToken){$temporaryCredential=New-Object System.Management.Automation.PSCredential('token',$AccessToken);$sensitiveValues+=$temporaryCredential.GetNetworkCredential().Password}
         elseif($PSCmdlet.ParameterSetName -eq 'ClientSecret' -and $ClientSecret){$temporaryCredential=New-Object System.Management.Automation.PSCredential('secret',$ClientSecret);$sensitiveValues+=$temporaryCredential.GetNetworkCredential().Password}
         elseif($PSCmdlet.ParameterSetName -eq 'EnvironmentVariable' -and $env:AZURE_CLIENT_SECRET){$sensitiveValues+=[string]$env:AZURE_CLIENT_SECRET}
-        Invoke-WindowsDeviceLinkGraphConnect -Parameters $parameters -MethodName $PSCmdlet.ParameterSetName -SensitiveValue $sensitiveValues
+        $connectionResult = Invoke-WindowsDeviceLinkGraphConnect -Parameters $parameters -MethodName $PSCmdlet.ParameterSetName -SensitiveValue $sensitiveValues
+        if ($PSCmdlet.ParameterSetName -eq 'Interactive') {
+            Write-Warning "If Windows asks whether to sign in to all apps, select 'No, this app only' to avoid registering this device in the signed-in tenant."
+        }
+        $connectionResult
     }
     finally {$temporaryCredential=$null;$sensitiveValues=$null}
 }
