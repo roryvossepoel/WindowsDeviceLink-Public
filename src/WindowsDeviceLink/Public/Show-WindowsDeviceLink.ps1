@@ -425,7 +425,7 @@ function Show-WindowsDeviceLink {
             if (-not $cacheValid) {
                 Clear-GuiSessionAuthentication
                 Set-GuiSigningInState
-                Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.' -Command
+                Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.'
 
                 $tokenParameters = @{}
                 if ($selectedTenant) { $tokenParameters.TenantId = $selectedTenant }

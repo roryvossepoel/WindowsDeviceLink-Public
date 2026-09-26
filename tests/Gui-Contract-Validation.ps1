@@ -163,7 +163,7 @@ foreach ($required in @(
     'Clear-GuiSessionAuthentication -ForceGraphDisconnect',
     '[switch]$ForceGraphDisconnect',
     "Method = 'AccessToken'",
-    'Authenticating once for this Direct-mode UI session.',
+    "Write-GuiConsole -Message 'Authenticating once for this Direct-mode UI session.'",
     'the in-memory token will be reused for cloud actions.',
     'Target tenant changed; sign in again to create a Direct-mode session for the selected tenant.',
     'Select a target tenant before signing in or performing a cloud action.',
